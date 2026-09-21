@@ -18,6 +18,13 @@ class CheckProviderBalanceCommand extends Command
     {
         $snapshot = $gateway->checkBalance();
         $provider = Provider::current()->fresh() ?? Provider::current();
+
+        if (! $snapshot->parsed) {
+            $this->error($snapshot->error ?? 'Unrecognised provider balance response.');
+
+            return self::FAILURE;
+        }
+
         $low = $snapshot->smsBalance < $provider->low_balance_threshold;
 
         if (! $low) {

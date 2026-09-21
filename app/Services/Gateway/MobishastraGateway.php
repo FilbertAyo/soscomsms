@@ -131,8 +131,25 @@ class MobishastraGateway implements SmsGatewayInterface
             ->get($this->url($provider, (string) config('sms.provider.balance_path', 'balance.aspx')), $query);
 
         $raw = trim($response->body());
-        $balance = (int) filter_var($raw, FILTER_SANITIZE_NUMBER_INT);
-        $this->log($provider, 'balance', $this->redact($query), ['body' => $raw], $response->status(), 'ok');
+        $balance = MobishastraBalanceParser::parse($raw);
+        $this->log(
+            $provider,
+            'balance',
+            $this->redact($query),
+            ['body' => $raw, 'sms_balance' => $balance],
+            $response->status(),
+            $balance !== null ? 'ok' : 'error',
+            $balance === null ? 'Unrecognised balance response' : null,
+        );
+
+        if ($balance === null) {
+            return new ProviderBalance(
+                smsBalance: (int) ($provider->last_balance ?? 0),
+                raw: $raw,
+                parsed: false,
+                error: 'Mobishastra did not return a numeric SMS balance.',
+            );
+        }
 
         $provider->last_balance = $balance;
         $provider->last_balance_at = now();

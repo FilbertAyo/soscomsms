@@ -29,9 +29,18 @@ export function AdminProviderBalance() {
               {snapshot?.name ?? 'Provider'} ({snapshot?.driver ?? '…'})
             </p>
             <p className='mt-2 text-4xl font-semibold'>
-              {formatNumber(snapshot?.smsBalance ?? 0)} SMS
+              {snapshot?.parsed === false
+                ? '—'
+                : `${formatNumber(snapshot?.smsBalance ?? 0)} SMS`}
             </p>
-            {snapshot?.lowBalance ? (
+            {snapshot?.parsed === false ? (
+              <p className='mt-4 text-sm text-destructive'>
+                {snapshot.parseError ||
+                  'Mobishastra did not return a numeric SMS balance.'}{' '}
+                Confirm the 8-digit profile ID and password, then compare the
+                raw reply below with the Mobishastra portal.
+              </p>
+            ) : snapshot?.lowBalance ? (
               <p className='mt-4 text-sm text-destructive'>
                 Balance is below the warning threshold of{' '}
                 {formatNumber(snapshot.lowBalanceThreshold)} SMS. Top up the
@@ -43,6 +52,11 @@ export function AdminProviderBalance() {
                 {formatNumber(snapshot?.lowBalanceThreshold ?? 0)} SMS.
               </p>
             )}
+            {snapshot?.driver === 'mobishastra' && snapshot.rawResponse ? (
+              <p className='mt-3 break-all font-mono text-xs text-muted-foreground'>
+                Mobishastra returned: {snapshot.rawResponse}
+              </p>
+            ) : null}
           </div>
           <div className='rounded-xl border bg-card p-5 text-sm text-muted-foreground'>
             <p>Base URL: {snapshot?.baseUrl || 'Not set'}</p>

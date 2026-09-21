@@ -109,7 +109,68 @@ it('lets an admin read the fake provider balance', function () {
         ->assertOk()
         ->assertJsonPath('driver', GatewayDriver::Fake->value)
         ->assertJsonPath('smsBalance', 100000)
+        ->assertJsonPath('parsed', true)
         ->assertJsonMissingPath('password');
+});
+
+it('reads the Tanzania row from a Mobishastra country balance reply', function () {
+    config([
+        'sms.gateway' => GatewayDriver::Mobishastra->value,
+        'sms.provider.base_url' => 'https://example.invalid',
+        'sms.provider.profile_id' => 'SOSCOM',
+        'sms.provider.password' => 'secret',
+    ]);
+    Provider::query()->delete();
+    Provider::factory()->mobishastra()->create([
+        'base_url' => 'https://example.invalid',
+        'profile_id' => 'SOSCOM',
+        'password' => 'secret',
+    ]);
+
+    Http::fake([
+        'https://example.invalid/balance.aspx*' => Http::response('Tanzania(+255) = 5009', 200),
+    ]);
+
+    $admin = User::factory()->admin()->create();
+
+    $this->actingAs($admin)
+        ->getJson('/api/admin/provider-balance')
+        ->assertOk()
+        ->assertJsonPath('driver', GatewayDriver::Mobishastra->value)
+        ->assertJsonPath('smsBalance', 5009)
+        ->assertJsonPath('parsed', true)
+        ->assertJsonPath('rawResponse', 'Tanzania(+255) = 5009');
+});
+
+it('does not invent a balance from a Mobishastra error body', function () {
+    config([
+        'sms.gateway' => GatewayDriver::Mobishastra->value,
+        'sms.provider.base_url' => 'https://example.invalid',
+        'sms.provider.profile_id' => 'SOSCOM',
+        'sms.provider.password' => 'secret',
+    ]);
+    Provider::query()->delete();
+    $provider = Provider::factory()->mobishastra()->create([
+        'base_url' => 'https://example.invalid',
+        'profile_id' => 'SOSCOM',
+        'password' => 'secret',
+        'last_balance' => 12000,
+    ]);
+
+    Http::fake([
+        'https://example.invalid/balance.aspx*' => Http::response('Invalid Password', 200),
+    ]);
+
+    $admin = User::factory()->admin()->create();
+
+    $this->actingAs($admin)
+        ->getJson('/api/admin/provider-balance')
+        ->assertOk()
+        ->assertJsonPath('parsed', false)
+        ->assertJsonPath('smsBalance', 12000)
+        ->assertJsonPath('rawResponse', 'Invalid Password');
+
+    expect($provider->fresh()?->last_balance)->toBe(12000);
 });
 
 it('posts Mobishastra JSON for bulk send and hex-encodes Unicode', function () {
