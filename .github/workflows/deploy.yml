@@ -44,7 +44,6 @@ jobs:
       - name: Install PHP dependencies
         run: |
           cp .env.example .env
-          php artisan key:generate --no-interaction
           composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist
 
       - name: Pack release as tar.gz
