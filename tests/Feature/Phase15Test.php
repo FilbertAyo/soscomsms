@@ -1,7 +1,6 @@
 <?php
 
 use App\Enums\CampaignRecipientStatus;
-use App\Enums\CreditTransactionType;
 use App\Enums\CustomerStatus;
 use App\Enums\GatewayDriver;
 use App\Enums\MessageEncoding;
@@ -15,6 +14,7 @@ use App\Services\CreditLedger;
 use App\Services\Gateway\MobishastraGateway;
 use App\Services\Gateway\OutboundSms;
 use App\Services\SegmentationService;
+use Database\Seeders\PricingTierSeeder;
 use Illuminate\Support\Facades\Http;
 
 function phase15Mobishastra(): MobishastraGateway
@@ -53,6 +53,7 @@ it('uses 153-character GSM concatenated segments and 63-character Unicode segmen
 });
 
 it('never mutates an older ledger row when a later movement is added', function () {
+    $this->seed(PricingTierSeeder::class);
     $user = User::factory()->create();
     $customer = Customer::factory()->complete()->create(['user_id' => $user->id]);
     $ledger = app(CreditLedger::class);
@@ -147,7 +148,7 @@ it('blocks another customers sender id on the dashboard and the public API', fun
     expect($strangerCustomer->fresh()->sms_balance)->toBe(20);
 });
 
-it('refunds a rejected send and does not charge a suspended account', function () {
+it('does not charge a rejected send and does not charge a suspended account', function () {
     $user = User::factory()->create();
     $customer = Customer::factory()->complete()->create(['user_id' => $user->id, 'sms_balance' => 20]);
     $sender = SenderId::factory()->generic()->create();
@@ -163,7 +164,7 @@ it('refunds a rejected send and does not charge a suspended account', function (
         ->assertCreated();
 
     expect($customer->fresh()->sms_balance)->toBe(20)
-        ->and(CreditTransaction::query()->where('type', CreditTransactionType::Refund)->count())->toBe(1);
+        ->and(CreditTransaction::query()->count())->toBe(0);
 
     $this->assertDatabaseHas('campaign_recipients', [
         'phone' => '+255712445221',

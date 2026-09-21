@@ -79,7 +79,9 @@ it('refunds only rejected recipients and does not retry a timed-out send', funct
         ->assertJsonPath('campaign.status', CampaignStatus::Failed->value)
         ->assertJsonPath('smsBalance', 19);
 
-    expect($customer->fresh()->sms_balance)->toBe(19);
+    expect($customer->fresh()->sms_balance)->toBe(19)
+        ->and(CreditTransaction::query()->where('type', CreditTransactionType::Usage)->count())->toBe(1)
+        ->and(CreditTransaction::query()->where('type', CreditTransactionType::Refund)->count())->toBe(0);
 
     $this->assertDatabaseHas('campaign_recipients', [
         'phone' => '+255712445221',
@@ -89,7 +91,6 @@ it('refunds only rejected recipients and does not retry a timed-out send', funct
         'phone' => '+255754221891',
         'status' => CampaignRecipientStatus::Unknown->value,
     ]);
-    expect(CreditTransaction::query()->where('type', CreditTransactionType::Refund)->count())->toBe(1);
 
     $campaign = Campaign::query()->first();
     Http::fake();

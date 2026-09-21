@@ -3,6 +3,7 @@
 use App\Console\Commands\BackupDatabaseCommand;
 use App\Console\Commands\CheckProviderBalanceCommand;
 use App\Console\Commands\DispatchScheduledCampaignsCommand;
+use App\Console\Commands\DrainQueueCommand;
 use App\Console\Commands\ExpirePendingPaymentsCommand;
 use App\Console\Commands\PollDeliveryReportsCommand;
 use App\Console\Commands\RetryWebhooksCommand;
@@ -13,6 +14,10 @@ use Illuminate\Support\Facades\Schedule;
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
+
+Schedule::command(DrainQueueCommand::class, ['--max-time=50'])
+    ->everyMinute()
+    ->withoutOverlapping(2);
 
 Schedule::command(DispatchScheduledCampaignsCommand::class)
     ->everyMinute()

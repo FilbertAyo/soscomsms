@@ -5,11 +5,17 @@ namespace App\Services;
 use App\Enums\GatewayDriver;
 use App\Exceptions\ProviderNotReadyException;
 use App\Models\Provider;
+use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
+use Throwable;
 
 class ProviderReadinessService
 {
     public const PRODUCTION_URL = 'https://sms.soscom.co.tz';
+
+    public const QUEUE_HEARTBEAT_KEY = 'queue.heartbeat';
 
     public function assertReadyToSend(): void
     {
@@ -34,6 +40,7 @@ class ProviderReadinessService
         $https = str_starts_with($appUrl, 'https://');
         $driver = $this->driver();
         $blockReason = $this->blockReason($provider);
+        $queue = $this->queueHealth($environment);
 
         $checks = [
             $this->check(
@@ -52,9 +59,9 @@ class ProviderReadinessService
             ),
             $this->check(
                 'queue',
-                'Queue worker (not sync in production)',
-                $environment !== 'production' || (string) config('queue.default') !== 'sync',
-                (string) config('queue.default'),
+                'Queue worker',
+                $queue['ready'],
+                $queue['detail'],
             ),
             $this->check(
                 'mail',
@@ -132,7 +139,10 @@ class ProviderReadinessService
             'expectedAppUrl' => self::PRODUCTION_URL,
             'https' => $https,
             'timezone' => (string) config('app.timezone'),
-            'queueConnection' => (string) config('queue.default'),
+            'queueConnection' => $queue['connection'],
+            'queueHeartbeatAt' => $queue['heartbeatAt'],
+            'queuePendingJobs' => $queue['pending'],
+            'queueFailedJobs' => $queue['failed'],
             'mailer' => (string) config('mail.default'),
             'logChannel' => (string) config('logging.default'),
             'database' => (string) config('database.default'),
@@ -261,6 +271,48 @@ class ProviderReadinessService
         $stack = config('logging.channels.stack.channels', []);
 
         return is_array($stack) && in_array('daily', $stack, true);
+    }
+
+    /**
+     * @return array{ready: bool, connection: string, heartbeatAt: string|null, pending: int, failed: int, detail: string}
+     */
+    private function queueHealth(string $environment): array
+    {
+        $connection = (string) config('queue.default');
+        $heartbeat = Cache::get(self::QUEUE_HEARTBEAT_KEY);
+        $heartbeatAt = is_string($heartbeat) && $heartbeat !== ''
+            ? CarbonImmutable::parse($heartbeat)
+            : null;
+        $fresh = $heartbeatAt !== null && $heartbeatAt->greaterThan(now()->subMinutes(3));
+        $pending = $this->queueTableCount('jobs');
+        $failed = $this->queueTableCount('failed_jobs');
+        $ready = $environment !== 'production'
+            || ($connection === 'database' && $fresh);
+
+        return [
+            'ready' => $ready,
+            'connection' => $connection,
+            'heartbeatAt' => $heartbeatAt?->toIso8601String(),
+            'pending' => $pending,
+            'failed' => $failed,
+            'detail' => implode(' · ', [
+                $connection,
+                $heartbeatAt === null
+                    ? 'no heartbeat'
+                    : 'heartbeat '.$heartbeatAt->toIso8601String(),
+                $pending.' pending',
+                $failed.' failed',
+            ]),
+        ];
+    }
+
+    private function queueTableCount(string $table): int
+    {
+        try {
+            return (int) DB::table($table)->count();
+        } catch (Throwable) {
+            return 0;
+        }
     }
 
     /**

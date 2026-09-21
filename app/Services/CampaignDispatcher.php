@@ -71,7 +71,7 @@ class CampaignDispatcher
 
         $recipientIds = $this->lockRecipientsForSend($campaign);
         if ($recipientIds === []) {
-            return $this->refreshCounts($campaign);
+            return $this->finishDispatch($campaign, notify: true);
         }
 
         $chunkSize = max(1, (int) config('sms.provider.bulk_chunk', 100));
@@ -79,7 +79,7 @@ class CampaignDispatcher
             $this->dispatchChunk($campaign, $chunkIds);
         }
 
-        return $this->refreshCounts($campaign);
+        return $this->finishDispatch($campaign, notify: true);
     }
 
     /**
@@ -146,7 +146,7 @@ class CampaignDispatcher
                 $this->markUnknown($recipient);
             }
 
-            $campaign->refreshCounts();
+            $this->finishDispatch($campaign);
 
             return;
         }
@@ -168,7 +168,7 @@ class CampaignDispatcher
             $this->applyResult($campaign, $recipient, $result);
         }
 
-        $campaign->refreshCounts();
+        $this->finishDispatch($campaign);
     }
 
     public function releaseDueScheduled(): int
@@ -233,7 +233,7 @@ class CampaignDispatcher
             $locked->save();
 
             $quantity = $locked->total_segments;
-            if ($quantity > 0) {
+            if ($locked->credit_transaction_id !== null && $quantity > 0) {
                 $this->ledger->refundUsage(
                     $customer,
                     $quantity,
@@ -367,7 +367,7 @@ class CampaignDispatcher
     private function refundFailedRecipient(Campaign $campaign, CampaignRecipient $recipient): void
     {
         $customer = $campaign->customer;
-        if ($customer === null) {
+        if ($customer === null || $campaign->credit_transaction_id === null) {
             return;
         }
 
@@ -379,11 +379,74 @@ class CampaignDispatcher
         );
     }
 
-    private function refreshCounts(Campaign $campaign): Campaign
+    private function finishDispatch(Campaign $campaign, bool $notify = false): Campaign
     {
         $campaign->refreshCounts();
-        $this->webhooks->campaignCompleted($campaign);
+        $this->settleUsage($campaign);
+
+        if ($notify) {
+            $this->webhooks->campaignCompleted($campaign);
+        }
 
         return $campaign->fresh(['message']) ?? $campaign;
+    }
+
+    private function settleUsage(Campaign $campaign): void
+    {
+        $campaign->refresh();
+
+        if ($campaign->credit_transaction_id !== null) {
+            return;
+        }
+
+        $shouldSettle = match ($campaign->status) {
+            CampaignStatus::Completed,
+            CampaignStatus::PartiallyDelivered,
+            CampaignStatus::Failed => true,
+            CampaignStatus::Queued,
+            CampaignStatus::Sending,
+            CampaignStatus::Scheduled,
+            CampaignStatus::Draft,
+            CampaignStatus::Cancelled => false,
+        };
+
+        if (! $shouldSettle) {
+            return;
+        }
+
+        $customer = $campaign->customer ?? $campaign->customer()->first();
+        if ($customer === null) {
+            return;
+        }
+
+        $accepted = (int) $campaign->recipients()
+            ->where(function ($query): void {
+                $query->whereIn('status', [
+                    CampaignRecipientStatus::Sent,
+                    CampaignRecipientStatus::Delivered,
+                    CampaignRecipientStatus::Unknown,
+                ])->orWhereHas('delivery', function ($delivery): void {
+                    $delivery->whereNotNull('sent_at');
+                });
+            })
+            ->sum('segment_count');
+
+        if ($accepted < 1) {
+            return;
+        }
+
+        try {
+            $transaction = $this->ledger->debitUsage(
+                $customer,
+                $accepted,
+                "Campaign {$campaign->name}",
+                'USE-CAMP-'.$campaign->id,
+            );
+        } catch (ValidationException) {
+            return;
+        }
+
+        $campaign->credit_transaction_id = $transaction->id;
+        $campaign->save();
     }
 }

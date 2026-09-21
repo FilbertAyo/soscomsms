@@ -133,6 +133,14 @@ export function AdminProduction() {
                 Go-live remaining: {snapshot.blockReason}
               </p>
             ) : null}
+            <p className='mt-3 text-sm text-muted-foreground'>
+              Queue: {snapshot?.queueConnection ?? '…'} ·{' '}
+              {snapshot?.queueHeartbeatAt
+                ? `heartbeat ${snapshot.queueHeartbeatAt}`
+                : 'no heartbeat'}{' '}
+              · {snapshot?.queuePendingJobs ?? 0} pending ·{' '}
+              {snapshot?.queueFailedJobs ?? 0} failed
+            </p>
           </div>
 
           <section className='space-y-2'>

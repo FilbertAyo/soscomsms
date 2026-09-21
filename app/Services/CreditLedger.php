@@ -93,6 +93,16 @@ class CreditLedger
             ]);
         }
 
+        if ($reference !== null) {
+            $existing = CreditTransaction::query()
+                ->where('reference', $reference)
+                ->first();
+
+            if ($existing !== null) {
+                return $existing;
+            }
+        }
+
         return $this->post(
             customer: $customer,
             type: CreditTransactionType::Usage,

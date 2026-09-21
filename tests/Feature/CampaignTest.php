@@ -261,7 +261,54 @@ it('hides campaigns from other customers and blocks their sender ids', function 
         ->assertJsonValidationErrors('sender_id');
 });
 
-it('persists a future schedule, deducts credits now, and rejects a past time', function () {
+it('does not deduct credits when the provider rejects every recipient', function () {
+    [$user, $customer, $sender] = campaignCustomer(20);
+    config(['sms.fake.fail_phones' => ['+255712445221']]);
+
+    $this->actingAs($user)
+        ->postJson('/api/campaigns', [
+            'source' => 'numbers',
+            'message' => 'Habari',
+            'sender_id' => $sender->name,
+            'numbers' => ['0712445221'],
+        ])
+        ->assertCreated()
+        ->assertJsonPath('campaign.status', CampaignStatus::Failed->value)
+        ->assertJsonPath('smsBalance', 20);
+
+    expect($customer->fresh()->sms_balance)->toBe(20);
+    $this->assertDatabaseCount('credit_transactions', 0);
+});
+
+it('holds scheduled credits so a second send cannot spend them twice', function () {
+    [$user, $customer, $sender] = campaignCustomer(2);
+
+    $this->actingAs($user)
+        ->postJson('/api/campaigns', [
+            'source' => 'numbers',
+            'message' => 'Habari',
+            'sender_id' => $sender->name,
+            'numbers' => ['0712445221'],
+            'scheduled_at' => now()->addHour()->toIso8601String(),
+        ])
+        ->assertCreated()
+        ->assertJsonPath('smsBalance', 2);
+
+    $this->actingAs($user)
+        ->postJson('/api/campaigns', [
+            'source' => 'numbers',
+            'message' => 'Habari tena',
+            'sender_id' => $sender->name,
+            'numbers' => ['0754221891', '0755000001'],
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('quantity');
+
+    expect($customer->fresh()->sms_balance)->toBe(2);
+    $this->assertDatabaseCount('credit_transactions', 0);
+});
+
+it('persists a future schedule without deducting credits and rejects a past time', function () {
     [$user, $customer, $sender] = campaignCustomer(20);
 
     $this->actingAs($user)
@@ -285,12 +332,13 @@ it('persists a future schedule, deducts credits now, and rejects a past time', f
         ])
         ->assertCreated()
         ->assertJsonPath('campaign.status', CampaignStatus::Scheduled->value)
-        ->assertJsonPath('smsBalance', 19);
+        ->assertJsonPath('smsBalance', 20);
 
     $campaign = Campaign::query()->first();
 
-    expect($customer->fresh()->sms_balance)->toBe(19)
+    expect($customer->fresh()->sms_balance)->toBe(20)
         ->and($campaign?->queued_at)->toBeNull()
+        ->and($campaign?->credit_transaction_id)->toBeNull()
         ->and($campaign?->scheduled_at)->not->toBeNull();
 
     $this->assertDatabaseHas('campaign_recipients', [

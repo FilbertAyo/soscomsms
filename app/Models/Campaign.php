@@ -94,6 +94,19 @@ class Campaign extends Model
         return $this->hasMany(CampaignRecipient::class);
     }
 
+    public static function reservedSegmentsFor(int $customerId): int
+    {
+        return (int) static::query()
+            ->where('customer_id', $customerId)
+            ->whereNull('credit_transaction_id')
+            ->whereIn('status', [
+                CampaignStatus::Scheduled,
+                CampaignStatus::Queued,
+                CampaignStatus::Sending,
+            ])
+            ->sum('total_segments');
+    }
+
     /**
      * @return array<string, mixed>
      */

@@ -98,6 +98,9 @@ export type ProductionSnapshot = {
   https: boolean
   timezone: string
   queueConnection: string
+  queueHeartbeatAt: string | null
+  queuePendingJobs: number
+  queueFailedJobs: number
   mailer: string
   logChannel: string
   database: string

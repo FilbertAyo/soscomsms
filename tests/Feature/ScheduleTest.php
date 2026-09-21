@@ -83,7 +83,7 @@ it('releases a due scheduled campaign through SOSCOM and never calls a provider 
         ])
         ->assertCreated()
         ->assertJsonPath('campaign.status', CampaignStatus::Scheduled->value)
-        ->assertJsonPath('smsBalance', 19);
+        ->assertJsonPath('smsBalance', 20);
 
     $this->artisan('sms:dispatch-scheduled')
         ->assertSuccessful();
@@ -112,7 +112,7 @@ it('releases a due scheduled campaign through SOSCOM and never calls a provider 
     expect($customer->fresh()->sms_balance)->toBe(19);
 });
 
-it('cancels a scheduled campaign, returns credits, and does not send later', function () {
+it('cancels a scheduled campaign without a refund and does not send later', function () {
     [$user, $customer, $sender] = scheduleCustomer(20);
     [$stranger] = scheduleCustomer(20);
 
@@ -139,7 +139,7 @@ it('cancels a scheduled campaign, returns credits, and does not send later', fun
         ->assertJsonPath('smsBalance', 20);
 
     expect($customer->fresh()->sms_balance)->toBe(20)
-        ->and(CreditTransaction::query()->where('type', CreditTransactionType::Refund)->count())->toBe(1);
+        ->and(CreditTransaction::query()->count())->toBe(0);
 
     $this->actingAs($user)
         ->postJson('/api/campaigns/'.$campaign->id.'/cancel')

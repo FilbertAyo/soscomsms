@@ -22,7 +22,6 @@ class CampaignService
     public function __construct(
         private SegmentationService $segmentation,
         private SenderIdService $senderIds,
-        private CreditLedger $ledger,
     ) {}
 
     /**
@@ -85,13 +84,6 @@ class CampaignService
 
         $scheduledAt = $this->scheduledAt($payload['scheduled_at'] ?? null);
         $totalSms = count($accepted) * $analysis['segmentCount'];
-
-        if ($customer->sms_balance < $totalSms) {
-            throw ValidationException::withMessages([
-                'quantity' => 'Not enough SMS credits for this campaign.',
-            ]);
-        }
-
         $status = $scheduledAt === null ? CampaignStatus::Queued : CampaignStatus::Scheduled;
         $recipientStatus = $scheduledAt === null
             ? CampaignRecipientStatus::Queued
@@ -109,6 +101,19 @@ class CampaignService
             $scheduledAt,
             $payload,
         ): Campaign {
+            /** @var Customer $locked */
+            $locked = Customer::query()
+                ->whereKey($customer->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $reserved = Campaign::reservedSegmentsFor($locked->id);
+            if ($locked->sms_balance < $totalSms + $reserved) {
+                throw ValidationException::withMessages([
+                    'quantity' => 'Not enough SMS credits for this campaign.',
+                ]);
+            }
+
             $message = Message::query()->create([
                 'customer_id' => $customer->id,
                 'body' => $messageBody,
@@ -148,16 +153,6 @@ class CampaignService
 
                 CampaignRecipient::query()->insert($rows);
             }
-
-            $transaction = $this->ledger->debitUsage(
-                $customer->fresh() ?? $customer,
-                $totalSms,
-                "Campaign {$campaign->name}",
-                'USE-CAMP-'.$campaign->id,
-            );
-
-            $campaign->credit_transaction_id = $transaction->id;
-            $campaign->save();
 
             return $campaign->fresh('message') ?? $campaign;
         });

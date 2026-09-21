@@ -11,6 +11,22 @@ beforeEach(function () {
     $this->seed(PricingTierSeeder::class);
 });
 
+it('does not debit the same campaign usage reference twice', function () {
+    $user = User::factory()->create();
+    $customer = Customer::factory()->complete()->create([
+        'user_id' => $user->id,
+        'sms_balance' => 20,
+    ]);
+    $ledger = app(CreditLedger::class);
+
+    $first = $ledger->debitUsage($customer, 2, 'Campaign send', 'USE-CAMP-99');
+    $second = $ledger->debitUsage($customer->fresh(), 2, 'Campaign send', 'USE-CAMP-99');
+
+    expect($first->id)->toBe($second->id)
+        ->and($customer->fresh()->sms_balance)->toBe(18)
+        ->and(CreditTransaction::query()->where('type', CreditTransactionType::Usage)->count())->toBe(1);
+});
+
 it('adds two grants onto the cached balance and the ledger', function () {
     $user = User::factory()->create();
     $customer = Customer::factory()->complete()->create(['user_id' => $user->id]);

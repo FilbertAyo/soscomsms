@@ -12,6 +12,8 @@ use App\Models\User;
 use App\Notifications\ProviderLowBalanceNotification;
 use App\Services\Gateway\MobishastraGateway;
 use App\Services\Gateway\OutboundSms;
+use App\Services\ProviderReadinessService;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Notification;
 
@@ -136,6 +138,43 @@ it('shows the Mobishastra static IP on provider balance while local stays on fak
         ->assertJsonPath('driver', GatewayDriver::Fake->value)
         ->assertJsonPath('staticIp', '203.0.113.10')
         ->assertJsonMissingPath('password');
+});
+
+it('lists the queue drain on the scheduler', function () {
+    $this->artisan('schedule:list')
+        ->expectsOutputToContain('sms:drain-queue')
+        ->assertSuccessful();
+});
+
+it('marks the production queue check not ready when the heartbeat is stale', function () {
+    $admin = User::factory()->admin()->create();
+    $this->app['env'] = 'production';
+    config(['queue.default' => 'database']);
+    Cache::forget(ProviderReadinessService::QUEUE_HEARTBEAT_KEY);
+
+    $stale = $this->actingAs($admin)
+        ->getJson('/api/admin/production')
+        ->assertOk();
+
+    $queue = collect($stale->json('checks'))->firstWhere('id', 'queue');
+
+    expect($queue['ready'])->toBeFalse()
+        ->and($stale->json('queueHeartbeatAt'))->toBeNull()
+        ->and($stale->json('queuePendingJobs'))->toBe(0)
+        ->and($stale->json('queueFailedJobs'))->toBe(0);
+
+    $this->artisan('sms:drain-queue', ['--max-time' => 5])
+        ->expectsOutputToContain('Queue drained.')
+        ->assertSuccessful();
+
+    $fresh = $this->actingAs($admin)
+        ->getJson('/api/admin/production')
+        ->assertOk();
+
+    $ready = collect($fresh->json('checks'))->firstWhere('id', 'queue');
+
+    expect($ready['ready'])->toBeTrue()
+        ->and($fresh->json('queueHeartbeatAt'))->not->toBeNull();
 });
 
 it('skips in-memory sqlite backups and forbids customers from production settings', function () {

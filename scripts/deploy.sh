@@ -7,9 +7,9 @@
 # First-time database seed (creates the admin user):
 #   bash scripts/deploy.sh --seed
 #
-# Cron (every minute):
+# One cron (every minute) is enough. Deploy installs it when crontab is available:
 #   * * * * * cd /home/USER/soscomsms && bash scripts/deploy.sh schedule >/dev/null 2>&1
-#   * * * * * cd /home/USER/soscomsms && bash scripts/deploy.sh queue >/dev/null 2>&1
+# That runs Laravel's scheduler, which drains the database queue and other minute jobs.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -25,8 +25,6 @@ else
 fi
 
 ARTISAN=("$PHP" artisan)
-LOCK_DIR="${TMPDIR:-/tmp}"
-QUEUE_LOCK="${LOCK_DIR}/soscomsms-queue.lock"
 MODE="${1:-deploy}"
 
 log() {
@@ -63,26 +61,52 @@ run_schedule() {
 }
 
 run_queue() {
+  log "Do not run a long-lived queue:work on this host."
+  log "Jobs are drained every minute by: bash scripts/deploy.sh schedule"
+}
+
+cron_line() {
+  echo "* * * * * cd ${ROOT} && PHP_BIN='${PHP}' bash ${ROOT}/scripts/deploy.sh schedule >> ${ROOT}/storage/logs/cron.log 2>&1"
+}
+
+is_production_env() {
+  grep -qE '^APP_ENV=production[[:space:]]*$' "$ROOT/.env"
+}
+
+ensure_cron() {
   require_env_file
-  # One long-lived worker. Cron starts it again if it exited after deploy or a crash.
-  if command -v flock >/dev/null 2>&1; then
-    flock -n "$QUEUE_LOCK" "${ARTISAN[@]}" queue:work database \
-      --sleep=2 \
-      --tries=1 \
-      --timeout=200 \
-      --max-time=3600 \
-      --memory=256 \
-      --no-interaction
-  else
-    "${ARTISAN[@]}" queue:work database \
-      --stop-when-empty \
-      --max-time=50 \
-      --sleep=2 \
-      --tries=1 \
-      --timeout=200 \
-      --memory=256 \
-      --no-interaction
+
+  if ! is_production_env; then
+    log "Skipping crontab install because APP_ENV is not production."
+    return 0
   fi
+
+  local line
+  line="$(cron_line)"
+
+  if ! command -v crontab >/dev/null 2>&1; then
+    log "crontab is not available. Add this line in cPanel:"
+    log "$line"
+    return 0
+  fi
+
+  local current
+  current="$(crontab -l 2>/dev/null || true)"
+  if printf '%s\n' "$current" | grep -F 'scripts/deploy.sh schedule' >/dev/null; then
+    log "Cron already runs schedule:run every minute."
+    return 0
+  fi
+
+  {
+    printf '%s\n' "$current"
+    printf '%s\n' "$line"
+  } | crontab -
+  log "Installed one cron for schedule:run."
+}
+
+drain_queue_once() {
+  log "Draining queued jobs once."
+  "${ARTISAN[@]}" sms:drain-queue --max-time=30 --no-interaction || true
 }
 
 run_deploy() {
@@ -154,6 +178,9 @@ run_deploy() {
   log "Bringing the app back up."
   "${ARTISAN[@]}" up --no-interaction
 
+  ensure_cron
+  drain_queue_once
+
   log "Production deploy finished."
 }
 
@@ -162,13 +189,16 @@ case "$MODE" in
     run_schedule
     ;;
   queue)
-    run_queue || true
+    run_queue
+    ;;
+  cron)
+    ensure_cron
     ;;
   deploy|--seed)
     run_deploy
     ;;
   *)
-    echo "Usage: bash scripts/deploy.sh [deploy|--seed|queue|schedule]"
+    echo "Usage: bash scripts/deploy.sh [deploy|--seed|queue|schedule|cron]"
     exit 1
     ;;
 esac

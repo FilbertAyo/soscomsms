@@ -31,7 +31,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { type PricingTier, type SmsPackageQuote } from '@/types/credits'
+import { type PricingTier } from '@/types/credits'
 
 type BuyStep = 'quantity' | 'pay'
 
@@ -52,7 +52,6 @@ export function BuySmsPage() {
     queryFn: () => fetchPayments(1, 100),
   })
   const tiers = walletQuery.data?.tiers ?? []
-  const packages = walletQuery.data?.packages ?? []
   const minPurchaseQuantity = walletQuery.data?.minPurchaseQuantity ?? 50
   const lipaNamba =
     walletQuery.data?.lipaNamba ?? paymentsQuery.data?.lipaNamba ?? '123456'
@@ -99,8 +98,8 @@ export function BuySmsPage() {
     },
   })
 
-  function selectPackage(item: SmsPackageQuote) {
-    setQuantityInput(String(item.quantity))
+  function selectTier(tier: PricingTier) {
+    setQuantityInput(String(tier.minQuantity))
     setStep('quantity')
   }
 
@@ -126,33 +125,21 @@ export function BuySmsPage() {
           </p>
         ) : (
           <div className='w-full space-y-6'>
-            {packages.length > 0 ? (
+            {tiers.length > 0 ? (
               <div className='grid w-full gap-4 sm:grid-cols-2 xl:grid-cols-4'>
-                {packages.map((item) => (
+                {tiers.map((tier) => (
                   <button
-                    key={item.quantity}
+                    key={tier.id}
                     type='button'
-                    onClick={() => selectPackage(item)}
+                    onClick={() => selectTier(tier)}
                     className={cn(
                       'rounded-xl border bg-card p-5 text-start',
-                      quantity === item.quantity && 'ring-2 ring-primary'
+                      quantityInTier(quantity, tier) && 'ring-2 ring-primary'
                     )}
                   >
-                    {item.popular ? (
-                      <p className='mb-2 text-xs font-medium text-primary'>
-                        Most used
-                      </p>
-                    ) : (
-                      <p className='mb-2 h-4' />
-                    )}
-                    <p className='text-2xl font-semibold'>
-                      {formatNumber(item.quantity)} SMS
-                    </p>
+                    <p className='text-2xl font-semibold'>{tier.label}</p>
                     <p className='mt-1 text-muted-foreground'>
-                      {formatTZS(item.totalTzs)}
-                    </p>
-                    <p className='mt-1 text-xs text-muted-foreground'>
-                      {formatTZS(item.unitPriceTzs)} each
+                      {formatTZS(tier.unitPriceTzs)} per SMS
                     </p>
                   </button>
                 ))}
