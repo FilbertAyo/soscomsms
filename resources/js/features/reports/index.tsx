@@ -68,6 +68,13 @@ export function DeliveryReportsPage() {
   const reportsQuery = useQuery({
     queryKey: deliveryReportsQuery(filters),
     queryFn: () => fetchDeliveryReports({ ...filters, perPage: 50 }),
+    refetchInterval: (query) => {
+      const items = query.state.data?.reports ?? []
+      const live = items.some((item) =>
+        ['queued', 'pending', 'sent', 'unknown'].includes(item.status ?? '')
+      )
+      return live ? 5000 : false
+    },
   })
 
   const campaigns = campaignsQuery.data?.campaigns ?? []

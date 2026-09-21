@@ -76,7 +76,7 @@ it('refunds only rejected recipients and does not retry a timed-out send', funct
             'numbers' => ['+255712445221', '+255754221891'],
         ])
         ->assertCreated()
-        ->assertJsonPath('campaign.status', CampaignStatus::Sending->value)
+        ->assertJsonPath('campaign.status', CampaignStatus::Failed->value)
         ->assertJsonPath('smsBalance', 19);
 
     expect($customer->fresh()->sms_balance)->toBe(19);
@@ -187,6 +187,45 @@ it('does not invent a balance from a Mobishastra error body', function () {
         ->assertJsonPath('rawResponse', 'Invalid Password');
 
     expect($provider->fresh()?->last_balance)->toBe(12000);
+});
+
+it('keeps the Mobishastra message id from a single send reply', function () {
+    config([
+        'sms.gateway' => GatewayDriver::Mobishastra->value,
+        'sms.provider.base_url' => 'https://example.invalid',
+        'sms.provider.profile_id' => 'SOSCOM',
+        'sms.provider.password' => 'secret',
+    ]);
+    Provider::query()->delete();
+    Provider::factory()->mobishastra()->create([
+        'base_url' => 'https://example.invalid',
+        'profile_id' => 'SOSCOM',
+        'password' => 'secret',
+        'static_ip' => '1.1.1.1',
+        'static_ip_whitelisted_at' => now(),
+        'credentials_confirmed_at' => now(),
+    ]);
+
+    Http::fake([
+        'https://example.invalid/sendurl.aspx*' => Http::response('000,M-77', 200),
+    ]);
+
+    $gateway = new MobishastraGateway;
+    $result = $gateway->send(new OutboundSms(
+        9,
+        '+255755237692',
+        'MWALIKO',
+        'Habari',
+        MessageEncoding::Gsm,
+    ));
+
+    expect($result->accepted)->toBeTrue()
+        ->and($result->providerMessageId)->toBe('M-77');
+
+    $this->assertDatabaseHas('provider_logs', [
+        'action' => 'send',
+        'status' => 'ok',
+    ]);
 });
 
 it('posts Mobishastra JSON for bulk send and hex-encodes Unicode', function () {

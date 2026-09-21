@@ -9,7 +9,6 @@ use App\Enums\DeliveryStatus;
 use App\Enums\MessageEncoding;
 use App\Exceptions\ProviderNotReadyException;
 use App\Jobs\DispatchCampaignJob;
-use App\Jobs\SendCampaignChunkJob;
 use App\Models\Campaign;
 use App\Models\CampaignRecipient;
 use App\Models\Customer;
@@ -18,7 +17,6 @@ use App\Models\Provider;
 use App\Models\ProviderLog;
 use App\Services\Gateway\GatewaySendResult;
 use App\Services\Gateway\OutboundSms;
-use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Throwable;
@@ -77,22 +75,11 @@ class CampaignDispatcher
         }
 
         $chunkSize = max(1, (int) config('sms.provider.bulk_chunk', 100));
-        $jobs = [];
         foreach (array_chunk($recipientIds, $chunkSize) as $chunkIds) {
-            $jobs[] = new SendCampaignChunkJob($campaign->id, $chunkIds);
+            $this->dispatchChunk($campaign, $chunkIds);
         }
 
-        $campaignId = $campaign->id;
-        Bus::batch($jobs)
-            ->name('campaign-'.$campaignId)
-            ->allowFailures()
-            ->finally(function () use ($campaignId): void {
-                $fresh = Campaign::query()->find($campaignId);
-                $fresh?->refreshCounts();
-            })
-            ->dispatch();
-
-        return $campaign->fresh(['message']) ?? $campaign;
+        return $this->refreshCounts($campaign);
     }
 
     /**
@@ -140,6 +127,7 @@ class CampaignDispatcher
                 body: (string) $campaign->message?->body,
                 encoding: $campaign->message?->encoding ?? MessageEncoding::Gsm,
                 segmentCount: $recipient->segment_count,
+                campaignId: $campaign->id,
             );
         }
 
@@ -219,7 +207,7 @@ class CampaignDispatcher
                 continue;
             }
 
-            $this->queue($queued);
+            $this->dispatch($queued);
             $released++;
         }
 

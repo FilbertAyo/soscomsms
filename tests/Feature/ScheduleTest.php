@@ -41,7 +41,7 @@ it('uses East Africa Time for Tanzania', function () {
         ->and($scheduled->toIso8601String())->toContain('+03:00');
 });
 
-it('queues send-now as a job so the HTTP request does not wait on the gateway', function () {
+it('sends immediately on confirm so a dead queue cannot hide the SMS', function () {
     [$user, $customer, $sender] = scheduleCustomer(80);
     Queue::fake();
 
@@ -59,13 +59,13 @@ it('queues send-now as a job so the HTTP request does not wait on the gateway', 
             'name' => 'Queue chunk demo',
         ])
         ->assertCreated()
-        ->assertJsonPath('campaign.status', CampaignStatus::Queued->value)
+        ->assertJsonPath('campaign.status', CampaignStatus::Completed->value)
         ->assertJsonPath('campaign.recipients', 50)
         ->assertJsonPath('smsBalance', 30);
 
     expect($customer->fresh()->sms_balance)->toBe(30);
-    $this->assertDatabaseCount('deliveries', 0);
-    Queue::assertPushed(DispatchCampaignJob::class);
+    $this->assertDatabaseCount('deliveries', 50);
+    Queue::assertNotPushed(DispatchCampaignJob::class);
 });
 
 it('releases a due scheduled campaign through SOSCOM and never calls a provider schedule date', function () {

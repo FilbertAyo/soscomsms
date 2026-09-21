@@ -1,5 +1,15 @@
 export const APP_TIMEZONE = 'Africa/Dar_es_Salaam'
 
+export function formatTzMobile(phone: string) {
+  const digits = phone.replace(/\D+/g, '')
+
+  if (digits.startsWith('255') && digits.length === 12) {
+    return `0${digits.slice(3)}`
+  }
+
+  return phone
+}
+
 export function formatNumber(value: number) {
   return value.toLocaleString('en-TZ')
 }

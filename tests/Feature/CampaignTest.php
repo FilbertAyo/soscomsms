@@ -94,6 +94,38 @@ it('previews cost by segment count and queues a send that deducts credits', func
     expect(CreditTransaction::query()->where('type', CreditTransactionType::Usage)->count())->toBe(1);
 });
 
+it('lists the recipient phone and completes after the provider accepts the send', function () {
+    [$user, , $sender] = campaignCustomer(20);
+    config(['sms.fake.auto_dlr' => false]);
+
+    $this->actingAs($user)
+        ->postJson('/api/campaigns', [
+            'source' => 'numbers',
+            'message' => 'Habari',
+            'sender_id' => $sender->name,
+            'numbers' => ['0755237692'],
+            'name' => 'One number',
+        ])
+        ->assertCreated()
+        ->assertJsonPath('campaign.status', CampaignStatus::Completed->value)
+        ->assertJsonPath('campaign.recipientPhone', '+255755237692')
+        ->assertJsonPath('campaign.sent', 1)
+        ->assertJsonPath('campaign.delivered', 0);
+
+    $this->actingAs($user)
+        ->getJson('/api/campaigns?status=completed')
+        ->assertOk()
+        ->assertJsonPath('campaigns.0.recipientPhone', '+255755237692')
+        ->assertJsonPath('campaigns.0.status', CampaignStatus::Completed->value);
+
+    $this->actingAs($user)
+        ->getJson('/api/delivery-reports')
+        ->assertOk()
+        ->assertJsonPath('reports.0.phone', '+255755237692')
+        ->assertJsonPath('reports.0.status', CampaignRecipientStatus::Sent->value)
+        ->assertJsonPath('reports.0.campaignName', 'One number');
+});
+
 it('rejects a send when the customer does not have enough credits', function () {
     [$user, $customer, $sender] = campaignCustomer(1);
 

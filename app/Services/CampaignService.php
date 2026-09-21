@@ -163,7 +163,7 @@ class CampaignService
         });
 
         if ($campaign->status === CampaignStatus::Queued) {
-            app(CampaignDispatcher::class)->queue($campaign);
+            $campaign = app(CampaignDispatcher::class)->dispatch($campaign);
         }
 
         return $campaign->fresh('message') ?? $campaign;

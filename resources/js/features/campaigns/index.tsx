@@ -3,7 +3,7 @@ import { Link } from '@tanstack/react-router'
 import { MessageSquarePlus } from 'lucide-react'
 import { useState } from 'react'
 import { campaignsQueryKey, fetchCampaigns } from '@/lib/campaigns'
-import { formatDateTime, formatNumber } from '@/lib/format'
+import { formatDateTime, formatNumber, formatTzMobile } from '@/lib/format'
 import { Button } from '@/components/ui/button'
 import { AppHeader } from '@/components/soscom/app-header'
 import { EmptyState } from '@/components/soscom/empty-state'
@@ -109,6 +109,7 @@ function CampaignTable({ items }: { items: Campaign[] }) {
         <TableHeader>
           <TableRow>
             <TableHead>Campaign</TableHead>
+            <TableHead>Phone</TableHead>
             <TableHead>Sender ID</TableHead>
             <TableHead>Recipients</TableHead>
             <TableHead>SMS</TableHead>
@@ -127,6 +128,17 @@ function CampaignTable({ items }: { items: Campaign[] }) {
                 >
                   {campaign.name}
                 </Link>
+              </TableCell>
+              <TableCell>
+                {campaign.recipientPhone
+                  ? formatTzMobile(campaign.recipientPhone)
+                  : '—'}
+                {campaign.recipients > 1 ? (
+                  <span className='text-muted-foreground'>
+                    {' '}
+                    +{formatNumber(campaign.recipients - 1)}
+                  </span>
+                ) : null}
               </TableCell>
               <TableCell>{campaign.senderId}</TableCell>
               <TableCell>{formatNumber(campaign.recipients)}</TableCell>

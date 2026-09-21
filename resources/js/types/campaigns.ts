@@ -43,6 +43,7 @@ export type Campaign = {
   encoding: 'gsm' | 'unicode' | null
   characterCount: number | null
   segmentsPerRecipient: number | null
+  recipientPhone: string | null
   recipients: number
   sent: number
   delivered: number

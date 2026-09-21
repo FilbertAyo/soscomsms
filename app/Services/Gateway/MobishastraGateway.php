@@ -39,7 +39,16 @@ class MobishastraGateway implements SmsGatewayInterface
             $response = $this->http()
                 ->get($this->url($provider, (string) config('sms.provider.send_path', 'sendurl.aspx')), $query);
         } catch (ConnectionException $exception) {
-            $this->log($provider, 'send', $this->redact($query), null, null, 'timeout', $exception->getMessage());
+            $this->log(
+                $provider,
+                'send',
+                $this->safeSendRequest($query, $message),
+                null,
+                null,
+                'timeout',
+                $exception->getMessage(),
+                $message->campaignId,
+            );
 
             return new GatewaySendResult(
                 recipientId: $message->recipientId,
@@ -52,7 +61,15 @@ class MobishastraGateway implements SmsGatewayInterface
         }
 
         $body = trim($response->body());
-        $this->log($provider, 'send', $this->redact($query), ['body' => $body], $response->status(), $response->successful() ? 'ok' : 'error');
+        $this->log(
+            $provider,
+            'send',
+            $this->safeSendRequest($query, $message),
+            ['body' => $body],
+            $response->status(),
+            $response->successful() ? 'ok' : 'error',
+            campaignId: $message->campaignId,
+        );
 
         return $this->mapCode($message, $body);
     }
@@ -91,7 +108,16 @@ class MobishastraGateway implements SmsGatewayInterface
                 ->asJson()
                 ->post($this->url($provider, (string) config('sms.provider.json_path', 'sendsms_api_json.aspx')), $payload);
         } catch (ConnectionException $exception) {
-            $this->log($provider, 'send_bulk', $this->bulkLogRequest($messages), null, null, 'timeout', $exception->getMessage());
+            $this->log(
+                $provider,
+                'send_bulk',
+                $this->bulkLogRequest($messages),
+                null,
+                null,
+                'timeout',
+                $exception->getMessage(),
+                $messages[0]->campaignId ?? null,
+            );
 
             return array_map(
                 fn (OutboundSms $message): GatewaySendResult => new GatewaySendResult(
@@ -111,9 +137,10 @@ class MobishastraGateway implements SmsGatewayInterface
             $provider,
             'send_bulk',
             $this->bulkLogRequest($messages),
-            $this->bulkLogResponse($response->status(), $decoded),
+            $this->bulkLogResponse($response->status(), $decoded, $response->body()),
             $response->status(),
             $response->successful() ? 'ok' : 'error',
+            campaignId: $messages[0]->campaignId ?? null,
         );
 
         return $this->mapJsonResults($messages, $response, $decoded);
@@ -244,7 +271,7 @@ class MobishastraGateway implements SmsGatewayInterface
                 recipientId: $message->recipientId,
                 phone: $message->phone,
                 accepted: true,
-                providerMessageId: 'MSH-R'.$message->recipientId,
+                providerMessageId: $this->extractMessageId($body, $message->recipientId),
                 code: '000',
                 raw: $body,
             );
@@ -334,23 +361,64 @@ class MobishastraGateway implements SmsGatewayInterface
         return $trimmed;
     }
 
+    private function extractMessageId(string $body, int $recipientId): string
+    {
+        $trimmed = trim($body);
+
+        if (preg_match('/\b(M-\d+)\b/i', $trimmed, $matches) === 1) {
+            return $matches[1];
+        }
+
+        if (str_contains($trimmed, ',')) {
+            foreach (array_map('trim', explode(',', $trimmed)) as $part) {
+                $code = $this->normalizeCode($part);
+                if ($part !== '' && ! in_array($code, ['000', 'send successful', '013'], true)) {
+                    return $part;
+                }
+            }
+        }
+
+        return 'MSH-R'.$recipientId;
+    }
+
+    /**
+     * @param  array<string, mixed>  $query
+     * @return array<string, mixed>
+     */
+    private function safeSendRequest(array $query, OutboundSms $message): array
+    {
+        return [
+            'user' => $this->maskedUser((string) ($query['user'] ?? '')),
+            'senderid' => $message->sender,
+            'mobileno' => ProviderPhone::digits($message->phone),
+            'CountryCode' => $query['CountryCode'] ?? null,
+            'language' => $query['language'] ?? 'English',
+            'characters' => mb_strlen($message->body),
+        ];
+    }
+
     /**
      * @param  list<OutboundSms>  $messages
-     * @return array{count: int, encoding: string}
+     * @return array{count: int, encoding: string, senderid: string|null, mobileno: list<string>}
      */
     private function bulkLogRequest(array $messages): array
     {
         return [
             'count' => count($messages),
             'encoding' => ($messages[0]->encoding ?? MessageEncoding::Gsm)->value,
+            'senderid' => $messages[0]->sender ?? null,
+            'mobileno' => array_map(
+                fn (OutboundSms $message): string => ProviderPhone::digits($message->phone),
+                array_slice($messages, 0, 5),
+            ),
         ];
     }
 
     /**
      * @param  array<string, mixed>|list<mixed>|null  $decoded
-     * @return array{accepted: int|null, http_status: int}
+     * @return array{accepted: int|null, http_status: int, body: string}
      */
-    private function bulkLogResponse(int $httpStatus, mixed $decoded): array
+    private function bulkLogResponse(int $httpStatus, mixed $decoded, string $rawBody): array
     {
         $accepted = null;
         if (is_array($decoded)) {
@@ -360,7 +428,17 @@ class MobishastraGateway implements SmsGatewayInterface
         return [
             'accepted' => $accepted,
             'http_status' => $httpStatus,
+            'body' => mb_substr(trim($rawBody), 0, 500),
         ];
+    }
+
+    private function maskedUser(string $user): string
+    {
+        if ($user === '') {
+            return '';
+        }
+
+        return str_repeat('*', max(strlen($user) - 4, 0)).substr($user, -4);
     }
 
     /**
@@ -397,10 +475,12 @@ class MobishastraGateway implements SmsGatewayInterface
         ?int $httpStatus,
         string $status,
         ?string $error = null,
+        ?int $campaignId = null,
     ): void {
         try {
             ProviderLog::query()->create([
                 'provider_id' => $provider->id,
+                'campaign_id' => $campaignId,
                 'action' => $action,
                 'request_payload' => $request,
                 'response_payload' => $response,

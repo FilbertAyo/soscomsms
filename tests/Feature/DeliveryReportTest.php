@@ -91,7 +91,8 @@ it('applies an inbound delivery report without refunding a later failure', funct
             'numbers' => ['0712445221'],
         ])
         ->assertCreated()
-        ->assertJsonPath('campaign.status', CampaignStatus::Sending->value);
+        ->assertJsonPath('campaign.status', CampaignStatus::Completed->value)
+        ->assertJsonPath('campaign.recipientPhone', '+255712445221');
 
     $this->actingAs($user)
         ->getJson('/api/campaigns/'.Campaign::query()->value('id'))

@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\CampaignStatus;
 use App\Http\Controllers\Api\Concerns\ResolvesCustomer;
 use App\Http\Controllers\Controller;
 use App\Models\Campaign;
+use App\Models\CampaignRecipient;
 use App\Services\CampaignDispatcher;
 use App\Services\CampaignService;
 use App\Services\SegmentationService;
@@ -57,10 +59,35 @@ class CampaignController extends Controller
         $customer = $this->currentCustomer($request);
 
         $page = $customer->campaigns()
+            ->addSelect([
+                'recipient_phone' => CampaignRecipient::query()
+                    ->select('phone')
+                    ->whereColumn('campaign_recipients.campaign_id', 'campaigns.id')
+                    ->orderBy('id')
+                    ->limit(1),
+            ])
             ->when($request->filled('status'), function ($query) use ($request): void {
-                $query->where('status', $request->string('status')->toString());
+                $status = $request->string('status')->toString();
+
+                switch ($status) {
+                    case 'queued':
+                        $query->whereIn('status', [
+                            CampaignStatus::Queued->value,
+                            CampaignStatus::Sending->value,
+                        ]);
+                        break;
+                    case 'completed':
+                        $query->whereIn('status', [
+                            CampaignStatus::Completed->value,
+                            CampaignStatus::PartiallyDelivered->value,
+                        ]);
+                        break;
+                    default:
+                        $query->where('status', $status);
+                        break;
+                }
             })
-            ->latest('id')
+            ->latest('campaigns.id')
             ->paginate(PaginationMeta::perPage($request));
 
         return response()->json([

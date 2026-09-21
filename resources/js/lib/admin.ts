@@ -15,6 +15,10 @@ export const adminTrafficQueryKey = ['admin', 'traffic'] as const
 export const adminDeliveryReportsQueryKey = ['admin', 'delivery-reports'] as const
 export const adminLogsQueryKey = ['admin', 'logs'] as const
 
+export function adminLogsPageQueryKey(auditPage: number, providerPage: number) {
+  return [...adminLogsQueryKey, auditPage, providerPage] as const
+}
+
 export function adminCustomersSearchQueryKey(q: string) {
   return ['admin', 'customers', q] as const
 }
@@ -48,15 +52,33 @@ export async function fetchAdminDeliveryReports(page = 1): Promise<{
   }
 }
 
-export async function fetchAdminLogs(): Promise<{
+export async function fetchAdminLogs(
+  auditPage = 1,
+  providerPage = 1
+): Promise<{
   auditLogs: AdminAuditLog[]
   providerLogs: AdminProviderLog[]
+  auditMeta: PageMeta
+  providerMeta: PageMeta
 }> {
   const { data } = await api.get<{
     auditLogs: AdminAuditLog[]
     providerLogs: AdminProviderLog[]
-  }>('/api/admin/logs')
-  return data
+    auditMeta?: PageMeta
+    providerMeta?: PageMeta
+  }>('/api/admin/logs', {
+    params: {
+      audit_page: auditPage,
+      provider_page: providerPage,
+      per_page: 15,
+    },
+  })
+  return {
+    auditLogs: data.auditLogs,
+    providerLogs: data.providerLogs,
+    auditMeta: data.auditMeta ?? emptyPageMeta,
+    providerMeta: data.providerMeta ?? emptyPageMeta,
+  }
 }
 
 export async function fetchAdminCustomer(id: number): Promise<AdminCustomer> {

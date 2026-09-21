@@ -200,10 +200,13 @@ it('records grants in the audit log and shows provider logs without gateway payl
         ->assertOk()
         ->assertJsonPath('auditLogs.0.action', AuditAction::CreditsGranted->value)
         ->assertJsonPath('providerLogs.0.action', 'send_bulk')
-        ->assertJsonPath('providerLogs.0.status', 'ok');
+        ->assertJsonPath('providerLogs.0.status', 'ok')
+        ->assertJsonPath('providerMeta.total', 1)
+        ->assertJsonPath('auditMeta.total', 1);
 
     expect($response->json('providerLogs.0'))->not->toHaveKey('request_payload')
         ->and($response->json('providerLogs.0'))->not->toHaveKey('response_payload')
+        ->and($response->json('providerLogs.0.diagnosis'))->not->toBeEmpty()
         ->and($response->json('auditLogs.0.message'))->toContain('1000 SMS')
         ->and($response->json('auditLogs.0.message'))->toContain('customer@soscom.co.tz');
 });

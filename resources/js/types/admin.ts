@@ -19,8 +19,14 @@ export type AdminProviderLog = {
   action: string
   status: string
   httpStatus: number | null
+  campaignId: number | null
   campaignName: string | null
   providerName: string | null
+  senderId: string | null
+  phone: string | null
+  countryCode: string | null
+  providerReply: string | null
+  diagnosis: string | null
   error: string | null
   message: string
   createdAt: string | null

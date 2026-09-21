@@ -3,8 +3,10 @@
 namespace App\Console\Commands;
 
 use App\Contracts\SmsGatewayInterface;
+use App\Enums\CampaignStatus;
 use App\Enums\DeliveryStatus;
 use App\Enums\GatewayDriver;
+use App\Models\Campaign;
 use App\Models\Delivery;
 use App\Services\DeliveryReportService;
 use App\Services\Gateway\ProviderDeliveryStatus;
@@ -59,6 +61,13 @@ class PollDeliveryReportsCommand extends Command
                 $updated++;
             }
         }
+
+        Campaign::query()
+            ->where('status', CampaignStatus::Sending)
+            ->orderBy('id')
+            ->limit(100)
+            ->get()
+            ->each(fn (Campaign $campaign) => $campaign->refreshCounts());
 
         $this->info('Checked '.$deliveries->count().' messages. Updated '.$updated.'.');
 

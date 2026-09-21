@@ -55,9 +55,7 @@ export function SendSms() {
   const [groupId, setGroupId] = useState('')
   const [uploadNumbers, setUploadNumbers] = useState<string[]>([])
   const [uploadName, setUploadName] = useState('')
-  const [message, setMessage] = useState(
-    'Habari, ada ya shule inapaswa kulipwa kabla ya tarehe 25 Septemba. Asante.'
-  )
+  const [message, setMessage] = useState('')
   const [schedule, setSchedule] = useState(false)
   const [scheduleAt, setScheduleAt] = useState('')
   const [confirmOpen, setConfirmOpen] = useState(false)

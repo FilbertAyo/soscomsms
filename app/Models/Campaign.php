@@ -112,6 +112,7 @@ class Campaign extends Model
             'encoding' => $withMessage ? $this->message?->encoding?->value : null,
             'characterCount' => $withMessage ? $this->message?->character_count : null,
             'segmentsPerRecipient' => $withMessage ? $this->message?->segment_count : null,
+            'recipientPhone' => $this->recipientPhonePreview(),
             'recipients' => $this->recipient_count,
             'sent' => $this->sent_count,
             'delivered' => $this->delivered_count,
@@ -210,8 +211,6 @@ class Campaign extends Model
         $delivered = $countFor(CampaignRecipientStatus::Delivered);
         $failed = $countFor(CampaignRecipientStatus::Failed, CampaignRecipientStatus::Rejected);
         $accepted = $countFor(CampaignRecipientStatus::Sent, CampaignRecipientStatus::Delivered);
-        $unknown = $countFor(CampaignRecipientStatus::Unknown);
-        $waiting = $countFor(CampaignRecipientStatus::Sent);
         $pending = $countFor(CampaignRecipientStatus::Queued, CampaignRecipientStatus::Pending);
 
         $this->sent_count = $accepted;
@@ -228,7 +227,7 @@ class Campaign extends Model
             return $this;
         }
 
-        if ($pending > 0 || $unknown > 0 || $waiting > 0) {
+        if ($pending > 0) {
             $this->status = CampaignStatus::Sending;
         } elseif ($accepted > 0 && $failed > 0) {
             $this->status = CampaignStatus::PartiallyDelivered;
@@ -241,5 +240,19 @@ class Campaign extends Model
         $this->save();
 
         return $this;
+    }
+
+    public function recipientPhonePreview(): ?string
+    {
+        $phone = $this->getAttribute('recipient_phone');
+        if (is_string($phone) && $phone !== '') {
+            return $phone;
+        }
+
+        if ($this->relationLoaded('recipients')) {
+            return $this->recipients->sortBy('id')->first()?->phone;
+        }
+
+        return $this->recipients()->orderBy('id')->value('phone');
     }
 }

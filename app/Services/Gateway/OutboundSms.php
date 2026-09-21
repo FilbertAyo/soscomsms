@@ -13,5 +13,6 @@ final class OutboundSms
         public string $body,
         public MessageEncoding $encoding,
         public int $segmentCount = 1,
+        public ?int $campaignId = null,
     ) {}
 }
