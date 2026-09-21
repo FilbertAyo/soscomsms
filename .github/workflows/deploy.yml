@@ -52,47 +52,51 @@ jobs:
           test -s /tmp/soscomsms-release.tar.gz
           cp /tmp/soscomsms-release.tar.gz soscomsms-release.tar.gz
 
+      - name: Configure SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USERNAME: ${{ secrets.SSH_USERNAME }}
+          SSH_PORT: ${{ secrets.SSH_PORT }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          PORT="${SSH_PORT:-22}"
+          {
+            echo "Host production"
+            echo "  HostName ${SSH_HOST}"
+            echo "  User ${SSH_USERNAME}"
+            echo "  Port ${PORT}"
+            echo "  IdentityFile ~/.ssh/deploy_key"
+            echo "  IdentitiesOnly yes"
+            echo "  StrictHostKeyChecking accept-new"
+          } > ~/.ssh/config
+          chmod 600 ~/.ssh/config
+          ssh-keyscan -p "$PORT" -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
+
       - name: Ensure the remote app directory exists
-        uses: appleboy/ssh-action@v1.2.2
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USERNAME }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          port: ${{ secrets.SSH_PORT || 22 }}
-          script_stop: true
-          script: mkdir -p "${{ secrets.DEPLOY_PATH }}"
+        run: ssh production "mkdir -p '${{ secrets.DEPLOY_PATH }}'"
 
       - name: Upload release archive
-        uses: appleboy/scp-action@v1.0.0
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USERNAME }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          port: ${{ secrets.SSH_PORT || 22 }}
-          source: soscomsms-release.tar.gz
-          target: ${{ secrets.DEPLOY_PATH }}
-          overwrite: true
+        run: scp soscomsms-release.tar.gz "production:${{ secrets.DEPLOY_PATH }}/soscomsms-release.tar.gz"
 
       - name: Extract release and run deploy script
-        uses: appleboy/ssh-action@v1.2.2
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USERNAME }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          port: ${{ secrets.SSH_PORT || 22 }}
-          script_stop: true
-          command_timeout: 10m
-          script: |
-            set -euo pipefail
-            cd "${{ secrets.DEPLOY_PATH }}"
+        env:
+          PHP_BIN: ${{ secrets.PHP_BIN }}
+        run: |
+          ssh production "set -euo pipefail
+            cd '${{ secrets.DEPLOY_PATH }}'
             if [ ! -f soscomsms-release.tar.gz ]; then
-              echo "Release archive was not uploaded."
+              echo 'Release archive was not uploaded.'
               exit 1
             fi
             rm -rf vendor public/build
             tar -xzf soscomsms-release.tar.gz
             rm -f soscomsms-release.tar.gz
-            if [ -n "${{ secrets.PHP_BIN }}" ]; then
-              export PHP_BIN="${{ secrets.PHP_BIN }}"
+            if [ -n '${PHP_BIN}' ]; then
+              export PHP_BIN='${PHP_BIN}'
             fi
-            bash scripts/deploy.sh
+            bash scripts/deploy.sh"
