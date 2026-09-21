@@ -36,6 +36,8 @@ export function SignUp() {
             By creating an account, you agree to our{' '}
             <Link
               to='/terms'
+              target='_blank'
+              rel='noopener noreferrer'
               className='underline underline-offset-4 hover:text-primary'
             >
               Terms of Service
@@ -43,6 +45,8 @@ export function SignUp() {
             and{' '}
             <Link
               to='/privacy'
+              target='_blank'
+              rel='noopener noreferrer'
               className='underline underline-offset-4 hover:text-primary'
             >
               Privacy Policy
