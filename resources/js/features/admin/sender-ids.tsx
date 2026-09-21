@@ -1,0 +1,338 @@
+import { useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { toast } from 'sonner'
+import { applyValidationErrors } from '@/lib/auth'
+import { formatDate } from '@/lib/format'
+import {
+  adminSenderIdRequestsQueryKey,
+  approveSenderIdRequest,
+  fetchAdminSenderIdRequests,
+  rejectSenderIdRequest,
+  reviewSenderIdRequest,
+  submitSenderIdRequestToProvider,
+  usableSenderIdsQueryKey,
+} from '@/lib/sender-ids'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { StatusBadge } from '@/components/soscom/status-badge'
+import { RequestTimeline } from '@/components/soscom/request-timeline'
+import {
+  ADMIN_REQUEST_STEPS,
+  adminTimelineIndex,
+  type SenderIdRequestRecord,
+} from '@/types/sender-ids'
+import { AdminPage } from './page'
+
+export function AdminSenderIds() {
+  const queryClient = useQueryClient()
+  const [selectedId, setSelectedId] = useState<number | null>(null)
+  const [providerOpen, setProviderOpen] = useState(false)
+  const [rejectOpen, setRejectOpen] = useState(false)
+  const [submittedAt, setSubmittedAt] = useState(todayInput())
+  const [providerReference, setProviderReference] = useState('')
+  const [notes, setNotes] = useState('')
+  const [rejectionReason, setRejectionReason] = useState('')
+
+  const requestsQuery = useQuery({
+    queryKey: adminSenderIdRequestsQueryKey,
+    queryFn: fetchAdminSenderIdRequests,
+  })
+  const requests = requestsQuery.data ?? []
+  const selected =
+    requests.find((item) => item.id === selectedId) ?? requests[0] ?? null
+
+  async function refresh() {
+    await queryClient.invalidateQueries({ queryKey: adminSenderIdRequestsQueryKey })
+    await queryClient.invalidateQueries({ queryKey: usableSenderIdsQueryKey })
+    await queryClient.invalidateQueries({ queryKey: ['sender-id-requests'] })
+  }
+
+  const reviewMutation = useMutation({
+    mutationFn: (id: number) => reviewSenderIdRequest(id),
+    onSuccess: async () => {
+      toast.success('Request marked under review.')
+      await refresh()
+    },
+    onError: (error) => toast.error(applyValidationErrors(error, () => undefined)),
+  })
+
+  const submitMutation = useMutation({
+    mutationFn: (id: number) =>
+      submitSenderIdRequestToProvider(id, {
+        submitted_to_provider_at: submittedAt || undefined,
+        provider_reference: providerReference.trim() || undefined,
+        notes: notes.trim() || undefined,
+      }),
+    onSuccess: async () => {
+      toast.success('Marked as submitted to Mobishastra.')
+      setProviderOpen(false)
+      setProviderReference('')
+      setNotes('')
+      await refresh()
+    },
+    onError: (error) => toast.error(applyValidationErrors(error, () => undefined)),
+  })
+
+  const approveMutation = useMutation({
+    mutationFn: (id: number) => approveSenderIdRequest(id),
+    onSuccess: async (request) => {
+      toast.success(`${request.name} is now active for this customer.`)
+      await refresh()
+    },
+    onError: (error) => toast.error(applyValidationErrors(error, () => undefined)),
+  })
+
+  const rejectMutation = useMutation({
+    mutationFn: (id: number) => rejectSenderIdRequest(id, rejectionReason.trim()),
+    onSuccess: async () => {
+      toast.success('Request rejected.')
+      setRejectOpen(false)
+      setRejectionReason('')
+      await refresh()
+    },
+    onError: (error) => toast.error(applyValidationErrors(error, () => undefined)),
+  })
+
+  return (
+    <AdminPage
+      title='Sender ID Requests'
+      description='Review customer requests, submit them to Mobishastra outside this system, then record the outcome here. No provider API call is made.'
+    >
+      {requestsQuery.isError ? (
+        <p className='text-sm text-destructive'>Could not load requests.</p>
+      ) : (
+        <div className='grid gap-6 lg:grid-cols-[20rem_minmax(0,1fr)]'>
+          <div className='space-y-3'>
+            {requests.length === 0 ? (
+              <p className='text-sm text-muted-foreground'>
+                No Sender ID requests yet.
+              </p>
+            ) : (
+              requests.map((item) => (
+                <button
+                  key={item.id}
+                  type='button'
+                  onClick={() => setSelectedId(item.id)}
+                  className={`w-full rounded-xl border bg-card p-4 text-start ${
+                    selected?.id === item.id ? 'ring-2 ring-primary' : ''
+                  }`}
+                >
+                  <p className='font-semibold'>{item.name}</p>
+                  <p className='text-sm text-muted-foreground'>
+                    Requested by: {item.customerBusiness ?? item.customerName}
+                  </p>
+                  <p className='mt-1 text-xs text-muted-foreground'>
+                    Date: {item.createdAt ? formatDate(item.createdAt) : '—'}
+                  </p>
+                </button>
+              ))
+            )}
+          </div>
+          {selected ? (
+            <RequestDetail
+              request={selected}
+              pending={
+                reviewMutation.isPending ||
+                submitMutation.isPending ||
+                approveMutation.isPending ||
+                rejectMutation.isPending
+              }
+              onReview={() => reviewMutation.mutate(selected.id)}
+              onOpenProvider={() => {
+                setSubmittedAt(todayInput())
+                setProviderOpen(true)
+              }}
+              onApprove={() => approveMutation.mutate(selected.id)}
+              onOpenReject={() => setRejectOpen(true)}
+            />
+          ) : null}
+        </div>
+      )}
+
+      <Dialog open={providerOpen} onOpenChange={setProviderOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Mark submitted to Mobishastra</DialogTitle>
+          </DialogHeader>
+          <div className='space-y-4'>
+            <p className='text-sm text-muted-foreground'>
+              Do this after you have emailed or logged the request with
+              Mobishastra. Nothing is sent from this screen.
+            </p>
+            <div className='space-y-2'>
+              <Label htmlFor='submitted-at'>Date submitted</Label>
+              <Input
+                id='submitted-at'
+                type='date'
+                value={submittedAt}
+                onChange={(event) => setSubmittedAt(event.target.value)}
+              />
+            </div>
+            <div className='space-y-2'>
+              <Label htmlFor='provider-ref'>Provider reference (optional)</Label>
+              <Input
+                id='provider-ref'
+                value={providerReference}
+                onChange={(event) => setProviderReference(event.target.value)}
+                placeholder='Email thread or ticket ID'
+              />
+            </div>
+            <div className='space-y-2'>
+              <Label htmlFor='provider-notes'>Notes (optional)</Label>
+              <Textarea
+                id='provider-notes'
+                value={notes}
+                onChange={(event) => setNotes(event.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant='outline' onClick={() => setProviderOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              disabled={submitMutation.isPending || selected === null}
+              onClick={() => selected && submitMutation.mutate(selected.id)}
+            >
+              {submitMutation.isPending ? 'Saving…' : 'Save'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={rejectOpen} onOpenChange={setRejectOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reject {selected?.name}</DialogTitle>
+          </DialogHeader>
+          <div className='space-y-2'>
+            <Label htmlFor='reject-reason'>Reason</Label>
+            <Textarea
+              id='reject-reason'
+              value={rejectionReason}
+              onChange={(event) => setRejectionReason(event.target.value)}
+              placeholder='Mobishastra declined this name because…'
+            />
+          </div>
+          <DialogFooter>
+            <Button variant='outline' onClick={() => setRejectOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant='destructive'
+              disabled={
+                rejectMutation.isPending ||
+                rejectionReason.trim() === '' ||
+                selected === null
+              }
+              onClick={() => selected && rejectMutation.mutate(selected.id)}
+            >
+              {rejectMutation.isPending ? 'Saving…' : 'Reject'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </AdminPage>
+  )
+}
+
+function RequestDetail({
+  request,
+  pending,
+  onReview,
+  onOpenProvider,
+  onApprove,
+  onOpenReject,
+}: {
+  request: SenderIdRequestRecord
+  pending: boolean
+  onReview: () => void
+  onOpenProvider: () => void
+  onApprove: () => void
+  onOpenReject: () => void
+}) {
+  const open = request.status !== 'approved' && request.status !== 'rejected'
+  const canReview =
+    request.status === 'submitted' || request.status === 'under_review'
+  const canSubmitToProvider =
+    request.status === 'submitted' || request.status === 'under_review'
+  const canResolve = request.status === 'submitted_to_provider'
+
+  return (
+    <div className='rounded-xl border bg-card p-5'>
+      <div className='flex items-start justify-between gap-3'>
+        <div>
+          <h2 className='text-xl font-semibold'>{request.name}</h2>
+          <p className='text-sm text-muted-foreground'>{request.purpose}</p>
+          <p className='mt-1 text-sm text-muted-foreground'>
+            {request.customerBusiness ?? request.customerName} ·{' '}
+            {request.organization}
+          </p>
+        </div>
+        <StatusBadge status={request.status} />
+      </div>
+      {request.description ? (
+        <p className='mt-4 text-sm'>{request.description}</p>
+      ) : null}
+      {request.providerReference ? (
+        <p className='mt-3 text-sm text-muted-foreground'>
+          Provider reference: {request.providerReference}
+        </p>
+      ) : null}
+      {request.rejectionReason ? (
+        <p className='mt-3 text-sm text-destructive'>{request.rejectionReason}</p>
+      ) : null}
+      <div className='mt-6'>
+        <RequestTimeline
+          steps={[...ADMIN_REQUEST_STEPS]}
+          currentIndex={adminTimelineIndex(request)}
+        />
+      </div>
+      {open ? (
+        <div className='mt-6 flex flex-wrap gap-2'>
+          {canReview ? (
+            <Button disabled={pending} onClick={onReview}>
+              Mark under review
+            </Button>
+          ) : null}
+          {canSubmitToProvider ? (
+            <Button variant='outline' disabled={pending} onClick={onOpenProvider}>
+              Submitted to Mobishastra
+            </Button>
+          ) : null}
+          {canResolve ? (
+            <>
+              <Button disabled={pending} onClick={onApprove}>
+                Approve
+              </Button>
+              <Button
+                variant='outline'
+                disabled={pending}
+                onClick={onOpenReject}
+              >
+                Reject
+              </Button>
+            </>
+          ) : (
+            <Button variant='outline' disabled={pending} onClick={onOpenReject}>
+              Reject
+            </Button>
+          )}
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+function todayInput(): string {
+  return new Date().toISOString().slice(0, 10)
+}

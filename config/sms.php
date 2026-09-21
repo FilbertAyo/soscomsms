@@ -1,0 +1,109 @@
+<?php
+
+return [
+
+    'welcome_credits' => (int) env('SMS_WELCOME_CREDITS', 20),
+
+    'provider_unit_cost_tzs' => (int) env('SMS_PROVIDER_UNIT_COST_TZS', 14),
+
+    'min_purchase_quantity' => 50,
+
+    'packages' => [1000, 5000, 10000, 50000],
+
+    'generic_sender_ids' => ['HARUSI', 'SEND OFF', 'MWALIKO', 'MCHANGO'],
+
+    'sender_id_max_length' => 13,
+
+    'sender_id_blocklist' => [
+        'CRDB',
+        'NMB',
+        'NBC',
+        'EQUITY',
+        'KCB',
+        'STANBIC',
+        'ABSA',
+        'BARCLAYS',
+        'BOA',
+        'DTB',
+        'EXIM',
+        'PBZ',
+        'TCB',
+        'AZANIA',
+        'ACCESS',
+        'UBA',
+        'CITIBANK',
+        'STANCHART',
+        'FINCA',
+        'TPB',
+        'ACB',
+        'DCBBANK',
+        'BOT',
+        'TCRA',
+        'TRA',
+        'MOBISHASTRA',
+    ],
+
+    'rate_limits' => [
+        'dashboard_send' => (int) env('SMS_DASHBOARD_SEND_RATE_LIMIT', 30),
+    ],
+
+    'send_unit_price_tzs' => (int) env('SMS_SEND_UNIT_PRICE_TZS', 30),
+
+    'max_recipients_per_campaign' => 5000,
+
+    'gateway' => env('SMS_GATEWAY', 'fake'),
+
+    'provider' => [
+        'profile_id' => env('SMS_PROVIDER_PROFILE_ID'),
+        'password' => env('SMS_PROVIDER_PASSWORD'),
+        'base_url' => env('SMS_PROVIDER_BASE_URL', 'https://mshastra.com'),
+        'static_ip' => env('SMS_PROVIDER_STATIC_IP'),
+        'country_code' => env('SMS_PROVIDER_COUNTRY_CODE', 'ALL'),
+        'send_path' => env('SMS_PROVIDER_SEND_PATH', 'sendurl.aspx'),
+        'json_path' => env('SMS_PROVIDER_JSON_PATH', 'sendsms_api_json.aspx'),
+        'balance_path' => env('SMS_PROVIDER_BALANCE_PATH', 'balance.aspx'),
+        'dlr_path' => env('SMS_PROVIDER_DLR_PATH', 'dlrstatus_api.aspx'),
+        'dlr_base_url' => env('SMS_PROVIDER_DLR_BASE_URL'),
+        'timeout' => (int) env('SMS_PROVIDER_TIMEOUT', 20),
+        'bulk_chunk' => (int) env('SMS_PROVIDER_BULK_CHUNK', 100),
+        'low_balance_threshold' => (int) env('SMS_PROVIDER_LOW_BALANCE', 10000),
+        'dlr_token' => env('SMS_PROVIDER_DLR_TOKEN'),
+    ],
+
+    'fake' => [
+        'balance' => (int) env('SMS_FAKE_BALANCE', 100000),
+        'fail_phones' => [],
+        'timeout_phones' => [],
+        'fail_dlr_phones' => [],
+        'auto_dlr' => (bool) env('SMS_FAKE_AUTO_DLR', true),
+    ],
+
+    'api' => [
+        'key_prefix' => env('SMS_API_KEY_PREFIX', 'sk_live_'),
+        'rate_limit' => (int) env('SMS_API_RATE_LIMIT', 60),
+        'max_keys' => (int) env('SMS_API_MAX_KEYS', 10),
+    ],
+
+    'webhooks' => [
+        'timeout' => (int) env('SMS_WEBHOOK_TIMEOUT', 10),
+        'max_per_customer' => (int) env('SMS_WEBHOOK_MAX', 5),
+        'max_attempts' => (int) env('SMS_WEBHOOK_ATTEMPTS', 5),
+        'backoff' => [60, 300, 900, 3600],
+    ],
+
+    'billing' => [
+        'lipa_namba' => env('SMS_LIPA_NAMBA', '123456'),
+        'lipa_namba_name' => env(
+            'SMS_LIPA_NAMBA_NAME',
+            'SOSCOM TECHNOLOGIES COMPANY LIMITED',
+        ),
+        'payment_expires_hours' => (int) env('SMS_PAYMENT_EXPIRES_HOURS', 72),
+    ],
+
+    'production' => [
+        'app_url' => 'https://sms.soscom.co.tz',
+        'backup_keep_days' => (int) env('SMS_BACKUP_KEEP_DAYS', 14),
+        'low_balance_alert_hours' => (int) env('SMS_LOW_BALANCE_ALERT_HOURS', 12),
+    ],
+
+];

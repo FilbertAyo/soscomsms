@@ -1,0 +1,125 @@
+<?php
+
+namespace App\Models;
+
+use App\Enums\SenderIdRequestStatus;
+use Database\Factories\SenderIdRequestFactory;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
+
+class SenderIdRequest extends Model
+{
+    /** @use HasFactory<SenderIdRequestFactory> */
+    use HasFactory;
+
+    /**
+     * @var list<string>
+     */
+    protected $fillable = [
+        'customer_id',
+        'name',
+        'purpose',
+        'organization',
+        'description',
+        'status',
+        'submitted_to_provider_at',
+        'provider_reference',
+        'notes',
+        'rejection_reason',
+        'reviewed_by',
+        'resolved_at',
+    ];
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'status' => SenderIdRequestStatus::class,
+            'submitted_to_provider_at' => 'datetime',
+            'resolved_at' => 'datetime',
+        ];
+    }
+
+    /**
+     * @return BelongsTo<Customer, $this>
+     */
+    public function customer(): BelongsTo
+    {
+        return $this->belongsTo(Customer::class);
+    }
+
+    /**
+     * @return BelongsTo<User, $this>
+     */
+    public function reviewer(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'reviewed_by');
+    }
+
+    /**
+     * @return HasOne<SenderId, $this>
+     */
+    public function senderId(): HasOne
+    {
+        return $this->hasOne(SenderId::class);
+    }
+
+    public function timelineIndex(): int
+    {
+        return match ($this->status) {
+            SenderIdRequestStatus::Submitted => 0,
+            SenderIdRequestStatus::UnderReview => 1,
+            SenderIdRequestStatus::SubmittedToProvider => 2,
+            SenderIdRequestStatus::Approved => 4,
+            SenderIdRequestStatus::Rejected => $this->submitted_to_provider_at !== null
+                ? 2
+                : ($this->reviewed_by !== null ? 1 : 0),
+        };
+    }
+
+    /**
+     * @return array{id: int, name: string, purpose: string, organization: string, description: string|null, status: string, currentStep: string, timelineIndex: int, submittedToProviderAt: string|null, rejectionReason: string|null, createdAt: string|null, senderIdId: int|null}
+     */
+    public function toApiArray(): array
+    {
+        $this->loadMissing('senderId');
+
+        return [
+            'id' => $this->id,
+            'name' => $this->name,
+            'purpose' => $this->purpose,
+            'organization' => $this->organization,
+            'description' => $this->description,
+            'status' => $this->status->value,
+            'currentStep' => $this->status->currentStep(),
+            'timelineIndex' => $this->timelineIndex(),
+            'submittedToProviderAt' => $this->submitted_to_provider_at?->toIso8601String(),
+            'rejectionReason' => $this->rejection_reason,
+            'createdAt' => $this->created_at?->toIso8601String(),
+            'senderIdId' => $this->senderId?->id,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function toAdminArray(): array
+    {
+        $this->loadMissing(['customer.user', 'senderId']);
+
+        return [
+            ...$this->toApiArray(),
+            'customerId' => $this->customer_id,
+            'customerName' => $this->customer?->user?->name,
+            'customerBusiness' => $this->customer?->business_name,
+            'customerEmail' => $this->customer?->user?->email,
+            'providerReference' => $this->provider_reference,
+            'notes' => $this->notes,
+            'resolvedAt' => $this->resolved_at?->toIso8601String(),
+        ];
+    }
+}

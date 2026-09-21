@@ -1,0 +1,73 @@
+import { useQuery } from '@tanstack/react-query'
+import { formatNumber } from '@/lib/format'
+import {
+  adminProviderBalanceQueryKey,
+  fetchAdminProviderBalance,
+} from '@/lib/credits'
+import { AdminPage } from './page'
+
+export function AdminProviderBalance() {
+  const balanceQuery = useQuery({
+    queryKey: adminProviderBalanceQueryKey,
+    queryFn: fetchAdminProviderBalance,
+  })
+  const snapshot = balanceQuery.data
+
+  return (
+    <AdminPage
+      title='SMS Provider Balance'
+      description='Credits remaining with the upstream SMS provider. Customers never see this.'
+    >
+      {balanceQuery.isError ? (
+        <p className='text-sm text-destructive'>
+          Could not load the provider balance.
+        </p>
+      ) : (
+        <div className='max-w-lg space-y-4'>
+          <div className='rounded-xl border bg-card p-6'>
+            <p className='text-sm text-muted-foreground'>
+              {snapshot?.name ?? 'Provider'} ({snapshot?.driver ?? '…'})
+            </p>
+            <p className='mt-2 text-4xl font-semibold'>
+              {formatNumber(snapshot?.smsBalance ?? 0)} SMS
+            </p>
+            {snapshot?.lowBalance ? (
+              <p className='mt-4 text-sm text-destructive'>
+                Balance is below the warning threshold of{' '}
+                {formatNumber(snapshot.lowBalanceThreshold)} SMS. Top up the
+                upstream account before customer traffic is affected.
+              </p>
+            ) : (
+              <p className='mt-4 text-sm text-muted-foreground'>
+                Warning threshold:{' '}
+                {formatNumber(snapshot?.lowBalanceThreshold ?? 0)} SMS.
+              </p>
+            )}
+          </div>
+          <div className='rounded-xl border bg-card p-5 text-sm text-muted-foreground'>
+            <p>Base URL: {snapshot?.baseUrl || 'Not set'}</p>
+            <p className='mt-1'>Username: {snapshot?.profileId || 'Not set'}</p>
+            <p className='mt-1'>
+              Static IP (for whitelist): {snapshot?.staticIp || 'Not recorded'}
+            </p>
+            <p className='mt-1'>
+              Whitelisted:{' '}
+              {snapshot?.staticIpWhitelistedAt
+                ? new Date(snapshot.staticIpWhitelistedAt).toLocaleString('en-TZ')
+                : 'Not confirmed'}
+            </p>
+            <p className='mt-1'>CountryCode: {snapshot?.countryCode || 'ALL'}</p>
+            <p className='mt-1'>
+              Tanzania account:{' '}
+              {snapshot?.credentialsConfirmedAt
+                ? new Date(snapshot.credentialsConfirmedAt).toLocaleString(
+                    'en-TZ'
+                  )
+                : 'Not confirmed'}
+            </p>
+          </div>
+        </div>
+      )}
+    </AdminPage>
+  )
+}

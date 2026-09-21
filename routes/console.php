@@ -1,0 +1,39 @@
+<?php
+
+use App\Console\Commands\BackupDatabaseCommand;
+use App\Console\Commands\CheckProviderBalanceCommand;
+use App\Console\Commands\DispatchScheduledCampaignsCommand;
+use App\Console\Commands\ExpirePendingPaymentsCommand;
+use App\Console\Commands\PollDeliveryReportsCommand;
+use App\Console\Commands\RetryWebhooksCommand;
+use Illuminate\Foundation\Inspiring;
+use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Schedule;
+
+Artisan::command('inspire', function () {
+    $this->comment(Inspiring::quote());
+})->purpose('Display an inspiring quote');
+
+Schedule::command(DispatchScheduledCampaignsCommand::class)
+    ->everyMinute()
+    ->withoutOverlapping();
+
+Schedule::command(RetryWebhooksCommand::class)
+    ->everyMinute()
+    ->withoutOverlapping();
+
+Schedule::command(ExpirePendingPaymentsCommand::class)
+    ->hourly()
+    ->withoutOverlapping();
+
+Schedule::command(CheckProviderBalanceCommand::class)
+    ->everyFifteenMinutes()
+    ->withoutOverlapping();
+
+Schedule::command(PollDeliveryReportsCommand::class)
+    ->everyMinute()
+    ->withoutOverlapping();
+
+Schedule::command(BackupDatabaseCommand::class)
+    ->dailyAt('02:15')
+    ->withoutOverlapping();
