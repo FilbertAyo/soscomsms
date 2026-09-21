@@ -64,7 +64,7 @@ jobs:
           script: mkdir -p "${{ secrets.DEPLOY_PATH }}"
 
       - name: Upload release archive
-        uses: appleboy/scp-action@v0.1.27
+        uses: appleboy/scp-action@v1.0.0
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USERNAME }}
