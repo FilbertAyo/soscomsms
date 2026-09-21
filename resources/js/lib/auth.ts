@@ -16,12 +16,20 @@ export type OtpChallenge = {
   expiresIn: number
 }
 
+export type AuthenticatedSession = {
+  requiresOtp: false
+  user: AuthUser
+  csrf_token: string
+}
+
+export type LoginResponse = OtpChallenge | AuthenticatedSession
+
 export async function loginRequest(
   email: string,
   password: string,
   remember = false
-): Promise<OtpChallenge> {
-  const { data } = await api.post<OtpChallenge>('/api/login', {
+): Promise<LoginResponse> {
+  const { data } = await api.post<LoginResponse>('/api/login', {
     email,
     password,
     remember,

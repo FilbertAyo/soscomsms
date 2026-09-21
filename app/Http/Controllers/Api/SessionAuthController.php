@@ -68,8 +68,13 @@ class SessionAuthController extends Controller
 
         /** @var User $user */
         $user = User::query()->where('email', $credentials['email'])->firstOrFail();
+        $remember = $request->boolean('remember');
 
-        return response()->json($otp->issue($user, $request->boolean('remember')));
+        if ($otp->canSkip($user)) {
+            return $this->completeLogin($request, $user, $remember);
+        }
+
+        return response()->json($otp->issue($user, $remember));
     }
 
     public function verifyOtp(Request $request, AuthOtpService $otp): JsonResponse
@@ -86,10 +91,7 @@ class SessionAuthController extends Controller
             $user->forceFill(['email_verified_at' => now()])->save();
         }
 
-        Auth::guard('web')->login($user, $result['remember']);
-        $request->session()->regenerate(true);
-
-        return response()->json($this->sessionPayload($user->fresh('customer') ?? $user));
+        return $this->completeLogin($request, $user, $result['remember']);
     }
 
     public function resendOtp(Request $request, AuthOtpService $otp): JsonResponse
@@ -101,8 +103,14 @@ class SessionAuthController extends Controller
         return response()->json($otp->resend($validated['challenge']));
     }
 
-    public function logout(Request $request): JsonResponse
+    public function logout(Request $request, AuthOtpService $otp): JsonResponse
     {
+        $user = Auth::guard('web')->user();
+
+        if ($user instanceof User) {
+            $otp->rememberSelfLogout($user);
+        }
+
         Auth::guard('web')->logout();
 
         $request->session()->invalidate();
@@ -131,5 +139,16 @@ class SessionAuthController extends Controller
             'user' => $user->toAuthArray(),
             'csrf_token' => csrf_token(),
         ];
+    }
+
+    private function completeLogin(Request $request, User $user, bool $remember): JsonResponse
+    {
+        Auth::guard('web')->login($user, $remember);
+        $request->session()->regenerate(true);
+
+        return response()->json([
+            'requiresOtp' => false,
+            ...$this->sessionPayload($user->fresh('customer') ?? $user),
+        ]);
     }
 }

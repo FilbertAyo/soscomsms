@@ -135,6 +135,7 @@ return [
     'otp' => [
         'expire' => (int) env('AUTH_OTP_EXPIRE', 10),
         'max_attempts' => (int) env('AUTH_OTP_MAX_ATTEMPTS', 5),
+        'skip_after_logout_minutes' => (int) env('AUTH_OTP_SKIP_AFTER_LOGOUT_MINUTES', 120),
     ],
 
 ];

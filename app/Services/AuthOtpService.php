@@ -10,6 +10,23 @@ use Illuminate\Validation\ValidationException;
 
 class AuthOtpService
 {
+    public function rememberSelfLogout(User $user): void
+    {
+        $minutes = $this->skipAfterLogoutMinutes();
+
+        if ($minutes < 1) {
+            return;
+        }
+
+        Cache::put($this->skipKey($user), true, now()->addMinutes($minutes));
+    }
+
+    public function canSkip(User $user): bool
+    {
+        return $this->skipAfterLogoutMinutes() >= 1
+            && Cache::has($this->skipKey($user));
+    }
+
     public function issue(User $user, bool $remember = false): array
     {
         $minutes = $this->expiresMinutes();
@@ -104,9 +121,19 @@ class AuthOtpService
         return 'auth_otp:'.$challenge;
     }
 
+    private function skipKey(User $user): string
+    {
+        return 'auth_otp_skip:'.$user->id;
+    }
+
     private function expiresMinutes(): int
     {
         return max(1, (int) config('auth.otp.expire', 10));
+    }
+
+    private function skipAfterLogoutMinutes(): int
+    {
+        return max(0, (int) config('auth.otp.skip_after_logout_minutes', 120));
     }
 
     private function expired(): ValidationException

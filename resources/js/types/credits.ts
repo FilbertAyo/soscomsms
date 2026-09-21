@@ -79,6 +79,8 @@ export type ProviderBalance = {
   driver: 'fake' | 'mobishastra'
   name: string
   smsBalance: number
+  customerCredits: number
+  realSmsBalance: number
   parsed: boolean
   parseError: string | null
   rawResponse: string

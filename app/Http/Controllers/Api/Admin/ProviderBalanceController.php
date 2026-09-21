@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\Admin;
 
 use App\Contracts\SmsGatewayInterface;
 use App\Http\Controllers\Controller;
+use App\Models\Customer;
 use App\Models\Provider;
 use App\Services\ProviderReadinessService;
 use Illuminate\Http\JsonResponse;
@@ -15,11 +16,14 @@ class ProviderBalanceController extends Controller
         $provider = Provider::current();
         $production = $readiness->productionProvider();
         $balance = $gateway->checkBalance();
+        $customerCredits = (int) Customer::query()->sum('sms_balance');
 
         return response()->json([
             'driver' => $provider->driver->value,
             'name' => $provider->name,
             'smsBalance' => $balance->smsBalance,
+            'customerCredits' => $customerCredits,
+            'realSmsBalance' => $balance->smsBalance - $customerCredits,
             'parsed' => $balance->parsed,
             'parseError' => $balance->error,
             'rawResponse' => mb_substr($balance->raw, 0, 500),

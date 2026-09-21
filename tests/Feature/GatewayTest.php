@@ -109,8 +109,24 @@ it('lets an admin read the fake provider balance', function () {
         ->assertOk()
         ->assertJsonPath('driver', GatewayDriver::Fake->value)
         ->assertJsonPath('smsBalance', 100000)
+        ->assertJsonPath('customerCredits', 0)
+        ->assertJsonPath('realSmsBalance', 100000)
         ->assertJsonPath('parsed', true)
         ->assertJsonMissingPath('password');
+});
+
+it('subtracts unused customer credits from the real remaining provider balance', function () {
+    $admin = User::factory()->admin()->create();
+    Provider::current();
+    Customer::factory()->create(['sms_balance' => 20]);
+    Customer::factory()->create(['sms_balance' => 80]);
+
+    $this->actingAs($admin)
+        ->getJson('/api/admin/provider-balance')
+        ->assertOk()
+        ->assertJsonPath('smsBalance', 100000)
+        ->assertJsonPath('customerCredits', 100)
+        ->assertJsonPath('realSmsBalance', 99900);
 });
 
 it('reads the Tanzania row from a Mobishastra country balance reply', function () {

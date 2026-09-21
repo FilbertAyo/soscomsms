@@ -121,3 +121,48 @@ it('signs out and rejects subsequent me requests', function () {
     $this->assertGuest();
     $this->getJson('/api/me')->assertUnauthorized();
 });
+
+it('skips the email code after a self logout within two hours', function () {
+    config(['auth.otp.skip_after_logout_minutes' => 120]);
+    $user = User::factory()->create();
+
+    signInAs($user)->assertOk();
+    Notification::fake();
+
+    $this->postJson('/api/logout')->assertOk();
+    $this->assertGuest();
+
+    $this->postJson('/api/login', [
+        'email' => $user->email,
+        'password' => 'password',
+    ])
+        ->assertOk()
+        ->assertJsonPath('requiresOtp', false)
+        ->assertJsonPath('user.email', $user->email);
+
+    Notification::assertNothingSent();
+    $this->getJson('/api/me')
+        ->assertOk()
+        ->assertJsonPath('user.id', $user->id);
+});
+
+it('asks for an email code again after the logout grace period', function () {
+    config(['auth.otp.skip_after_logout_minutes' => 120]);
+    $user = User::factory()->create();
+
+    signInAs($user)->assertOk();
+    $this->postJson('/api/logout')->assertOk();
+
+    $this->travel(121)->minutes();
+    Notification::fake();
+
+    $this->postJson('/api/login', [
+        'email' => $user->email,
+        'password' => 'password',
+    ])
+        ->assertOk()
+        ->assertJsonPath('requiresOtp', true);
+
+    Notification::assertSentTo($user, LoginOtpNotification::class);
+    $this->assertGuest();
+});

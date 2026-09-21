@@ -16,14 +16,14 @@ export function AdminProviderBalance() {
   return (
     <AdminPage
       title='SMS Provider Balance'
-      description='Credits remaining with the upstream SMS provider. Customers never see this.'
+      description='Mobishastra remaining, unused customer credits, and the real leftover after bonuses and buys. Customers never see this.'
     >
       {balanceQuery.isError ? (
         <p className='text-sm text-destructive'>
           Could not load the provider balance.
         </p>
       ) : (
-        <div className='max-w-lg space-y-4'>
+        <div className='max-w-3xl space-y-4'>
           <div className='rounded-xl border bg-card p-6'>
             <p className='text-sm text-muted-foreground'>
               {snapshot?.name ?? 'Provider'} ({snapshot?.driver ?? '…'})
@@ -58,6 +58,23 @@ export function AdminProviderBalance() {
               </p>
             ) : null}
           </div>
+          <div className='grid gap-4 sm:grid-cols-2'>
+            <BalanceCard
+              label='Customer credits'
+              value={`${formatNumber(snapshot?.customerCredits ?? 0)} SMS`}
+              hint='Unused signup bonuses and purchases still sitting in customer wallets. Mobishastra does not drop when these credits are granted.'
+            />
+            <BalanceCard
+              label='Real remaining'
+              value={
+                snapshot?.parsed === false
+                  ? '—'
+                  : `${formatNumber(snapshot?.realSmsBalance ?? 0)} SMS`
+              }
+              hint='Provider remaining minus customer credits. This is what is left after bonuses and buys.'
+              warn={(snapshot?.realSmsBalance ?? 0) < 0}
+            />
+          </div>
           <div className='rounded-xl border bg-card p-5 text-sm text-muted-foreground'>
             <p>Base URL: {snapshot?.baseUrl || 'Not set'}</p>
             <p className='mt-1'>Username: {snapshot?.profileId || 'Not set'}</p>
@@ -83,5 +100,27 @@ export function AdminProviderBalance() {
         </div>
       )}
     </AdminPage>
+  )
+}
+
+function BalanceCard({
+  label,
+  value,
+  hint,
+  warn = false,
+}: {
+  label: string
+  value: string
+  hint: string
+  warn?: boolean
+}) {
+  return (
+    <div className='rounded-xl border bg-card p-5'>
+      <p className='text-sm text-muted-foreground'>{label}</p>
+      <p className={`mt-2 text-2xl font-semibold ${warn ? 'text-destructive' : ''}`}>
+        {value}
+      </p>
+      <p className='mt-3 text-xs leading-5 text-muted-foreground'>{hint}</p>
+    </div>
   )
 }

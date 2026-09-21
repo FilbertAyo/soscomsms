@@ -44,7 +44,7 @@ export function AdminOverview() {
         <p className='text-sm text-destructive'>Could not load admin overview.</p>
       ) : (
         <>
-          <div className='grid gap-4 sm:grid-cols-2 xl:grid-cols-4'>
+          <div className='grid gap-4 sm:grid-cols-2 xl:grid-cols-3'>
             <Stat label='Customers' value={formatNumber(overview?.customers ?? 0)} />
             <Stat
               label='SMS traffic'
@@ -57,6 +57,18 @@ export function AdminOverview() {
             <Stat
               label='SMS provider balance'
               value={formatNumber(providerQuery.data?.smsBalance ?? 0)}
+              hint='Credits still on Mobishastra.'
+            />
+            <Stat
+              label='Customer credits'
+              value={formatNumber(providerQuery.data?.customerCredits ?? 0)}
+              hint='Unused signup bonuses and purchases.'
+            />
+            <Stat
+              label='Real remaining'
+              value={formatNumber(providerQuery.data?.realSmsBalance ?? 0)}
+              hint='Provider remaining minus customer credits.'
+              warn={(providerQuery.data?.realSmsBalance ?? 0) < 0}
             />
           </div>
           <div className='mt-6 grid gap-4 xl:grid-cols-2'>
@@ -150,11 +162,26 @@ export function AdminOverview() {
   )
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({
+  label,
+  value,
+  hint,
+  warn = false,
+}: {
+  label: string
+  value: string
+  hint?: string
+  warn?: boolean
+}) {
   return (
     <div className='rounded-xl border bg-card p-5'>
       <p className='text-sm text-muted-foreground'>{label}</p>
-      <p className='mt-2 text-2xl font-semibold'>{value}</p>
+      <p className={`mt-2 text-2xl font-semibold ${warn ? 'text-destructive' : ''}`}>
+        {value}
+      </p>
+      {hint ? (
+        <p className='mt-1 text-xs text-muted-foreground'>{hint}</p>
+      ) : null}
     </div>
   )
 }
