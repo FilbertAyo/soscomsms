@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Soscom SMS production helper for shared hosting with SSH.
 #
-# GitHub Actions calls this after uploading a release:
+# GitHub Actions uploads a tar.gz over SSH (this host has no rsync), then runs:
 #   bash scripts/deploy.sh
 #
 # First-time database seed (creates the admin user):

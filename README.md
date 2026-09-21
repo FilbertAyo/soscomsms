@@ -18,4 +18,4 @@ PHP 8.2+ and Node 22 are required. Queue workers run with `composer run dev`.
 
 ## Production
 
-Copy `.env.production.example` to `.env` on the server, fill in secrets, then push to `main`. GitHub Actions builds the frontend, uploads the release, and runs `scripts/deploy.sh` (migrate, caches, queue restart).
+Copy `.env.production.example` to `.env` on the server, fill in secrets, then push to `main`. GitHub Actions builds the frontend, uploads a tar.gz over SSH, and runs `scripts/deploy.sh` (migrate, caches, queue restart).
