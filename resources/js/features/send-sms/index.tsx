@@ -322,7 +322,7 @@ export function SendSms() {
                   <Textarea
                     value={numbers}
                     onChange={(event) => setNumbers(event.target.value)}
-                    placeholder='0712 445 221, one number per line'
+                    placeholder='0712445221, one number per line'
                     rows={6}
                   />
                 </TabsContent>
