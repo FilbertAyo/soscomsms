@@ -36,7 +36,7 @@ const features = [
     icon: FileText,
     title: 'Delivery Reports',
     description:
-      'See which messages were delivered, pending, or failed — recipient by recipient.',
+      'See which messages were delivered, pending, or failed recipient by recipient.',
   },
 ]
 
@@ -162,7 +162,7 @@ export function LandingPage() {
   -H "Content-Type: application/json" \\
   -d '{
     "sender_id": "MWALIKO",
-    "to": "+255712445221",
+    "to": "+255712XXX221",
     "message": "Fee reminder for this week."
   }'`}
             </pre>
