@@ -62,10 +62,36 @@ class Delivery extends Model
         return filled($this->provider_message_id);
     }
 
+    /**
+     * Block retry when the provider already accepted the SMS, or while a send
+     * attempt is still within the in-flight grace window. Stale "sending"
+     * rows (process died mid-campaign) become eligible again so cron can resume.
+     */
     public function isLockedAgainstRetry(): bool
     {
-        return $this->wasSubmitted()
-            || ($this->attempted_at !== null && $this->provider_message_id === null);
+        if ($this->wasSubmitted()) {
+            return true;
+        }
+
+        if (in_array($this->status, [
+            DeliveryStatus::Unknown,
+            DeliveryStatus::Failed,
+            DeliveryStatus::Delivered,
+            DeliveryStatus::Submitted,
+        ], true)) {
+            return true;
+        }
+
+        if ($this->status !== DeliveryStatus::Sending || $this->attempted_at === null) {
+            return false;
+        }
+
+        $graceSeconds = max(
+            60,
+            (int) config('sms.provider.retry_stale_after', (int) config('sms.provider.timeout', 20) * 3),
+        );
+
+        return $this->attempted_at->gt(now()->subSeconds($graceSeconds));
     }
 
     /**

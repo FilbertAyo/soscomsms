@@ -66,6 +66,10 @@ return [
         'dlr_base_url' => env('SMS_PROVIDER_DLR_BASE_URL'),
         'timeout' => (int) env('SMS_PROVIDER_TIMEOUT', 20),
         'bulk_chunk' => (int) env('SMS_PROVIDER_BULK_CHUNK', 100),
+        // Seconds before a stuck "sending" delivery (no provider id) may be retried.
+        'retry_stale_after' => (int) env('SMS_PROVIDER_RETRY_STALE_AFTER', 90),
+        // Soft time budget per dispatch/resume run so cron can finish and continue next minute.
+        'dispatch_budget_seconds' => (int) env('SMS_PROVIDER_DISPATCH_BUDGET', 45),
         'low_balance_threshold' => (int) env('SMS_PROVIDER_LOW_BALANCE', 10000),
         'dlr_token' => env('SMS_PROVIDER_DLR_TOKEN'),
     ],

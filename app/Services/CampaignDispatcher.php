@@ -69,17 +69,79 @@ class CampaignDispatcher
         $campaign->status = CampaignStatus::Sending;
         $campaign->save();
 
-        $recipientIds = $this->lockRecipientsForSend($campaign);
-        if ($recipientIds === []) {
+        $chunkSize = max(1, (int) config('sms.provider.bulk_chunk', 100));
+        $budgetSeconds = max(5, (int) config('sms.provider.dispatch_budget_seconds', 45));
+        $deadline = microtime(true) + $budgetSeconds;
+        $sentAny = false;
+
+        while (microtime(true) < $deadline) {
+            $chunkIds = $this->claimNextChunk($campaign, $chunkSize);
+            if ($chunkIds === []) {
+                break;
+            }
+
+            $this->dispatchChunk($campaign, $chunkIds);
+            $sentAny = true;
+        }
+
+        $campaign = $this->finishDispatch($campaign, notify: false);
+        $stillPending = $campaign->recipients()
+            ->whereIn('status', [
+                CampaignRecipientStatus::Queued,
+                CampaignRecipientStatus::Pending,
+            ])
+            ->exists();
+
+        if (! $stillPending) {
             return $this->finishDispatch($campaign, notify: true);
         }
 
-        $chunkSize = max(1, (int) config('sms.provider.bulk_chunk', 100));
-        foreach (array_chunk($recipientIds, $chunkSize) as $chunkIds) {
-            $this->dispatchChunk($campaign, $chunkIds);
+        if (! $sentAny) {
+            // All remaining queued rows are still inside the in-flight grace window.
+            return $campaign;
         }
 
-        return $this->finishDispatch($campaign, notify: true);
+        return $campaign;
+    }
+
+    /**
+     * Continue campaigns left in "sending" after a timeout, crash, or budget stop.
+     */
+    public function resumeStuckSending(): int
+    {
+        $ids = Campaign::query()
+            ->where('status', CampaignStatus::Sending)
+            ->whereHas('recipients', function ($query): void {
+                $query->where('status', CampaignRecipientStatus::Queued);
+            })
+            ->orderBy('id')
+            ->pluck('id');
+
+        $resumed = 0;
+        foreach ($ids as $id) {
+            /** @var Campaign|null $campaign */
+            $campaign = Campaign::query()->with('customer')->find($id);
+            if ($campaign === null || $campaign->customer?->isSuspended()) {
+                continue;
+            }
+
+            $before = $campaign->recipients()
+                ->where('status', CampaignRecipientStatus::Queued)
+                ->count();
+
+            $this->dispatch($campaign);
+
+            $after = CampaignRecipient::query()
+                ->where('campaign_id', $id)
+                ->where('status', CampaignRecipientStatus::Queued)
+                ->count();
+
+            if ($after < $before) {
+                $resumed++;
+            }
+        }
+
+        return $resumed;
     }
 
     /**
@@ -247,59 +309,69 @@ class CampaignDispatcher
     }
 
     /**
+     * Lock at most one chunk of unlocked queued recipients for the next send.
+     * Locking per chunk (instead of the whole campaign) keeps later rows retryable
+     * if the process dies mid-send.
+     *
      * @return list<int>
      */
-    private function lockRecipientsForSend(Campaign $campaign): array
+    private function claimNextChunk(Campaign $campaign, int $limit): array
     {
         $provider = Provider::current();
         $ids = [];
         $now = now();
+        $overFetch = max($limit * 3, $limit);
 
-        $campaign->recipients()
+        $candidates = $campaign->recipients()
             ->with('delivery')
             ->where('status', CampaignRecipientStatus::Queued)
             ->orderBy('id')
-            ->chunkById(500, function ($recipients) use ($provider, $now, &$ids): void {
-                $insert = [];
-                $updateIds = [];
+            ->limit($overFetch)
+            ->get();
 
-                foreach ($recipients as $recipient) {
-                    $delivery = $recipient->delivery;
-                    if ($delivery?->isLockedAgainstRetry()) {
-                        continue;
-                    }
+        $insert = [];
+        $updateIds = [];
 
-                    if ($delivery !== null) {
-                        $updateIds[] = $delivery->id;
-                    } else {
-                        $insert[] = [
-                            'campaign_recipient_id' => $recipient->id,
-                            'provider_id' => $provider->id,
-                            'status' => DeliveryStatus::Sending->value,
-                            'attempted_at' => $now,
-                            'created_at' => $now,
-                            'updated_at' => $now,
-                        ];
-                    }
+        foreach ($candidates as $recipient) {
+            if (count($ids) >= $limit) {
+                break;
+            }
 
-                    $ids[] = $recipient->id;
-                }
+            $delivery = $recipient->delivery;
+            if ($delivery?->isLockedAgainstRetry()) {
+                continue;
+            }
 
-                if ($insert !== []) {
-                    Delivery::query()->insertOrIgnore($insert);
-                }
+            if ($delivery !== null) {
+                $updateIds[] = $delivery->id;
+            } else {
+                $insert[] = [
+                    'campaign_recipient_id' => $recipient->id,
+                    'provider_id' => $provider->id,
+                    'status' => DeliveryStatus::Sending->value,
+                    'attempted_at' => $now,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ];
+            }
 
-                if ($updateIds !== []) {
-                    Delivery::query()
-                        ->whereIn('id', $updateIds)
-                        ->update([
-                            'provider_id' => $provider->id,
-                            'status' => DeliveryStatus::Sending->value,
-                            'attempted_at' => $now,
-                            'updated_at' => $now,
-                        ]);
-                }
-            });
+            $ids[] = $recipient->id;
+        }
+
+        if ($insert !== []) {
+            Delivery::query()->insertOrIgnore($insert);
+        }
+
+        if ($updateIds !== []) {
+            Delivery::query()
+                ->whereIn('id', $updateIds)
+                ->update([
+                    'provider_id' => $provider->id,
+                    'status' => DeliveryStatus::Sending->value,
+                    'attempted_at' => $now,
+                    'updated_at' => $now,
+                ]);
+        }
 
         return $ids;
     }
@@ -384,7 +456,12 @@ class CampaignDispatcher
         $campaign->refreshCounts();
         $this->settleUsage($campaign);
 
-        if ($notify) {
+        if ($notify && ! in_array($campaign->status, [
+            CampaignStatus::Queued,
+            CampaignStatus::Sending,
+            CampaignStatus::Scheduled,
+            CampaignStatus::Draft,
+        ], true)) {
             $this->webhooks->campaignCompleted($campaign);
         }
 

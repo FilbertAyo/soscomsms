@@ -3,10 +3,14 @@
 use App\Enums\CampaignRecipientStatus;
 use App\Enums\CampaignStatus;
 use App\Enums\CreditTransactionType;
+use App\Enums\DeliveryStatus;
 use App\Jobs\DispatchCampaignJob;
 use App\Models\Campaign;
+use App\Models\CampaignRecipient;
 use App\Models\CreditTransaction;
 use App\Models\Customer;
+use App\Models\Delivery;
+use App\Models\Provider;
 use App\Models\SenderId;
 use App\Models\User;
 use Carbon\CarbonImmutable;
@@ -193,4 +197,132 @@ it('marks mixed delivery results as partially delivered', function () {
         ->assertJsonPath('campaign.status', CampaignStatus::PartiallyDelivered->value)
         ->assertJsonPath('campaign.delivered', 1)
         ->assertJsonPath('campaign.failed', 1);
+});
+
+it('resumes a stuck sending campaign after stale delivery locks expire', function () {
+    [$user, $customer, $sender] = scheduleCustomer(50);
+    config([
+        'sms.provider.retry_stale_after' => 60,
+        'sms.provider.bulk_chunk' => 100,
+        'sms.provider.dispatch_budget_seconds' => 45,
+    ]);
+
+    $this->actingAs($user)
+        ->postJson('/api/campaigns', [
+            'source' => 'numbers',
+            'message' => 'Habari',
+            'sender_id' => $sender->name,
+            'numbers' => ['0712445221', '0754221891', '0765000001'],
+            'name' => 'Stuck bulk',
+            'scheduled_at' => now()->addMinutes(5)->toIso8601String(),
+        ])
+        ->assertCreated()
+        ->assertJsonPath('campaign.status', CampaignStatus::Scheduled->value);
+
+    $campaign = Campaign::query()->firstOrFail();
+    $message = $campaign->message;
+
+    $campaign->forceFill([
+        'status' => CampaignStatus::Sending,
+        'queued_at' => now()->subMinutes(10),
+        'recipient_count' => 3,
+        'total_segments' => 3,
+    ])->save();
+
+    $campaign->recipients()->delete();
+
+    $sent = CampaignRecipient::factory()->create([
+        'campaign_id' => $campaign->id,
+        'message_id' => $message->id,
+        'phone' => '+255712445221',
+        'status' => CampaignRecipientStatus::Sent,
+        'segment_count' => 1,
+    ]);
+    Delivery::factory()->create([
+        'campaign_recipient_id' => $sent->id,
+        'provider_id' => Provider::current()->id,
+        'status' => DeliveryStatus::Submitted,
+        'provider_message_id' => 'MSH-R'.$sent->id,
+        'attempted_at' => now()->subMinutes(10),
+        'sent_at' => now()->subMinutes(10),
+    ]);
+
+    $stuckPhones = ['+255754221891', '+255765000001'];
+    foreach ($stuckPhones as $phone) {
+        $recipient = CampaignRecipient::factory()->create([
+            'campaign_id' => $campaign->id,
+            'message_id' => $message->id,
+            'phone' => $phone,
+            'status' => CampaignRecipientStatus::Queued,
+            'segment_count' => 1,
+        ]);
+        Delivery::factory()->create([
+            'campaign_recipient_id' => $recipient->id,
+            'provider_id' => Provider::current()->id,
+            'status' => DeliveryStatus::Sending,
+            'provider_message_id' => null,
+            'attempted_at' => now()->subMinutes(10),
+        ]);
+    }
+
+    $this->artisan('sms:dispatch-scheduled')
+        ->expectsOutputToContain('Resumed 1 stuck sending campaign(s).')
+        ->assertSuccessful();
+
+    $this->assertDatabaseHas('campaigns', [
+        'id' => $campaign->id,
+        'status' => CampaignStatus::Completed->value,
+    ]);
+    $this->assertDatabaseHas('campaign_recipients', [
+        'phone' => '+255754221891',
+        'status' => CampaignRecipientStatus::Delivered->value,
+    ]);
+    $this->assertDatabaseHas('campaign_recipients', [
+        'phone' => '+255765000001',
+        'status' => CampaignRecipientStatus::Delivered->value,
+    ]);
+    expect($customer->fresh()->sms_balance)->toBe(47);
+});
+
+it('does not retry stuck deliveries that are still inside the grace window', function () {
+    [$user, , $sender] = scheduleCustomer(20);
+    config(['sms.provider.retry_stale_after' => 120]);
+
+    $this->actingAs($user)
+        ->postJson('/api/campaigns', [
+            'source' => 'numbers',
+            'message' => 'Habari',
+            'sender_id' => $sender->name,
+            'numbers' => ['0712445221'],
+            'scheduled_at' => now()->addHour()->toIso8601String(),
+        ])
+        ->assertCreated();
+
+    $campaign = Campaign::query()->firstOrFail();
+    $campaign->forceFill([
+        'status' => CampaignStatus::Sending,
+        'queued_at' => now(),
+    ])->save();
+
+    $recipient = $campaign->recipients()->firstOrFail();
+    $recipient->update(['status' => CampaignRecipientStatus::Queued]);
+    Delivery::factory()->create([
+        'campaign_recipient_id' => $recipient->id,
+        'provider_id' => Provider::current()->id,
+        'status' => DeliveryStatus::Sending,
+        'attempted_at' => now()->subSeconds(30),
+    ]);
+
+    $this->artisan('sms:dispatch-scheduled')
+        ->expectsOutputToContain('Resumed 0 stuck sending campaign(s).')
+        ->assertSuccessful();
+
+    $this->assertDatabaseHas('campaign_recipients', [
+        'id' => $recipient->id,
+        'status' => CampaignRecipientStatus::Queued->value,
+    ]);
+    $this->assertDatabaseHas('campaigns', [
+        'id' => $campaign->id,
+        'status' => CampaignStatus::Sending->value,
+    ]);
 });
