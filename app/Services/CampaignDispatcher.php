@@ -105,14 +105,55 @@ class CampaignDispatcher
     }
 
     /**
-     * Continue campaigns left in "sending" after a timeout, crash, or budget stop.
+     * Cancel remaining unsent recipients that were already attempted (no provider id).
+     * Never resend those — retries can duplicate SMS at the gateway.
+     */
+    public function cancelStuckSending(): int
+    {
+        $ids = Campaign::query()
+            ->where('status', CampaignStatus::Sending)
+            ->whereHas('recipients', function ($query): void {
+                $query->whereIn('status', [
+                    CampaignRecipientStatus::Queued,
+                    CampaignRecipientStatus::Pending,
+                ])->whereHas('delivery', function ($delivery): void {
+                    $delivery->whereNotNull('attempted_at')
+                        ->where(function ($q): void {
+                            $q->whereNull('provider_message_id')
+                                ->orWhere('provider_message_id', '');
+                        });
+                });
+            })
+            ->orderBy('id')
+            ->pluck('id');
+
+        $cancelled = 0;
+        foreach ($ids as $id) {
+            /** @var Campaign|null $campaign */
+            $campaign = Campaign::query()->with(['customer', 'recipients.delivery'])->find($id);
+            if ($campaign === null) {
+                continue;
+            }
+
+            $didCancel = $this->cancelAmbiguousUnsent($campaign);
+            if ($didCancel) {
+                $cancelled++;
+            }
+        }
+
+        return $cancelled;
+    }
+
+    /**
+     * Continue only never-attempted queued recipients (no delivery row yet).
      */
     public function resumeStuckSending(): int
     {
         $ids = Campaign::query()
             ->where('status', CampaignStatus::Sending)
             ->whereHas('recipients', function ($query): void {
-                $query->where('status', CampaignRecipientStatus::Queued);
+                $query->where('status', CampaignRecipientStatus::Queued)
+                    ->whereDoesntHave('delivery');
             })
             ->orderBy('id')
             ->pluck('id');
@@ -127,13 +168,19 @@ class CampaignDispatcher
 
             $before = $campaign->recipients()
                 ->where('status', CampaignRecipientStatus::Queued)
+                ->whereDoesntHave('delivery')
                 ->count();
+
+            if ($before < 1) {
+                continue;
+            }
 
             $this->dispatch($campaign);
 
             $after = CampaignRecipient::query()
                 ->where('campaign_id', $id)
                 ->where('status', CampaignRecipientStatus::Queued)
+                ->whereDoesntHave('delivery')
                 ->count();
 
             if ($after < $before) {
@@ -142,6 +189,60 @@ class CampaignDispatcher
         }
 
         return $resumed;
+    }
+
+    /**
+     * Mark attempted-but-unconfirmed queued recipients as failed without sending.
+     */
+    private function cancelAmbiguousUnsent(Campaign $campaign): bool
+    {
+        $recipients = $campaign->recipients()
+            ->with('delivery')
+            ->whereIn('status', [
+                CampaignRecipientStatus::Queued,
+                CampaignRecipientStatus::Pending,
+            ])
+            ->whereHas('delivery', function ($delivery): void {
+                $delivery->whereNotNull('attempted_at')
+                    ->where(function ($q): void {
+                        $q->whereNull('provider_message_id')
+                            ->orWhere('provider_message_id', '');
+                    });
+            })
+            ->orderBy('id')
+            ->get();
+
+        if ($recipients->isEmpty()) {
+            return false;
+        }
+
+        $now = now();
+
+        foreach ($recipients as $recipient) {
+            $recipient->status = CampaignRecipientStatus::Failed;
+            $recipient->save();
+
+            $delivery = $recipient->delivery;
+            if ($delivery !== null) {
+                $delivery->status = DeliveryStatus::Failed;
+                $delivery->provider_response_code = 'cancelled';
+                $delivery->provider_response = 'Cancelled to prevent duplicate SMS';
+                $delivery->updated_at = $now;
+                $delivery->save();
+            }
+        }
+
+        ProviderLog::query()->create([
+            'provider_id' => Provider::current()->id,
+            'campaign_id' => $campaign->id,
+            'action' => 'cancel_stuck',
+            'status' => 'ok',
+            'error' => 'Cancelled attempted unsent recipients to stop duplicate SMS',
+        ]);
+
+        $this->finishDispatch($campaign, notify: true);
+
+        return true;
     }
 
     /**

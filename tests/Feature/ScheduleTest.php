@@ -199,13 +199,8 @@ it('marks mixed delivery results as partially delivered', function () {
         ->assertJsonPath('campaign.failed', 1);
 });
 
-it('resumes a stuck sending campaign after stale delivery locks expire', function () {
+it('cancels stuck attempted recipients instead of resending them', function () {
     [$user, $customer, $sender] = scheduleCustomer(50);
-    config([
-        'sms.provider.retry_stale_after' => 60,
-        'sms.provider.bulk_chunk' => 100,
-        'sms.provider.dispatch_budget_seconds' => 45,
-    ]);
 
     $this->actingAs($user)
         ->postJson('/api/campaigns', [
@@ -266,27 +261,30 @@ it('resumes a stuck sending campaign after stale delivery locks expire', functio
     }
 
     $this->artisan('sms:dispatch-scheduled')
-        ->expectsOutputToContain('Resumed 1 stuck sending campaign(s).')
+        ->expectsOutputToContain('Cancelled 1 stuck sending campaign(s).')
         ->assertSuccessful();
 
     $this->assertDatabaseHas('campaigns', [
         'id' => $campaign->id,
-        'status' => CampaignStatus::Completed->value,
+        'status' => CampaignStatus::PartiallyDelivered->value,
     ]);
     $this->assertDatabaseHas('campaign_recipients', [
         'phone' => '+255754221891',
-        'status' => CampaignRecipientStatus::Delivered->value,
+        'status' => CampaignRecipientStatus::Failed->value,
     ]);
     $this->assertDatabaseHas('campaign_recipients', [
         'phone' => '+255765000001',
-        'status' => CampaignRecipientStatus::Delivered->value,
+        'status' => CampaignRecipientStatus::Failed->value,
     ]);
-    expect($customer->fresh()->sms_balance)->toBe(47);
+    $this->assertDatabaseHas('deliveries', [
+        'provider_response_code' => 'cancelled',
+    ]);
+    // Only the already-sent SMS is billed.
+    expect($customer->fresh()->sms_balance)->toBe(49);
 });
 
-it('does not retry stuck deliveries that are still inside the grace window', function () {
+it('does not resend a recently attempted delivery without a provider message id', function () {
     [$user, , $sender] = scheduleCustomer(20);
-    config(['sms.provider.retry_stale_after' => 120]);
 
     $this->actingAs($user)
         ->postJson('/api/campaigns', [
@@ -314,15 +312,15 @@ it('does not retry stuck deliveries that are still inside the grace window', fun
     ]);
 
     $this->artisan('sms:dispatch-scheduled')
-        ->expectsOutputToContain('Resumed 0 stuck sending campaign(s).')
+        ->expectsOutputToContain('Cancelled 1 stuck sending campaign(s).')
         ->assertSuccessful();
 
     $this->assertDatabaseHas('campaign_recipients', [
         'id' => $recipient->id,
-        'status' => CampaignRecipientStatus::Queued->value,
+        'status' => CampaignRecipientStatus::Failed->value,
     ]);
-    $this->assertDatabaseHas('campaigns', [
-        'id' => $campaign->id,
-        'status' => CampaignStatus::Sending->value,
+    $this->assertDatabaseHas('deliveries', [
+        'campaign_recipient_id' => $recipient->id,
+        'provider_response_code' => 'cancelled',
     ]);
 });
