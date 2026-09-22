@@ -181,6 +181,9 @@ run_deploy() {
   ensure_cron
   drain_queue_once
 
+  log "Releasing due schedules and resuming any stuck sending campaigns."
+  "${ARTISAN[@]}" sms:dispatch-scheduled --no-interaction || true
+
   log "Production deploy finished."
 }
 
