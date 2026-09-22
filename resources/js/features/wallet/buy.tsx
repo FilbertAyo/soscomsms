@@ -260,7 +260,7 @@ export function BuySmsPage() {
                       }
                       onClick={() => buyMutation.mutate()}
                     >
-                      {buyMutation.isPending ? 'Please wait…' : 'Submit for payment'}
+                      {buyMutation.isPending ? 'Please wait…' : 'Submit for confirmation'}
                     </Button>
                   </div>
                 </div>
