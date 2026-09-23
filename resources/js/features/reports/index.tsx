@@ -111,6 +111,11 @@ export function DeliveryReportsPage() {
             </Button>
           }
         />
+        <p className='mb-4 rounded-xl border bg-muted/40 px-4 py-3 text-sm text-muted-foreground'>
+          We show the delivery report the telecom network provided. Not
+          confirmed means no delivery confirmation yet — the SMS may still
+          have reached the phone.
+        </p>
         <div className='mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5'>
           <Input
             type='date'

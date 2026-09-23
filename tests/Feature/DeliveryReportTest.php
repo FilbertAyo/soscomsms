@@ -36,7 +36,9 @@ it('normalizes provider delivery statuses to Soscom enums', function () {
         ->and(ProviderDeliveryStatus::normalize('Undelivered'))->toBe(CampaignRecipientStatus::Failed)
         ->and(ProviderDeliveryStatus::normalize('DND'))->toBe(CampaignRecipientStatus::Rejected)
         ->and(ProviderDeliveryStatus::normalize('Submitted'))->toBe(CampaignRecipientStatus::Sent)
-        ->and(ProviderDeliveryStatus::normalize('not-a-status'))->toBeNull();
+        ->and(ProviderDeliveryStatus::normalize('Unknown'))->toBe(CampaignRecipientStatus::Unknown)
+        ->and(ProviderDeliveryStatus::normalize('not-a-status'))->toBeNull()
+        ->and(ProviderDeliveryStatus::normalize(''))->toBeNull();
 });
 
 it('marks fake gateway sends as delivered and lists them on reports', function () {
@@ -176,6 +178,43 @@ it('lets a later delivery report resolve an unknown send', function () {
         'status' => CampaignStatus::Completed->value,
         'delivered_count' => 1,
     ]);
+});
+
+it('applies provider Unknown as not confirmed without changing credits', function () {
+    [$user, $customer, $sender] = reportCustomer(20);
+    config(['sms.fake.auto_dlr' => false]);
+
+    $this->actingAs($user)
+        ->postJson('/api/campaigns', [
+            'source' => 'numbers',
+            'message' => 'Habari',
+            'sender_id' => $sender->name,
+            'numbers' => ['0712445221'],
+        ])
+        ->assertCreated();
+
+    $delivery = Delivery::query()->first();
+    expect($delivery?->provider_message_id)->not->toBeNull();
+
+    $this->postJson('/api/provider/delivery-reports', [
+        'msgid' => $delivery->provider_message_id,
+        'status' => 'Unknown',
+        'mobileno' => '255712445221',
+    ])
+        ->assertOk()
+        ->assertJsonPath('matched', true);
+
+    $this->assertDatabaseHas('campaign_recipients', [
+        'phone' => '+255712445221',
+        'status' => CampaignRecipientStatus::Unknown->value,
+    ]);
+    expect($customer->fresh()->sms_balance)->toBe(19);
+
+    $this->actingAs($user)
+        ->getJson('/api/delivery-reports?status=unknown')
+        ->assertOk()
+        ->assertJsonPath('reports.0.status', CampaignRecipientStatus::Unknown->value)
+        ->assertJsonPath('reports.0.phone', '+255712445221');
 });
 
 it('hides another customers delivery reports and requires a DLR token when configured', function () {

@@ -333,6 +333,95 @@ it('polls dlrstatus_api with messageid and applies Message_id,DLR_Status,DLR_Tim
     ]);
 });
 
+it('leaves existing status unchanged when the DLR poll body is empty', function () {
+    config([
+        'sms.gateway' => GatewayDriver::Mobishastra->value,
+        'sms.provider.base_url' => 'https://example.invalid',
+        'sms.provider.profile_id' => 'SOSCOM',
+        'sms.provider.password' => 'secret',
+        'sms.provider.dlr_path' => 'dlrstatus_api.aspx',
+    ]);
+    Provider::query()->delete();
+    $provider = Provider::factory()->mobishastra()->create([
+        'base_url' => 'https://example.invalid',
+        'profile_id' => 'SOSCOM',
+        'password' => 'secret',
+    ]);
+
+    $recipient = CampaignRecipient::factory()->create([
+        'phone' => '+255712445221',
+        'status' => CampaignRecipientStatus::Sent,
+    ]);
+    Delivery::factory()->create([
+        'campaign_recipient_id' => $recipient->id,
+        'provider_id' => $provider->id,
+        'provider_message_id' => 'M-empty',
+        'status' => DeliveryStatus::Submitted,
+        'sent_at' => now(),
+    ]);
+
+    Http::fake([
+        'https://example.invalid/dlrstatus_api.aspx*' => Http::response('', 200),
+    ]);
+
+    $this->artisan('sms:poll-delivery-reports')
+        ->expectsOutputToContain('Updated 0')
+        ->assertSuccessful();
+
+    $this->assertDatabaseHas('campaign_recipients', [
+        'id' => $recipient->id,
+        'status' => CampaignRecipientStatus::Sent->value,
+    ]);
+});
+
+it('polls DELIVRD and upgrades an unknown recipient to delivered', function () {
+    config([
+        'sms.gateway' => GatewayDriver::Mobishastra->value,
+        'sms.provider.base_url' => 'https://example.invalid',
+        'sms.provider.profile_id' => 'SOSCOM',
+        'sms.provider.password' => 'secret',
+        'sms.provider.dlr_path' => 'dlrstatus_api.aspx',
+    ]);
+    Provider::query()->delete();
+    $provider = Provider::factory()->mobishastra()->create([
+        'base_url' => 'https://example.invalid',
+        'profile_id' => 'SOSCOM',
+        'password' => 'secret',
+    ]);
+
+    $recipient = CampaignRecipient::factory()->create([
+        'phone' => '+255712445221',
+        'status' => CampaignRecipientStatus::Unknown,
+    ]);
+    Delivery::factory()->create([
+        'campaign_recipient_id' => $recipient->id,
+        'provider_id' => $provider->id,
+        'provider_message_id' => '1871080898',
+        'status' => DeliveryStatus::Unknown,
+        'sent_at' => now(),
+    ]);
+
+    Http::fake([
+        'https://example.invalid/dlrstatus_api.aspx*' => Http::response(
+            '1871080898,DELIVRD,September 23, 2026, 11:20 AM',
+            200
+        ),
+    ]);
+
+    $this->artisan('sms:poll-delivery-reports')
+        ->expectsOutputToContain('Updated 1')
+        ->assertSuccessful();
+
+    $this->assertDatabaseHas('campaign_recipients', [
+        'id' => $recipient->id,
+        'status' => CampaignRecipientStatus::Delivered->value,
+    ]);
+    $this->assertDatabaseHas('deliveries', [
+        'provider_message_id' => '1871080898',
+        'status' => DeliveryStatus::Delivered->value,
+    ]);
+});
+
 it('skips DLR polling while the fake gateway is active', function () {
     $this->artisan('sms:poll-delivery-reports')
         ->expectsOutputToContain('Skipped')

@@ -189,7 +189,8 @@ class MobishastraGateway implements SmsGatewayInterface
     {
         $path = (string) config('sms.provider.dlr_path', 'dlrstatus_api.aspx');
         if ($path === '') {
-            return new DeliveryReport($providerMessageId, 'unknown', '');
+            // Empty status is unmapped — do not invent provider "Unknown".
+            return new DeliveryReport($providerMessageId, '', '');
         }
 
         $provider = Provider::current();
@@ -204,7 +205,7 @@ class MobishastraGateway implements SmsGatewayInterface
         } catch (ConnectionException $exception) {
             $this->log($provider, 'delivery_status', $this->redact($query), null, null, 'timeout', $exception->getMessage());
 
-            return new DeliveryReport($providerMessageId, 'unknown', $exception->getMessage());
+            return new DeliveryReport($providerMessageId, '', $exception->getMessage());
         }
 
         $raw = trim($response->body());
@@ -247,7 +248,8 @@ class MobishastraGateway implements SmsGatewayInterface
     private function mapDlrBody(string $providerMessageId, string $raw): DeliveryReport
     {
         if ($raw === '') {
-            return new DeliveryReport($providerMessageId, 'unknown', '');
+            // Empty poll body is unmapped — keep the existing Soscom status.
+            return new DeliveryReport($providerMessageId, '', '');
         }
 
         if (! str_contains($raw, ',')) {

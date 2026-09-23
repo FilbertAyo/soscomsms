@@ -47,6 +47,11 @@ final class ProviderDeliveryStatus
             'buffered',
             'enroute',
             'ack' => CampaignRecipientStatus::Sent,
+            'unknown',
+            'unknwn',
+            'notconfirmed',
+            'notrcvd',
+            'noreport' => CampaignRecipientStatus::Unknown,
             default => null,
         };
     }
