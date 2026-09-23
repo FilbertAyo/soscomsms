@@ -54,19 +54,31 @@ function guessColumn(headers: string[], candidates: string[]): string {
   return headers[0] ?? IGNORE
 }
 
+function looksLikePhone(value: string): boolean {
+  const digits = value.replace(/\D/g, '')
+  return /^(?:0[67]\d{8}|255[67]\d{8}|[67]\d{8})$/.test(digits)
+}
+
+function columnLabels(width: number): string[] {
+  return Array.from({ length: width }, (_, index) => `Column ${String.fromCharCode(65 + index)}`)
+}
+
 export function ImportContacts() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [step, setStep] = useState(0)
   const [file, setFile] = useState<File | null>(null)
   const [rows, setRows] = useState<string[][]>([])
+  const [hasHeader, setHasHeader] = useState(true)
   const [nameColumn, setNameColumn] = useState('Name')
   const [phoneColumn, setPhoneColumn] = useState('Phone')
   const [groupColumn, setGroupColumn] = useState('Group')
   const [result, setResult] = useState<ContactImportResult | null>(null)
 
-  const headers = rows[0] ?? []
-  const bodyRows = rows.slice(1)
+  const headers = hasHeader
+    ? (rows[0] ?? [])
+    : columnLabels(Math.max(...rows.map((row) => row.length), 0))
+  const bodyRows = hasHeader ? rows.slice(1) : rows
   const columnOptions = [...headers, IGNORE]
 
   const previewRows = useMemo(() => {
@@ -88,24 +100,30 @@ export function ImportContacts() {
         throw new Error('Upload a CSV file to continue.')
       }
 
+      const phoneIndex = headers.indexOf(phoneColumn)
+      if (phoneIndex < 0 || phoneColumn === IGNORE) {
+        throw new Error('Choose the phone number column.')
+      }
+
+      const nameIndex =
+        nameColumn === IGNORE ? null : headers.indexOf(nameColumn)
+      const groupIndex =
+        groupColumn === IGNORE ? null : headers.indexOf(groupColumn)
+
       return importContacts(file, {
         name: nameColumn,
         phone: phoneColumn,
         group: groupColumn,
+        hasHeader,
+        nameIndex: nameIndex !== null && nameIndex >= 0 ? nameIndex : null,
+        phoneIndex,
+        groupIndex: groupIndex !== null && groupIndex >= 0 ? groupIndex : null,
       })
     },
     onSuccess: async (payload) => {
       setResult(payload)
       await queryClient.invalidateQueries({ queryKey: ['contacts'] })
       await queryClient.invalidateQueries({ queryKey: contactGroupsQueryKey })
-
-      if (payload.status === 'queued') {
-        toast.success(
-          payload.message ?? 'Your contacts are importing in the background.'
-        )
-        navigate({ to: '/contacts' })
-        return
-      }
 
       if (payload.created > 0) {
         toast.success(
@@ -114,8 +132,11 @@ export function ImportContacts() {
         return
       }
 
+      const firstError = payload.errors[0]
       toast.error(
-        `No contacts imported. Skipped ${formatNumber(payload.skipped)}. Invalid ${formatNumber(payload.invalid)}.`
+        firstError
+          ? `No contacts imported. Row ${firstError.row}: ${firstError.reason}`
+          : `No contacts imported. Skipped ${formatNumber(payload.skipped)}. Invalid ${formatNumber(payload.invalid)}.`
       )
     },
     onError: (error) => {
@@ -136,14 +157,29 @@ export function ImportContacts() {
     const text = await selected.text()
     const parsed = parseCsvText(text)
     setRows(parsed)
+    const headerless =
+      (parsed[0] ?? []).some((cell) => looksLikePhone(cell))
+    setHasHeader(!headerless)
+
+    if (headerless) {
+      const labels = columnLabels(Math.max(parsed[0]?.length ?? 0, 3))
+      setPhoneColumn(labels[0] ?? 'Column A')
+      setGroupColumn(labels[1] ?? 'Column B')
+      setNameColumn((parsed[0]?.length ?? 0) >= 3 ? (labels[2] ?? 'Column C') : IGNORE)
+      return
+    }
+
     const nextHeaders = parsed[0] ?? []
     setNameColumn(guessColumn(nextHeaders, ['name', 'full name', 'contact']))
     setPhoneColumn(
-      guessColumn(nextHeaders, ['phone', 'phone number', 'mobile', 'msisdn'])
+      guessColumn(nextHeaders, ['phone', 'phone number', 'mobile', 'number', 'msisdn'])
     )
-    const guessedGroup = guessColumn(nextHeaders, ['group', 'category'])
+    const guessedGroup = guessColumn(nextHeaders, ['group', 'category', 'habil'])
     setGroupColumn(
-      ['group', 'category'].includes(guessedGroup.trim().toLowerCase())
+      nextHeaders.some((header) =>
+        ['group', 'category'].includes(header.trim().toLowerCase()) ||
+        header.trim().toLowerCase().includes('habil')
+      )
         ? guessedGroup
         : IGNORE
     )
@@ -155,8 +191,12 @@ export function ImportContacts() {
       return
     }
 
-    if (step === 0 && rows.length < 2) {
-      toast.error('The file needs a header row and at least one contact.')
+    if (step === 0 && (hasHeader ? rows.length < 2 : rows.length < 1)) {
+      toast.error(
+        hasHeader
+          ? 'The file needs a header row and at least one contact.'
+          : 'The file needs at least one contact.'
+      )
       return
     }
 
@@ -169,7 +209,7 @@ export function ImportContacts() {
       <Main>
         <PageHeader
           title='Import Contacts'
-          description='Upload a CSV file, match the columns, then review before importing. Duplicate Tanzanian numbers are skipped.'
+          description='Upload a CSV. With no header, column A is the number, column B is the group, and column C is the name. Files with a header row are matched automatically.'
         />
         <div className='mb-8 rounded-xl border bg-card p-5'>
           <Stepper steps={steps} current={step} />
@@ -187,8 +227,10 @@ export function ImportContacts() {
             />
             <p className='mt-2 text-sm text-muted-foreground'>
               {file
-                ? `Selected: ${file.name}`
-                : 'Use columns such as Name, Phone, and Group. Excel files should be saved as CSV first.'}
+                ? hasHeader
+                  ? `Selected: ${file.name}. Header row detected — columns will be matched from the names in the file.`
+                  : `Selected: ${file.name}. No header row. Column A is the number, column B is the group, and column C is the name.`
+                : 'Save Excel as CSV. No header: A = number, B = group, C = name. With a header row, columns are detected from the names.'}
             </p>
             <Button className='mt-6' onClick={next}>
               Continue
@@ -200,26 +242,31 @@ export function ImportContacts() {
           <section className='rounded-xl border bg-card p-5'>
             <h2 className='font-semibold'>Match columns</h2>
             <p className='mt-1 text-sm text-muted-foreground'>
-              Tell us which column in your file is name, phone number, and group.
+              {hasHeader
+                ? 'These columns were detected from your header row. Change them if a column was matched incorrectly.'
+                : 'This file has no header. Column A is always the number, column B is always the group, and column C is the name.'}
             </p>
             <div className='mt-5 grid gap-4 sm:grid-cols-3'>
-              <ColumnSelect
-                label='Name'
-                value={nameColumn}
-                options={columnOptions}
-                onChange={setNameColumn}
-              />
               <ColumnSelect
                 label='Phone Number'
                 value={phoneColumn}
                 options={columnOptions}
                 onChange={setPhoneColumn}
+                disabled={!hasHeader}
               />
               <ColumnSelect
                 label='Group'
                 value={groupColumn}
                 options={columnOptions}
                 onChange={setGroupColumn}
+                disabled={!hasHeader}
+              />
+              <ColumnSelect
+                label='Name'
+                value={nameColumn}
+                options={columnOptions}
+                onChange={setNameColumn}
+                disabled={!hasHeader}
               />
             </div>
             <div className='mt-6 flex gap-2'>
@@ -238,8 +285,8 @@ export function ImportContacts() {
                 {formatNumber(bodyRows.length)} contacts ready to import
               </p>
               <p className='text-sm text-muted-foreground'>
-                Review a sample below. Duplicate phones for this account are
-                skipped. Invalid numbers are reported, not saved.
+                Review a sample below. If name is ignored, the phone number is
+                saved as the name. Duplicate phones are skipped.
               </p>
             </div>
             <TableWrap>
@@ -310,18 +357,20 @@ function ColumnSelect({
   value,
   options,
   onChange,
+  disabled = false,
 }: {
   label: string
   value: string
   options: string[]
   onChange: (value: string) => void
+  disabled?: boolean
 }) {
   const unique = Array.from(new Set(options.filter((option) => option !== '')))
 
   return (
     <div className='space-y-2'>
       <Label>{label}</Label>
-      <Select value={value} onValueChange={onChange}>
+      <Select value={value} onValueChange={onChange} disabled={disabled}>
         <SelectTrigger>
           <SelectValue />
         </SelectTrigger>

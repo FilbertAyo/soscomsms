@@ -101,13 +101,29 @@ export async function updateContact(
 
 export async function importContacts(
   file: File,
-  columns: { name: string; phone: string; group: string }
+  columns: {
+    name: string
+    phone: string
+    group: string
+    hasHeader: boolean
+    nameIndex: number | null
+    phoneIndex: number
+    groupIndex: number | null
+  }
 ): Promise<ContactImportResult> {
   const body = new FormData()
   body.append('file', file)
   body.append('name_column', columns.name)
   body.append('phone_column', columns.phone)
   body.append('group_column', columns.group)
+  body.append('has_header', columns.hasHeader ? '1' : '0')
+  body.append('phone_index', String(columns.phoneIndex))
+  if (columns.nameIndex !== null) {
+    body.append('name_index', String(columns.nameIndex))
+  }
+  if (columns.groupIndex !== null) {
+    body.append('group_index', String(columns.groupIndex))
+  }
 
   const { data } = await api.post<ContactImportResult>(
     '/api/contacts/import',

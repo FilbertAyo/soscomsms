@@ -23,6 +23,10 @@ class ContactImporter
         string $nameColumn = 'name',
         string $phoneColumn = 'phone',
         ?string $groupColumn = 'group',
+        bool $hasHeader = true,
+        ?int $nameIndex = null,
+        ?int $phoneIndex = null,
+        ?int $groupIndex = null,
     ): array {
         return $this->importPath(
             $customer,
@@ -30,6 +34,10 @@ class ContactImporter
             $nameColumn,
             $phoneColumn,
             $groupColumn,
+            $hasHeader,
+            $nameIndex,
+            $phoneIndex,
+            $groupIndex,
         );
     }
 
@@ -42,6 +50,10 @@ class ContactImporter
         string $nameColumn = 'name',
         string $phoneColumn = 'phone',
         ?string $groupColumn = 'group',
+        bool $hasHeader = true,
+        ?int $nameIndex = null,
+        ?int $phoneIndex = null,
+        ?int $groupIndex = null,
     ): array {
         $handle = fopen($path, 'r');
 
@@ -55,23 +67,43 @@ class ContactImporter
         }
 
         try {
-            $header = fgetcsv($handle);
-            if ($header === false) {
-                return [
-                    'created' => 0,
-                    'skipped' => 0,
-                    'invalid' => 1,
-                    'errors' => [['row' => 1, 'reason' => 'The file is empty.']],
+            $indexes = [
+                'name' => $this->isIgnored($nameColumn) ? null : $nameIndex,
+                'phone' => $phoneIndex,
+                'group' => $this->isIgnored($groupColumn) ? null : $groupIndex,
+            ];
+
+            if (! $hasHeader) {
+                $indexes = [
+                    'phone' => 0,
+                    'group' => 1,
+                    'name' => 2,
                 ];
+            } else {
+                $header = fgetcsv($handle);
+                if ($header === false) {
+                    return [
+                        'created' => 0,
+                        'skipped' => 0,
+                        'invalid' => 1,
+                        'errors' => [['row' => 1, 'reason' => 'The file is empty.']],
+                    ];
+                }
+
+                $fromHeader = $this->columnIndexes($header, $nameColumn, $phoneColumn, $groupColumn);
+                $indexes['name'] = $this->isIgnored($nameColumn) ? null : ($nameIndex ?? $fromHeader['name']);
+                $indexes['phone'] = $phoneIndex ?? $fromHeader['phone'];
+                $indexes['group'] = $this->isIgnored($groupColumn)
+                    ? null
+                    : ($groupIndex ?? $fromHeader['group']);
             }
 
-            $indexes = $this->columnIndexes($header, $nameColumn, $phoneColumn, $groupColumn);
-            if ($indexes['name'] === null || $indexes['phone'] === null) {
+            if ($indexes['phone'] === null) {
                 return [
                     'created' => 0,
                     'skipped' => 0,
                     'invalid' => 1,
-                    'errors' => [['row' => 1, 'reason' => 'Name and phone columns are required.']],
+                    'errors' => [['row' => 1, 'reason' => 'Choose the phone number column.']],
                 ];
             }
 
@@ -79,7 +111,7 @@ class ContactImporter
             $skipped = 0;
             $invalid = 0;
             $errors = [];
-            $rowNumber = 1;
+            $rowNumber = $hasHeader ? 1 : 0;
             $seenInFile = [];
             $pending = [];
             $groups = $customer->contactGroups()
@@ -106,18 +138,13 @@ class ContactImporter
                         continue;
                     }
 
-                    $name = trim((string) ($row[$indexes['name']] ?? ''));
                     $phoneRaw = trim((string) ($row[$indexes['phone']] ?? ''));
                     $groupName = $indexes['group'] === null
                         ? ''
                         : trim((string) ($row[$indexes['group']] ?? ''));
-
-                    if ($name === '') {
-                        $invalid++;
-                        $errors[] = ['row' => $rowNumber, 'reason' => 'Name is missing.'];
-
-                        continue;
-                    }
+                    $name = $indexes['name'] === null
+                        ? ''
+                        : trim((string) ($row[$indexes['name']] ?? ''));
 
                     if (! TanzaniaPhone::isValid($phoneRaw)) {
                         $invalid++;
@@ -127,6 +154,9 @@ class ContactImporter
                     }
 
                     $phone = TanzaniaPhone::normalize($phoneRaw);
+                    if ($name === '') {
+                        $name = $phone;
+                    }
 
                     if (isset($seenInFile[$phone])) {
                         $skipped++;
@@ -248,12 +278,25 @@ class ContactImporter
         }
 
         return [
-            'name' => $normalized[$this->normalizeHeader($nameColumn)] ?? $normalized['name'] ?? null,
+            'name' => $this->isIgnored($nameColumn)
+                ? null
+                : ($normalized[$this->normalizeHeader($nameColumn)] ?? $normalized['name'] ?? null),
             'phone' => $normalized[$this->normalizeHeader($phoneColumn)] ?? $normalized['phone'] ?? $normalized['phone number'] ?? null,
-            'group' => $groupColumn === null || $groupColumn === '' || $this->normalizeHeader($groupColumn) === 'ignore'
+            'group' => $groupColumn === null || $this->isIgnored($groupColumn)
                 ? null
                 : ($normalized[$this->normalizeHeader($groupColumn)] ?? $normalized['group'] ?? null),
         ];
+    }
+
+    private function isIgnored(?string $value): bool
+    {
+        if ($value === null) {
+            return true;
+        }
+
+        $normalized = $this->normalizeHeader($value);
+
+        return $normalized === '' || $normalized === 'ignore' || $normalized === 'ignore this column';
     }
 
     private function normalizeHeader(string $value): string

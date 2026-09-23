@@ -262,6 +262,62 @@ CSV;
         ->and($customer->contacts()->where('phone', '+255712445221')->value('name'))->toBe('Juma Hassan');
 });
 
+it('imports a headerless phone and group file when name is ignored', function () {
+    [$user, $customer] = customerUser();
+
+    $csv = <<<'CSV'
+0612189927,Habili - Mchango
+0613079395,Habili - Mchango
+0613455528,Habili - Mchango
+CSV;
+
+    $file = UploadedFile::fake()->createWithContent('habili.csv', $csv);
+
+    $this->actingAs($user)
+        ->post('/api/contacts/import', [
+            'file' => $file,
+            'name_column' => 'Ignore',
+            'phone_column' => 'Column 1',
+            'group_column' => 'Column 2',
+            'has_header' => 0,
+            'phone_index' => 0,
+            'group_index' => 1,
+        ], ['Accept' => 'application/json'])
+        ->assertOk()
+        ->assertJsonPath('status', 'completed')
+        ->assertJsonPath('created', 3)
+        ->assertJsonPath('invalid', 0);
+
+    expect($customer->contacts()->count())->toBe(3)
+        ->and($customer->contacts()->where('phone', '+255612189927')->value('name'))->toBe('+255612189927')
+        ->and($customer->contactGroups()->where('name', 'Habili - Mchango')->exists())->toBeTrue();
+});
+
+it('reads a headerless file as column A number, column B group, and column C name', function () {
+    [$user, $customer] = customerUser();
+
+    $csv = <<<'CSV'
+0612189927,Habili - Mchango,Amina
+0613079395,Habili - Mchango,Juma
+CSV;
+
+    $file = UploadedFile::fake()->createWithContent('habili.csv', $csv);
+
+    $this->actingAs($user)
+        ->post('/api/contacts/import', [
+            'file' => $file,
+            'has_header' => 0,
+            'phone_index' => 2,
+            'group_index' => 0,
+            'name_index' => 1,
+        ], ['Accept' => 'application/json'])
+        ->assertOk()
+        ->assertJsonPath('created', 2);
+
+    expect($customer->contacts()->where('phone', '+255612189927')->value('name'))->toBe('Amina')
+        ->and($customer->contacts()->where('phone', '+255612189927')->first()?->group?->name)->toBe('Habili - Mchango');
+});
+
 it('paginates contacts ten at a time', function () {
     [$user, $customer] = customerUser();
     Contact::factory()->count(12)->create(['customer_id' => $customer->id]);
