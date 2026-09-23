@@ -17,6 +17,7 @@ use App\Http\Controllers\Api\CampaignController;
 use App\Http\Controllers\Api\ContactController;
 use App\Http\Controllers\Api\ContactGroupController;
 use App\Http\Controllers\Api\ContactImportController;
+use App\Http\Controllers\Api\MessageTemplateController;
 use App\Http\Controllers\Api\DeliveryReportController;
 use App\Http\Controllers\Api\PasswordController;
 use App\Http\Controllers\Api\PasswordResetController;
@@ -78,6 +79,11 @@ Route::prefix('api')->group(function (): void {
             Route::get('/sender-id-requests', [SenderIdRequestController::class, 'index']);
             Route::post('/sender-id-requests', [SenderIdRequestController::class, 'store']);
             Route::get('/sender-id-requests/{senderIdRequest}', [SenderIdRequestController::class, 'show']);
+
+            Route::get('/message-templates', [MessageTemplateController::class, 'index']);
+            Route::post('/message-templates', [MessageTemplateController::class, 'store']);
+            Route::patch('/message-templates/{messageTemplate}', [MessageTemplateController::class, 'update']);
+            Route::delete('/message-templates/{messageTemplate}', [MessageTemplateController::class, 'destroy']);
 
             Route::post('/sms/preview', [CampaignController::class, 'preview']);
             Route::post('/sms/segment', [CampaignController::class, 'segment']);

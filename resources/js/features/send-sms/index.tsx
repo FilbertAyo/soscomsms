@@ -8,12 +8,7 @@ import {
   createCampaign,
   previewCampaign,
 } from '@/lib/campaigns'
-import {
-  contactGroupsQueryKey,
-  contactsQueryKey,
-  fetchContactGroups,
-  fetchContacts,
-} from '@/lib/contacts'
+import { contactGroupsQueryKey, fetchContactGroups } from '@/lib/contacts'
 import {
   creditTransactionsQueryKey,
   walletQueryKey,
@@ -21,6 +16,13 @@ import {
 } from '@/lib/credits'
 import { parseCsvText } from '@/lib/csv'
 import { formatNumber } from '@/lib/format'
+import {
+  createMessageTemplate,
+  deleteMessageTemplate,
+  fetchMessageTemplates,
+  messageTemplatesQueryKey,
+  updateMessageTemplate,
+} from '@/lib/message-templates'
 import { fetchUsableSenderIds, usableSenderIdsQueryKey } from '@/lib/sender-ids'
 import { analyzeSms, parsePhoneNumbers } from '@/lib/sms'
 import { useAuthStore } from '@/stores/auth-store'
@@ -40,10 +42,10 @@ import { ConfirmDialog } from '@/components/confirm-dialog'
 import { AppHeader } from '@/components/soscom/app-header'
 import { PageHeader } from '@/components/soscom/page-header'
 import { Main } from '@/components/layout/main'
-import { Checkbox } from '@/components/ui/checkbox'
 import { type CampaignPayload } from '@/types/campaigns'
+import { type MessageTemplate } from '@/types/message-templates'
 
-type RecipientMode = 'numbers' | 'contacts' | 'group' | 'upload'
+type RecipientMode = 'numbers' | 'group' | 'upload'
 
 export function SendSms() {
   const navigate = useNavigate()
@@ -51,11 +53,12 @@ export function SendSms() {
   const [senderId, setSenderId] = useState('')
   const [mode, setMode] = useState<RecipientMode>('numbers')
   const [numbers, setNumbers] = useState('')
-  const [selectedContacts, setSelectedContacts] = useState<number[]>([])
   const [groupId, setGroupId] = useState('')
   const [uploadNumbers, setUploadNumbers] = useState<string[]>([])
   const [uploadName, setUploadName] = useState('')
   const [message, setMessage] = useState('')
+  const [templateName, setTemplateName] = useState('')
+  const [editingTemplateId, setEditingTemplateId] = useState<number | null>(null)
   const [schedule, setSchedule] = useState(false)
   const [scheduleAt, setScheduleAt] = useState('')
   const [confirmOpen, setConfirmOpen] = useState(false)
@@ -69,15 +72,14 @@ export function SendSms() {
     queryKey: contactGroupsQueryKey,
     queryFn: fetchContactGroups,
   })
-  const contactsQuery = useQuery({
-    queryKey: contactsQueryKey({ status: 'active' }),
-    queryFn: () => fetchContacts({ status: 'active', perPage: 200 }),
-    enabled: mode === 'contacts',
+  const templatesQuery = useQuery({
+    queryKey: messageTemplatesQueryKey,
+    queryFn: fetchMessageTemplates,
   })
 
   const senderIds = senderIdsQuery.data ?? []
   const groups = groupsQuery.data ?? []
-  const contacts = contactsQuery.data?.contacts ?? []
+  const templates = templatesQuery.data ?? []
 
   useEffect(() => {
     if (senderIds.length === 0) {
@@ -110,8 +112,6 @@ export function SendSms() {
     switch (mode) {
       case 'numbers':
         return { ...base, source: 'numbers', numbers: parsedNumbers }
-      case 'contacts':
-        return { ...base, source: 'contacts', contact_ids: selectedContacts }
       case 'group':
         return {
           ...base,
@@ -130,7 +130,6 @@ export function SendSms() {
     message,
     mode,
     parsedNumbers,
-    selectedContacts,
     senderId,
     uploadNumbers,
   ])
@@ -247,6 +246,76 @@ export function SendSms() {
     setUploadNumbers(phones)
   }
 
+  const saveTemplateMutation = useMutation({
+    mutationFn: (payload: { id: number | null; name: string; body: string }) => {
+      if (payload.id === null) {
+        return createMessageTemplate({ name: payload.name, body: payload.body })
+      }
+
+      return updateMessageTemplate(payload.id, {
+        name: payload.name,
+        body: payload.body,
+      })
+    },
+    onSuccess: async (_template, payload) => {
+      await queryClient.invalidateQueries({ queryKey: messageTemplatesQueryKey })
+      toast.success(payload.id === null ? 'Template saved.' : 'Template updated.')
+      setEditingTemplateId(null)
+      setTemplateName('')
+    },
+    onError: (error) => {
+      toast.error(applyValidationErrors(error, () => undefined))
+    },
+  })
+
+  const deleteTemplateMutation = useMutation({
+    mutationFn: (id: number) => deleteMessageTemplate(id),
+    onSuccess: async (_result, id) => {
+      await queryClient.invalidateQueries({ queryKey: messageTemplatesQueryKey })
+      setEditingTemplateId((current) => (current === id ? null : current))
+      setTemplateName((current) =>
+        editingTemplateId === id ? '' : current
+      )
+      toast.success('Template deleted.')
+    },
+    onError: (error) => {
+      toast.error(applyValidationErrors(error, () => undefined))
+    },
+  })
+
+  function loadTemplate(template: MessageTemplate) {
+    setMessage(template.body)
+  }
+
+  function beginEdit(template: MessageTemplate) {
+    setEditingTemplateId(template.id)
+    setTemplateName(template.name)
+    setMessage(template.body)
+  }
+
+  function cancelEdit() {
+    setEditingTemplateId(null)
+    setTemplateName('')
+  }
+
+  function saveTemplate() {
+    const name = templateName.trim()
+    if (!name) {
+      toast.error('Name this template before saving.')
+      return
+    }
+    if (!message.trim()) {
+      toast.error('Type a message before saving it as a template.')
+      return
+    }
+
+    saveTemplateMutation.mutate({
+      id: editingTemplateId,
+      name,
+      body: message,
+    })
+  }
+
   return (
     <>
       <AppHeader />
@@ -314,7 +383,6 @@ export function SendSms() {
               >
                 <TabsList className='mb-4 h-auto w-full flex-wrap'>
                   <TabsTrigger value='numbers'>Enter numbers</TabsTrigger>
-                  <TabsTrigger value='contacts'>Select contacts</TabsTrigger>
                   <TabsTrigger value='group'>Select group</TabsTrigger>
                   <TabsTrigger value='upload'>Upload CSV</TabsTrigger>
                 </TabsList>
@@ -325,43 +393,6 @@ export function SendSms() {
                     placeholder='0712445221, one number per line'
                     rows={6}
                   />
-                </TabsContent>
-                <TabsContent value='contacts'>
-                  <div className='max-h-64 space-y-2 overflow-y-auto'>
-                    {contacts.map((contact) => {
-                      const checked = selectedContacts.includes(contact.id)
-                      return (
-                        <label
-                          key={contact.id}
-                          className='flex items-center gap-3 rounded-lg border px-3 py-2'
-                        >
-                          <Checkbox
-                            checked={checked}
-                            onCheckedChange={(value) => {
-                              setSelectedContacts((current) =>
-                                value
-                                  ? [...current, contact.id]
-                                  : current.filter((id) => id !== contact.id)
-                              )
-                            }}
-                          />
-                          <span className='flex-1'>
-                            <span className='block text-sm font-medium'>
-                              {contact.name}
-                            </span>
-                            <span className='text-xs text-muted-foreground'>
-                              {contact.phone}
-                            </span>
-                          </span>
-                        </label>
-                      )
-                    })}
-                    {contacts.length === 0 ? (
-                      <p className='text-sm text-muted-foreground'>
-                        No active contacts yet.
-                      </p>
-                    ) : null}
-                  </div>
                 </TabsContent>
                 <TabsContent value='group'>
                   <Select
@@ -399,25 +430,120 @@ export function SendSms() {
             </section>
 
             <section className='rounded-xl border bg-card p-5'>
-              <Label htmlFor='message'>Message</Label>
+              <div className='flex items-center justify-between gap-3'>
+                <Label>Message templates</Label>
+                <p className='text-sm text-muted-foreground'>
+                  {templatesQuery.isPending
+                    ? 'Loading…'
+                    : `${formatNumber(templates.length)} saved`}
+                </p>
+              </div>
+              <div className='mt-3 max-h-64 space-y-2 overflow-y-auto'>
+                {templates.map((template) => (
+                  <div
+                    key={template.id}
+                    className={`flex flex-col gap-3 rounded-lg border px-3 py-2 sm:flex-row sm:items-start sm:justify-between ${
+                      editingTemplateId === template.id ? 'border-primary' : ''
+                    }`}
+                  >
+                    <div className='min-w-0 flex-1'>
+                      <p className='text-sm font-medium'>{template.name}</p>
+                      <p className='truncate text-xs text-muted-foreground'>
+                        {template.body}
+                      </p>
+                      <p className='text-xs text-muted-foreground'>
+                        {formatNumber(template.characterCount)} characters ·{' '}
+                        {formatNumber(template.segmentCount)} SMS
+                      </p>
+                    </div>
+                    <div className='flex shrink-0 gap-1'>
+                      <Button
+                        type='button'
+                        size='sm'
+                        variant='outline'
+                        onClick={() => loadTemplate(template)}
+                      >
+                        Use
+                      </Button>
+                      <Button
+                        type='button'
+                        size='sm'
+                        variant='ghost'
+                        onClick={() => beginEdit(template)}
+                      >
+                        Edit
+                      </Button>
+                      <Button
+                        type='button'
+                        size='sm'
+                        variant='ghost'
+                        disabled={deleteTemplateMutation.isPending}
+                        onClick={() => deleteTemplateMutation.mutate(template.id)}
+                      >
+                        Delete
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+                {!templatesQuery.isPending && templates.length === 0 ? (
+                  <p className='text-sm text-muted-foreground'>
+                    No templates yet. Type a message and save it to reuse later.
+                  </p>
+                ) : null}
+              </div>
+
+              <div className='mt-4 space-y-2'>
+                <Label htmlFor='template-name'>Template name</Label>
+                <Input
+                  id='template-name'
+                  value={templateName}
+                  placeholder='Fee reminder'
+                  maxLength={80}
+                  onChange={(event) => setTemplateName(event.target.value)}
+                />
+              </div>
+
+              <Label htmlFor='message' className='mt-4'>
+                Message
+              </Label>
               <Textarea
                 id='message'
                 className='mt-2 min-h-36'
                 placeholder='Type your message here...'
                 value={message}
+                maxLength={2000}
                 onChange={(event) => setMessage(event.target.value)}
               />
               <div className='mt-2 flex flex-wrap gap-4 text-sm text-muted-foreground'>
                 <span>
                   Characters: {analysis.characterCount} / {analysis.singleLimit}
                 </span>
-                <span>SMS per person: {segments || 0}</span>
+                <span>Messages: {analysis.segmentCount} SMS</span>
               </div>
-              {segments > 1 ? (
+              {analysis.segmentCount > 1 ? (
                 <p className='mt-2 text-sm text-amber-700 dark:text-amber-400'>
-                  This message uses {segments} SMS for each person.
+                  This message uses {analysis.segmentCount} SMS for each person.
                 </p>
               ) : null}
+              <div className='mt-3 flex flex-wrap gap-2'>
+                <Button
+                  type='button'
+                  variant='outline'
+                  disabled={saveTemplateMutation.isPending}
+                  onClick={saveTemplate}
+                >
+                  {saveTemplateMutation.isPending
+                    ? 'Saving…'
+                    : editingTemplateId === null
+                      ? 'Save template'
+                      : 'Update template'}
+                </Button>
+                {editingTemplateId !== null ? (
+                  <Button type='button' variant='ghost' onClick={cancelEdit}>
+                    Cancel
+                  </Button>
+                ) : null}
+              </div>
             </section>
 
             <section className='rounded-xl border bg-card p-5'>

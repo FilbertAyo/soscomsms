@@ -95,6 +95,14 @@ class Customer extends Model
     }
 
     /**
+     * @return HasMany<MessageTemplate, $this>
+     */
+    public function messageTemplates(): HasMany
+    {
+        return $this->hasMany(MessageTemplate::class);
+    }
+
+    /**
      * @return HasMany<Webhook, $this>
      */
     public function webhooks(): HasMany
