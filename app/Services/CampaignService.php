@@ -107,8 +107,7 @@ class CampaignService
                 ->lockForUpdate()
                 ->firstOrFail();
 
-            $reserved = Campaign::reservedSegmentsFor($locked->id);
-            if ($locked->sms_balance < $totalSms + $reserved) {
+            if ($locked->sms_balance < $totalSms) {
                 throw ValidationException::withMessages([
                     'quantity' => 'Not enough SMS credits for this campaign.',
                 ]);
@@ -122,18 +121,32 @@ class CampaignService
                 'segment_count' => $analysis['segmentCount'],
             ]);
 
+            $name = $this->campaignName($payload['name'] ?? null, $messageBody);
+
             $campaign = Campaign::query()->create([
                 'customer_id' => $customer->id,
                 'sender_id_id' => $sender->id,
                 'message_id' => $message->id,
-                'name' => $this->campaignName($payload['name'] ?? null, $messageBody),
+                'name' => $name,
                 'sender_name' => $sender->name,
                 'status' => $status,
                 'recipient_count' => count($accepted),
                 'total_segments' => $totalSms,
+                'reserved_segments' => $totalSms,
+                'consumed_segments' => 0,
                 'scheduled_at' => $scheduledAt,
                 'queued_at' => $scheduledAt === null ? now() : null,
             ]);
+
+            $transaction = app(CreditLedger::class)->reserveCampaign(
+                $locked,
+                $campaign->id,
+                $totalSms,
+                $name,
+            );
+
+            $campaign->credit_transaction_id = $transaction->id;
+            $campaign->save();
 
             $now = now();
             foreach (array_chunk($accepted, 500) as $chunk) {

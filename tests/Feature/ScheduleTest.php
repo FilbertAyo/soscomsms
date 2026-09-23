@@ -87,7 +87,7 @@ it('releases a due scheduled campaign through SOSCOM and never calls a provider 
         ])
         ->assertCreated()
         ->assertJsonPath('campaign.status', CampaignStatus::Scheduled->value)
-        ->assertJsonPath('smsBalance', 20);
+        ->assertJsonPath('smsBalance', 19);
 
     $this->artisan('sms:dispatch-scheduled')
         ->assertSuccessful();
@@ -116,7 +116,7 @@ it('releases a due scheduled campaign through SOSCOM and never calls a provider 
     expect($customer->fresh()->sms_balance)->toBe(19);
 });
 
-it('cancels a scheduled campaign without a refund and does not send later', function () {
+it('cancels a scheduled campaign and refunds the reservation', function () {
     [$user, $customer, $sender] = scheduleCustomer(20);
     [$stranger] = scheduleCustomer(20);
 
@@ -128,7 +128,8 @@ it('cancels a scheduled campaign without a refund and does not send later', func
             'numbers' => ['0712445221'],
             'scheduled_at' => now()->addHour()->toIso8601String(),
         ])
-        ->assertCreated();
+        ->assertCreated()
+        ->assertJsonPath('smsBalance', 19);
 
     $campaign = Campaign::query()->first();
 
@@ -143,7 +144,8 @@ it('cancels a scheduled campaign without a refund and does not send later', func
         ->assertJsonPath('smsBalance', 20);
 
     expect($customer->fresh()->sms_balance)->toBe(20)
-        ->and(CreditTransaction::query()->count())->toBe(0);
+        ->and(CreditTransaction::query()->where('type', CreditTransactionType::Usage)->count())->toBe(1)
+        ->and(CreditTransaction::query()->where('type', CreditTransactionType::Refund)->count())->toBe(1);
 
     $this->actingAs($user)
         ->postJson('/api/campaigns/'.$campaign->id.'/cancel')
@@ -212,7 +214,8 @@ it('cancels stuck attempted recipients instead of resending them', function () {
             'scheduled_at' => now()->addMinutes(5)->toIso8601String(),
         ])
         ->assertCreated()
-        ->assertJsonPath('campaign.status', CampaignStatus::Scheduled->value);
+        ->assertJsonPath('campaign.status', CampaignStatus::Scheduled->value)
+        ->assertJsonPath('smsBalance', 47);
 
     $campaign = Campaign::query()->firstOrFail();
     $message = $campaign->message;
@@ -222,6 +225,8 @@ it('cancels stuck attempted recipients instead of resending them', function () {
         'queued_at' => now()->subMinutes(10),
         'recipient_count' => 3,
         'total_segments' => 3,
+        'reserved_segments' => 3,
+        'consumed_segments' => 3,
     ])->save();
 
     $campaign->recipients()->delete();
@@ -237,7 +242,7 @@ it('cancels stuck attempted recipients instead of resending them', function () {
         'campaign_recipient_id' => $sent->id,
         'provider_id' => Provider::current()->id,
         'status' => DeliveryStatus::Submitted,
-        'provider_message_id' => 'MSH-R'.$sent->id,
+        'provider_message_id' => 'M-'.$sent->id,
         'attempted_at' => now()->subMinutes(10),
         'sent_at' => now()->subMinutes(10),
     ]);
@@ -279,7 +284,7 @@ it('cancels stuck attempted recipients instead of resending them', function () {
     $this->assertDatabaseHas('deliveries', [
         'provider_response_code' => 'cancelled',
     ]);
-    // Only the already-sent SMS is billed.
+    // Reserved 3 at create; refunded 2 ambiguous cancels → only 1 sent SMS billed.
     expect($customer->fresh()->sms_balance)->toBe(49);
 });
 

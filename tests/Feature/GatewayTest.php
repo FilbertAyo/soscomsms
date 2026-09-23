@@ -81,7 +81,7 @@ it('refunds only rejected recipients and does not retry a timed-out send', funct
 
     expect($customer->fresh()->sms_balance)->toBe(19)
         ->and(CreditTransaction::query()->where('type', CreditTransactionType::Usage)->count())->toBe(1)
-        ->and(CreditTransaction::query()->where('type', CreditTransactionType::Refund)->count())->toBe(0);
+        ->and(CreditTransaction::query()->where('type', CreditTransactionType::Refund)->count())->toBe(1);
 
     $this->assertDatabaseHas('campaign_recipients', [
         'phone' => '+255712445221',

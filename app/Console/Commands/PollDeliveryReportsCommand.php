@@ -29,6 +29,7 @@ class PollDeliveryReportsCommand extends Command
         $deliveries = Delivery::query()
             ->whereNotNull('provider_message_id')
             ->where('provider_message_id', '!=', '')
+            ->where('provider_message_id', 'not like', 'MSH-R%')
             ->whereIn('status', [
                 DeliveryStatus::Pending,
                 DeliveryStatus::Sending,

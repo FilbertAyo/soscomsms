@@ -11,6 +11,10 @@ final class ProviderDeliveryStatus
         $value = strtolower(trim($raw));
         $value = (string) preg_replace('/[\s_\-]+/', '', $value);
 
+        if ($value === '') {
+            return null;
+        }
+
         return match ($value) {
             'delivered',
             'delivrd',
@@ -39,9 +43,17 @@ final class ProviderDeliveryStatus
             'pending',
             'queued',
             'accept',
-            'accepted' => CampaignRecipientStatus::Sent,
+            'accepted',
+            'buffered',
+            'enroute',
+            'ack' => CampaignRecipientStatus::Sent,
             default => null,
         };
+    }
+
+    public static function isSyntheticProviderId(string $providerMessageId): bool
+    {
+        return str_starts_with(strtoupper($providerMessageId), 'MSH-R');
     }
 
     public static function isTerminal(CampaignRecipientStatus $status): bool

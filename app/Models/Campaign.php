@@ -33,6 +33,8 @@ class Campaign extends Model
         'delivered_count',
         'failed_count',
         'total_segments',
+        'reserved_segments',
+        'consumed_segments',
         'scheduled_at',
         'queued_at',
     ];
@@ -49,9 +51,44 @@ class Campaign extends Model
             'delivered_count' => 'integer',
             'failed_count' => 'integer',
             'total_segments' => 'integer',
+            'reserved_segments' => 'integer',
+            'consumed_segments' => 'integer',
             'scheduled_at' => 'datetime',
             'queued_at' => 'datetime',
         ];
+    }
+
+    public function remainingReservedSegments(): int
+    {
+        return max(0, $this->reserved_segments - $this->consumed_segments);
+    }
+
+    /**
+     * Atomically consume reserved segments for a send attempt.
+     * Returns false when the campaign reservation is exhausted.
+     */
+    public function tryConsumeSegments(int $segments): bool
+    {
+        if ($segments < 1) {
+            return false;
+        }
+
+        $affected = static::query()
+            ->whereKey($this->id)
+            ->whereRaw('consumed_segments + ? <= reserved_segments', [$segments])
+            ->update([
+                'consumed_segments' => DB::raw('consumed_segments + '.(int) $segments),
+            ]);
+
+        if ($affected === 1) {
+            $this->consumed_segments += $segments;
+
+            return true;
+        }
+
+        $this->refresh();
+
+        return false;
     }
 
     /**
@@ -94,6 +131,10 @@ class Campaign extends Model
         return $this->hasMany(CampaignRecipient::class);
     }
 
+    /**
+     * Soft-held segments for campaigns that have not yet hard-reserved (legacy).
+     * New campaigns debit at create, so this is normally zero.
+     */
     public static function reservedSegmentsFor(int $customerId): int
     {
         return (int) static::query()
@@ -131,6 +172,9 @@ class Campaign extends Model
             'delivered' => $this->delivered_count,
             'failed' => $this->failed_count,
             'totalSms' => $this->total_segments,
+            'reservedSms' => $this->reserved_segments,
+            'consumedSms' => $this->consumed_segments,
+            'remainingReservedSms' => $this->remainingReservedSegments(),
             'scheduledAt' => $this->scheduled_at?->toIso8601String(),
             'queuedAt' => $this->queued_at?->toIso8601String(),
             'createdAt' => $this->created_at?->toIso8601String(),

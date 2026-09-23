@@ -66,7 +66,7 @@ export function Campaigns() {
           >
             <TabsList className='mb-4'>
               <TabsTrigger value='all'>All</TabsTrigger>
-              <TabsTrigger value='queued'>Being sent</TabsTrigger>
+              <TabsTrigger value='queued'>In progress</TabsTrigger>
               <TabsTrigger value='scheduled'>Scheduled</TabsTrigger>
               <TabsTrigger value='completed'>Completed</TabsTrigger>
             </TabsList>

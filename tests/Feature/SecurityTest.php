@@ -125,7 +125,7 @@ it('skips scheduled dispatch while the customer is suspended and sends after uns
         'status' => CampaignStatus::Scheduled->value,
     ]);
     $this->assertDatabaseCount('deliveries', 0);
-    expect($customer->fresh()->sms_balance)->toBe(20);
+    expect($customer->fresh()->sms_balance)->toBe(19);
 
     $this->actingAs($admin)
         ->postJson("/api/admin/customers/{$customer->id}/unsuspension")

@@ -97,7 +97,6 @@ class CampaignDispatcher
         }
 
         if (! $sentAny) {
-            // All remaining queued rows are still inside the in-flight grace window.
             return $campaign;
         }
 
@@ -230,6 +229,9 @@ class CampaignDispatcher
                 $delivery->updated_at = $now;
                 $delivery->save();
             }
+
+            // Ambiguous attempts were consumed before the provider call; refund them.
+            $this->refundFailedRecipient($campaign, $recipient, 'Cancelled ambiguous send');
         }
 
         ProviderLog::query()->create([
@@ -255,6 +257,7 @@ class CampaignDispatcher
         }
 
         $campaign->loadMissing(['message', 'customer']);
+        $campaign->refresh();
 
         if ($campaign->customer?->isSuspended()) {
             return;
@@ -281,8 +284,25 @@ class CampaignDispatcher
             ->orderBy('id')
             ->get();
 
-        $messages = [];
+        $funded = [];
         foreach ($recipients as $recipient) {
+            if (! $campaign->tryConsumeSegments($recipient->segment_count)) {
+                $this->markCreditExhausted($campaign, $recipient);
+
+                continue;
+            }
+
+            $funded[] = $recipient;
+        }
+
+        if ($funded === []) {
+            $this->finishDispatch($campaign);
+
+            return;
+        }
+
+        $messages = [];
+        foreach ($funded as $recipient) {
             $messages[] = new OutboundSms(
                 recipientId: $recipient->id,
                 phone: $recipient->phone,
@@ -305,7 +325,7 @@ class CampaignDispatcher
                 'error' => $exception->getMessage(),
             ]);
 
-            foreach ($recipients as $recipient) {
+            foreach ($funded as $recipient) {
                 $this->markUnknown($recipient);
             }
 
@@ -319,7 +339,7 @@ class CampaignDispatcher
             $byRecipient[$result->recipientId] = $result;
         }
 
-        foreach ($recipients as $recipient) {
+        foreach ($funded as $recipient) {
             $result = $byRecipient[$recipient->id] ?? new GatewaySendResult(
                 recipientId: $recipient->id,
                 phone: $recipient->phone,
@@ -395,86 +415,73 @@ class CampaignDispatcher
             $locked->status = CampaignStatus::Cancelled;
             $locked->save();
 
-            $quantity = $locked->total_segments;
-            if ($locked->credit_transaction_id !== null && $quantity > 0) {
+            $unused = $locked->remainingReservedSegments();
+            if ($locked->credit_transaction_id !== null && $unused > 0) {
                 $this->ledger->refundUsage(
                     $customer,
-                    $quantity,
+                    $unused,
                     "Cancelled scheduled campaign {$locked->name}",
                     'REF-CAMP-'.$locked->id.'-CANCEL',
                 );
+                $locked->consumed_segments = $locked->reserved_segments;
+                $locked->save();
             }
+
+            $locked->recipients()
+                ->whereIn('status', [
+                    CampaignRecipientStatus::Pending,
+                    CampaignRecipientStatus::Queued,
+                ])
+                ->update(['status' => CampaignRecipientStatus::Failed]);
 
             return $locked->fresh(['message']) ?? $locked;
         });
     }
 
     /**
-     * Lock at most one chunk of unlocked queued recipients for the next send.
-     * Locking per chunk (instead of the whole campaign) keeps later rows retryable
-     * if the process dies mid-send.
+     * Atomically claim at most one chunk of never-attempted queued recipients.
      *
      * @return list<int>
      */
     private function claimNextChunk(Campaign $campaign, int $limit): array
     {
-        $provider = Provider::current();
-        $ids = [];
-        $now = now();
-        $overFetch = max($limit * 3, $limit);
+        return DB::transaction(function () use ($campaign, $limit): array {
+            $provider = Provider::current();
+            $ids = [];
+            $now = now();
+            $overFetch = max($limit * 3, $limit);
 
-        $candidates = $campaign->recipients()
-            ->with('delivery')
-            ->where('status', CampaignRecipientStatus::Queued)
-            ->orderBy('id')
-            ->limit($overFetch)
-            ->get();
+            $candidates = $campaign->recipients()
+                ->where('status', CampaignRecipientStatus::Queued)
+                ->whereDoesntHave('delivery')
+                ->orderBy('id')
+                ->limit($overFetch)
+                ->lockForUpdate()
+                ->get();
 
-        $insert = [];
-        $updateIds = [];
+            foreach ($candidates as $recipient) {
+                if (count($ids) >= $limit) {
+                    break;
+                }
 
-        foreach ($candidates as $recipient) {
-            if (count($ids) >= $limit) {
-                break;
-            }
-
-            $delivery = $recipient->delivery;
-            if ($delivery?->isLockedAgainstRetry()) {
-                continue;
-            }
-
-            if ($delivery !== null) {
-                $updateIds[] = $delivery->id;
-            } else {
-                $insert[] = [
+                $affected = Delivery::query()->insertOrIgnore([[
                     'campaign_recipient_id' => $recipient->id,
                     'provider_id' => $provider->id,
                     'status' => DeliveryStatus::Sending->value,
                     'attempted_at' => $now,
                     'created_at' => $now,
                     'updated_at' => $now,
-                ];
+                ]]);
+
+                if ($affected < 1) {
+                    continue;
+                }
+
+                $ids[] = $recipient->id;
             }
 
-            $ids[] = $recipient->id;
-        }
-
-        if ($insert !== []) {
-            Delivery::query()->insertOrIgnore($insert);
-        }
-
-        if ($updateIds !== []) {
-            Delivery::query()
-                ->whereIn('id', $updateIds)
-                ->update([
-                    'provider_id' => $provider->id,
-                    'status' => DeliveryStatus::Sending->value,
-                    'attempted_at' => $now,
-                    'updated_at' => $now,
-                ]);
-        }
-
-        return $ids;
+            return $ids;
+        });
     }
 
     private function applyResult(Campaign $campaign, CampaignRecipient $recipient, GatewaySendResult $result): void
@@ -482,6 +489,7 @@ class CampaignDispatcher
         $delivery = $recipient->delivery ?? $recipient->delivery()->first();
 
         if ($result->timedOut) {
+            // Keep consumed credits — the provider may have accepted the SMS.
             $this->markUnknown($recipient, $result);
 
             return;
@@ -521,6 +529,37 @@ class CampaignDispatcher
         $this->refundFailedRecipient($campaign, $recipient);
     }
 
+    private function markCreditExhausted(Campaign $campaign, CampaignRecipient $recipient): void
+    {
+        $recipient->status = CampaignRecipientStatus::Failed;
+        $recipient->save();
+
+        $delivery = $recipient->delivery ?? $recipient->delivery()->first();
+        if ($delivery === null) {
+            $delivery = Delivery::query()->create([
+                'campaign_recipient_id' => $recipient->id,
+                'provider_id' => Provider::current()->id,
+                'status' => DeliveryStatus::Failed,
+                'provider_response_code' => 'no_credits',
+                'provider_response' => 'Campaign reservation exhausted before provider submit',
+                'attempted_at' => now(),
+            ]);
+        } else {
+            $delivery->status = DeliveryStatus::Failed;
+            $delivery->provider_response_code = 'no_credits';
+            $delivery->provider_response = 'Campaign reservation exhausted before provider submit';
+            $delivery->save();
+        }
+
+        ProviderLog::query()->create([
+            'provider_id' => Provider::current()->id,
+            'campaign_id' => $campaign->id,
+            'action' => 'send_bulk',
+            'status' => 'blocked',
+            'error' => "Skipped {$recipient->phone}: campaign reservation exhausted",
+        ]);
+    }
+
     private function markUnknown(CampaignRecipient $recipient, ?GatewaySendResult $result = null): void
     {
         $recipient->status = CampaignRecipientStatus::Unknown;
@@ -537,17 +576,24 @@ class CampaignDispatcher
         $delivery->save();
     }
 
-    private function refundFailedRecipient(Campaign $campaign, CampaignRecipient $recipient): void
-    {
-        $customer = $campaign->customer;
+    private function refundFailedRecipient(
+        Campaign $campaign,
+        CampaignRecipient $recipient,
+        string $reason = 'Provider rejected',
+    ): void {
+        $customer = $campaign->customer ?? $campaign->customer()->first();
         if ($customer === null || $campaign->credit_transaction_id === null) {
+            return;
+        }
+
+        if ($recipient->segment_count < 1) {
             return;
         }
 
         $this->ledger->refundUsage(
             $customer,
             $recipient->segment_count,
-            "Provider rejected {$recipient->phone} for campaign {$campaign->name}",
+            "{$reason} {$recipient->phone} for campaign {$campaign->name}",
             'REF-CAMP-'.$campaign->id.'-R'.$recipient->id,
         );
     }
@@ -555,7 +601,7 @@ class CampaignDispatcher
     private function finishDispatch(Campaign $campaign, bool $notify = false): Campaign
     {
         $campaign->refreshCounts();
-        $this->settleUsage($campaign);
+        $this->releaseUnusedReservation($campaign);
 
         if ($notify && ! in_array($campaign->status, [
             CampaignStatus::Queued,
@@ -569,26 +615,30 @@ class CampaignDispatcher
         return $campaign->fresh(['message']) ?? $campaign;
     }
 
-    private function settleUsage(Campaign $campaign): void
+    /**
+     * Refund never-attempted reserved segments once the campaign is terminal.
+     */
+    private function releaseUnusedReservation(Campaign $campaign): void
     {
         $campaign->refresh();
 
-        if ($campaign->credit_transaction_id !== null) {
-            return;
-        }
-
-        $shouldSettle = match ($campaign->status) {
+        $shouldRelease = match ($campaign->status) {
             CampaignStatus::Completed,
             CampaignStatus::PartiallyDelivered,
-            CampaignStatus::Failed => true,
+            CampaignStatus::Failed,
+            CampaignStatus::Cancelled => true,
             CampaignStatus::Queued,
             CampaignStatus::Sending,
             CampaignStatus::Scheduled,
-            CampaignStatus::Draft,
-            CampaignStatus::Cancelled => false,
+            CampaignStatus::Draft => false,
         };
 
-        if (! $shouldSettle) {
+        if (! $shouldRelease) {
+            return;
+        }
+
+        $unused = $campaign->remainingReservedSegments();
+        if ($unused < 1 || $campaign->credit_transaction_id === null) {
             return;
         }
 
@@ -597,34 +647,18 @@ class CampaignDispatcher
             return;
         }
 
-        $accepted = (int) $campaign->recipients()
-            ->where(function ($query): void {
-                $query->whereIn('status', [
-                    CampaignRecipientStatus::Sent,
-                    CampaignRecipientStatus::Delivered,
-                    CampaignRecipientStatus::Unknown,
-                ])->orWhereHas('delivery', function ($delivery): void {
-                    $delivery->whereNotNull('sent_at');
-                });
-            })
-            ->sum('segment_count');
-
-        if ($accepted < 1) {
-            return;
-        }
-
         try {
-            $transaction = $this->ledger->debitUsage(
+            $this->ledger->refundUsage(
                 $customer,
-                $accepted,
-                "Campaign {$campaign->name}",
-                'USE-CAMP-'.$campaign->id,
+                $unused,
+                "Unused reservation for campaign {$campaign->name}",
+                'REF-CAMP-'.$campaign->id.'-UNUSED',
             );
         } catch (ValidationException) {
             return;
         }
 
-        $campaign->credit_transaction_id = $transaction->id;
+        $campaign->consumed_segments = $campaign->reserved_segments;
         $campaign->save();
     }
 }

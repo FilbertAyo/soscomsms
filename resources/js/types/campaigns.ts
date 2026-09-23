@@ -49,6 +49,9 @@ export type Campaign = {
   delivered: number
   failed: number
   totalSms: number
+  reservedSms?: number
+  consumedSms?: number
+  remainingReservedSms?: number
   scheduledAt: string | null
   queuedAt: string | null
   createdAt: string | null

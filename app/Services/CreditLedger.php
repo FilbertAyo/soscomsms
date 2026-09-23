@@ -114,6 +114,20 @@ class CreditLedger
         );
     }
 
+    /**
+     * Atomically reserve campaign credits up front (hard debit).
+     * Idempotent on USE-CAMP-{id}.
+     */
+    public function reserveCampaign(Customer $customer, int $campaignId, int $quantity, string $campaignName): CreditTransaction
+    {
+        return $this->debitUsage(
+            $customer,
+            $quantity,
+            "Reserved for campaign {$campaignName}",
+            'USE-CAMP-'.$campaignId,
+        );
+    }
+
     public function purchase(
         Customer $customer,
         int $quantity,

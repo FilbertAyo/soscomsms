@@ -267,11 +267,25 @@ class MobishastraGateway implements SmsGatewayInterface
         $code = $this->normalizeCode($body);
 
         if (in_array($code, ['000', 'send successful'], true)) {
+            $messageId = $this->extractMessageId($body);
+
+            if ($messageId === null) {
+                // Accepted by code but no trackable id — treat as uncertain (do not invent MSH-R*).
+                return new GatewaySendResult(
+                    recipientId: $message->recipientId,
+                    phone: $message->phone,
+                    accepted: false,
+                    timedOut: true,
+                    code: '000',
+                    raw: $body,
+                );
+            }
+
             return new GatewaySendResult(
                 recipientId: $message->recipientId,
                 phone: $message->phone,
                 accepted: true,
-                providerMessageId: $this->extractMessageId($body, $message->recipientId),
+                providerMessageId: $messageId,
                 code: '000',
                 raw: $body,
             );
@@ -331,19 +345,68 @@ class MobishastraGateway implements SmsGatewayInterface
             }
 
             $code = $this->normalizeCode((string) ($row['response'] ?? $row['str_response'] ?? ''));
-            $msgId = isset($row['msg_id']) ? (string) $row['msg_id'] : null;
-            $accepted = $msgId !== null && $msgId !== '' && ! in_array($code, ['001', '003', '005', '006', '007', '008', '009', '010', '011', '012', '013'], true);
-            if ($code === '000' || $code === 'send successful') {
-                $accepted = true;
+            $msgId = isset($row['msg_id']) ? trim((string) $row['msg_id']) : '';
+            $msgId = $msgId !== '' ? $msgId : null;
+
+            if ($code === '013') {
+                $results[] = new GatewaySendResult(
+                    recipientId: $message->recipientId,
+                    phone: $message->phone,
+                    accepted: false,
+                    timedOut: true,
+                    code: '013',
+                    raw: json_encode($row) ?: '',
+                );
+
+                continue;
+            }
+
+            $hardFail = in_array($code, ['001', '003', '005', '006', '007', '008', '009', '010', '011', '012'], true);
+            $successCode = $code === '000' || $code === 'send successful';
+
+            if ($hardFail) {
+                $results[] = new GatewaySendResult(
+                    recipientId: $message->recipientId,
+                    phone: $message->phone,
+                    accepted: false,
+                    code: $code !== '' ? $code : '001',
+                    raw: json_encode($row) ?: '',
+                );
+
+                continue;
+            }
+
+            if ($successCode || $msgId !== null) {
+                if ($msgId === null) {
+                    $results[] = new GatewaySendResult(
+                        recipientId: $message->recipientId,
+                        phone: $message->phone,
+                        accepted: false,
+                        timedOut: true,
+                        code: $successCode ? '000' : ($code !== '' ? $code : 'unknown'),
+                        raw: json_encode($row) ?: '',
+                    );
+
+                    continue;
+                }
+
+                $results[] = new GatewaySendResult(
+                    recipientId: $message->recipientId,
+                    phone: $message->phone,
+                    accepted: true,
+                    providerMessageId: $msgId,
+                    code: $successCode ? '000' : ($code !== '' ? $code : '000'),
+                    raw: json_encode($row) ?: '',
+                );
+
+                continue;
             }
 
             $results[] = new GatewaySendResult(
                 recipientId: $message->recipientId,
                 phone: $message->phone,
-                accepted: $accepted,
-                timedOut: $code === '013',
-                providerMessageId: $accepted ? ($msgId ?: 'MSH-R'.$message->recipientId) : null,
-                code: $code !== '' ? $code : ($accepted ? '000' : '001'),
+                accepted: false,
+                code: $code !== '' ? $code : '001',
                 raw: json_encode($row) ?: '',
             );
         }
@@ -354,6 +417,14 @@ class MobishastraGateway implements SmsGatewayInterface
     private function normalizeCode(string $body): string
     {
         $trimmed = strtolower(trim($body));
+
+        if (str_contains($trimmed, ',')) {
+            $first = trim(explode(',', $trimmed, 2)[0]);
+            if ($first !== '') {
+                $trimmed = $first;
+            }
+        }
+
         if (preg_match('/\b(\d{3})\b/', $trimmed, $matches) === 1) {
             return $matches[1];
         }
@@ -361,7 +432,7 @@ class MobishastraGateway implements SmsGatewayInterface
         return $trimmed;
     }
 
-    private function extractMessageId(string $body, int $recipientId): string
+    private function extractMessageId(string $body): ?string
     {
         $trimmed = trim($body);
 
@@ -378,7 +449,7 @@ class MobishastraGateway implements SmsGatewayInterface
             }
         }
 
-        return 'MSH-R'.$recipientId;
+        return null;
     }
 
     /**

@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\CampaignRecipientStatus;
+use App\Enums\CreditTransactionType;
 use App\Enums\CustomerStatus;
 use App\Enums\GatewayDriver;
 use App\Enums\MessageEncoding;
@@ -100,8 +101,10 @@ it('maps Mobishastra ShowError codes 000 through 013', function (string $body, b
         ->and($result->timedOut)->toBe($timedOut)
         ->and($result->code)->toBe($code);
 })->with([
-    ['000', true, false, '000'],
-    ['Send Successful', true, false, '000'],
+    ['000,M-1', true, false, '000'],
+    ['Send Successful,M-2', true, false, '000'],
+    ['000', false, true, '000'],
+    ['Send Successful', false, true, '000'],
     ['001', false, false, '001'],
     ['003', false, false, '003'],
     ['005', false, false, '005'],
@@ -164,7 +167,8 @@ it('does not charge a rejected send and does not charge a suspended account', fu
         ->assertCreated();
 
     expect($customer->fresh()->sms_balance)->toBe(20)
-        ->and(CreditTransaction::query()->count())->toBe(0);
+        ->and(CreditTransaction::query()->where('type', CreditTransactionType::Usage)->count())->toBe(1)
+        ->and(CreditTransaction::query()->where('type', CreditTransactionType::Refund)->count())->toBe(1);
 
     $this->assertDatabaseHas('campaign_recipients', [
         'phone' => '+255712445221',

@@ -78,7 +78,8 @@ it('previews cost by segment count and queues a send that deducts credits', func
         ->and($usage?->customer_unit_price)->toBe(30)
         ->and($usage?->provider_unit_cost)->toBe(14)
         ->and($usage?->amount_tzs)->toBe(120)
-        ->and($usage?->reference)->toBe('USE-CAMP-'.$campaign->id);
+        ->and($usage?->reference)->toBe('USE-CAMP-'.$campaign->id)
+        ->and($usage?->description)->toContain('Reserved for campaign');
 
     $this->assertDatabaseCount('campaign_recipients', 2);
     $this->assertDatabaseHas('campaign_recipients', [
@@ -277,7 +278,8 @@ it('does not deduct credits when the provider rejects every recipient', function
         ->assertJsonPath('smsBalance', 20);
 
     expect($customer->fresh()->sms_balance)->toBe(20);
-    $this->assertDatabaseCount('credit_transactions', 0);
+    expect(CreditTransaction::query()->where('type', CreditTransactionType::Usage)->count())->toBe(1);
+    expect(CreditTransaction::query()->where('type', CreditTransactionType::Refund)->count())->toBe(1);
 });
 
 it('holds scheduled credits so a second send cannot spend them twice', function () {
@@ -292,7 +294,7 @@ it('holds scheduled credits so a second send cannot spend them twice', function 
             'scheduled_at' => now()->addHour()->toIso8601String(),
         ])
         ->assertCreated()
-        ->assertJsonPath('smsBalance', 2);
+        ->assertJsonPath('smsBalance', 1);
 
     $this->actingAs($user)
         ->postJson('/api/campaigns', [
@@ -304,11 +306,11 @@ it('holds scheduled credits so a second send cannot spend them twice', function 
         ->assertUnprocessable()
         ->assertJsonValidationErrors('quantity');
 
-    expect($customer->fresh()->sms_balance)->toBe(2);
-    $this->assertDatabaseCount('credit_transactions', 0);
+    expect($customer->fresh()->sms_balance)->toBe(1);
+    expect(CreditTransaction::query()->where('type', CreditTransactionType::Usage)->count())->toBe(1);
 });
 
-it('persists a future schedule without deducting credits and rejects a past time', function () {
+it('persists a future schedule with reserved credits and rejects a past time', function () {
     [$user, $customer, $sender] = campaignCustomer(20);
 
     $this->actingAs($user)
@@ -332,13 +334,14 @@ it('persists a future schedule without deducting credits and rejects a past time
         ])
         ->assertCreated()
         ->assertJsonPath('campaign.status', CampaignStatus::Scheduled->value)
-        ->assertJsonPath('smsBalance', 20);
+        ->assertJsonPath('smsBalance', 19);
 
     $campaign = Campaign::query()->first();
 
-    expect($customer->fresh()->sms_balance)->toBe(20)
+    expect($customer->fresh()->sms_balance)->toBe(19)
         ->and($campaign?->queued_at)->toBeNull()
-        ->and($campaign?->credit_transaction_id)->toBeNull()
+        ->and($campaign?->credit_transaction_id)->not->toBeNull()
+        ->and($campaign?->reserved_segments)->toBe(1)
         ->and($campaign?->scheduled_at)->not->toBeNull();
 
     $this->assertDatabaseHas('campaign_recipients', [

@@ -9,6 +9,7 @@ use App\Models\Delivery;
 use App\Services\Gateway\ProviderDeliveryStatus;
 use App\Services\Gateway\ProviderPhone;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Log;
 use Throwable;
 
 class DeliveryReportService
@@ -23,6 +24,17 @@ class DeliveryReportService
     ): ?Delivery {
         $normalized = ProviderDeliveryStatus::normalize($rawStatus);
         if ($normalized === null || $providerMessageId === '') {
+            if ($providerMessageId !== '' && trim($rawStatus) !== '') {
+                Log::warning('Unmapped DLR status', [
+                    'provider_message_id' => $providerMessageId,
+                    'raw_status' => $rawStatus,
+                ]);
+            }
+
+            return null;
+        }
+
+        if (ProviderDeliveryStatus::isSyntheticProviderId($providerMessageId)) {
             return null;
         }
 
