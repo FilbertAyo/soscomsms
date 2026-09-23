@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import { toast } from 'sonner'
 import { faqs } from '@/data/sms'
+import { developerApiVisible } from '@/lib/features'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -27,7 +28,10 @@ export function HelpPage() {
 
   const filtered = useMemo(() => {
     const value = query.toLowerCase()
-    return faqs
+    const source = developerApiVisible
+      ? faqs
+      : faqs.filter((category) => category.category !== 'API')
+    return source
       .map((category) => ({
         ...category,
         items: category.items.filter(
@@ -66,13 +70,17 @@ export function HelpPage() {
             >
               {supportEmail}
             </a>
-            {' · '}
-            <Link
-              to='/developer/docs'
-              className='font-medium text-primary hover:underline'
-            >
-              API documentation
-            </Link>
+            {developerApiVisible ? (
+              <>
+                {' · '}
+                <Link
+                  to='/developer/docs'
+                  className='font-medium text-primary hover:underline'
+                >
+                  API documentation
+                </Link>
+              </>
+            ) : null}
           </p>
         </div>
         <div className='space-y-8'>

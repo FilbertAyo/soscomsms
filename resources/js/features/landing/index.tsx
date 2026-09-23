@@ -9,6 +9,7 @@ import {
   ShieldCheck,
   Wallet,
 } from 'lucide-react'
+import { developerApiVisible } from '@/lib/features'
 import { PublicSiteFrame } from '@/components/public-site-frame'
 import { Button } from '@/components/ui/button'
 import { useAuthStore } from '@/stores/auth-store'
@@ -55,6 +56,10 @@ const faqs = [
   },
 ]
 
+const visibleFeatures = features.filter(
+  (feature) => developerApiVisible || feature.title !== 'SMS API'
+)
+
 export function LandingPage() {
   const user = useAuthStore((state) => state.user)
 
@@ -70,8 +75,9 @@ export function LandingPage() {
               Send SMS. Reach Everyone.
             </h1>
             <p className='mt-4 max-w-2xl text-lg text-muted-foreground'>
-              A simple and reliable platform for sending bulk SMS and connecting
-              your applications through SMS APIs.
+              {developerApiVisible
+                ? 'A simple and reliable platform for sending bulk SMS and connecting your applications through SMS APIs.'
+                : 'A simple and reliable platform for sending bulk SMS.'}
             </p>
             <div className='mt-8 flex flex-col gap-3 sm:flex-row'>
               {user ? (
@@ -89,9 +95,11 @@ export function LandingPage() {
                   </Link>
                 </Button>
               )}
-              <Button size='lg' variant='outline' asChild>
-                <a href='#developers'>Explore API</a>
-              </Button>
+              {developerApiVisible ? (
+                <Button size='lg' variant='outline' asChild>
+                  <a href='#developers'>Explore API</a>
+                </Button>
+              ) : null}
             </div>
           </div>
         </section>
@@ -108,8 +116,12 @@ export function LandingPage() {
               Clear tools for sending messages, managing contacts, buying SMS,
               and tracking delivery.
             </p>
-            <div className='mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4'>
-              {features.map((feature) => (
+            <div
+              className={`mt-10 grid gap-4 sm:grid-cols-2 ${
+                visibleFeatures.length > 3 ? 'lg:grid-cols-4' : 'lg:grid-cols-3'
+              }`}
+            >
+              {visibleFeatures.map((feature) => (
                 <div
                   key={feature.title}
                   className='rounded-xl border bg-card p-5'
@@ -125,6 +137,7 @@ export function LandingPage() {
           </div>
         </section>
 
+        {developerApiVisible ? (
         <section
           id='developers'
           className='border-y bg-muted/30 py-16 sm:py-20'
@@ -168,6 +181,7 @@ export function LandingPage() {
             </pre>
           </div>
         </section>
+        ) : null}
 
         <section id='faq' className='mx-auto max-w-6xl px-4 py-16 sm:py-20'>
           <h2 className='text-2xl font-semibold tracking-tight'>FAQ</h2>

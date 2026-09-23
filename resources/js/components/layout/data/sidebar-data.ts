@@ -16,6 +16,7 @@ import {
   ScrollText,
   Radio,
 } from 'lucide-react'
+import { developerApiVisible } from '@/lib/features'
 import {
   isAdmin,
   needsProfileCompletion,
@@ -76,15 +77,19 @@ const customerNavGroups: SidebarData['navGroups'] = [
           { title: 'Transactions', url: '/wallet/transactions' },
         ],
       },
-      {
-        title: 'Developer',
-        icon: KeyRound,
-        items: [
-          { title: 'API keys', url: '/developer' },
-          { title: 'Documentation', url: '/developer/docs' },
-          { title: 'Webhooks', url: '/developer/webhooks' },
-        ],
-      },
+      ...(developerApiVisible
+        ? [
+            {
+              title: 'Developer',
+              icon: KeyRound,
+              items: [
+                { title: 'API keys', url: '/developer' },
+                { title: 'Documentation', url: '/developer/docs' },
+                { title: 'Webhooks', url: '/developer/webhooks' },
+              ],
+            },
+          ]
+        : []),
       {
         title: 'Help',
         url: '/help-center',

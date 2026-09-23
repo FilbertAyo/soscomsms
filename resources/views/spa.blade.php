@@ -10,7 +10,8 @@
 
         <title>Soscom SMS</title>
         <meta name="title" content="Soscom SMS">
-        <meta name="description" content="A simple and reliable platform for sending bulk SMS and connecting your applications through SMS APIs.">
+        {{-- Restore the API sentence when resources/js/lib/features.ts developerApiVisible is true. --}}
+        <meta name="description" content="A simple and reliable platform for sending bulk SMS.">
         <meta name="theme-color" content="#379019">
 
         <link rel="preconnect" href="https://fonts.googleapis.com">

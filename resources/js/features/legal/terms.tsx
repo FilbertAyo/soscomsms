@@ -1,14 +1,18 @@
+import { developerApiVisible } from '@/lib/features'
 import { LegalLayout, LegalSection } from './layout'
 
 export function TermsPage() {
+  const section = (number: number) =>
+    developerApiVisible ? number : number - 1
   return (
     <LegalLayout title='Terms of Service'>
       <LegalSection title='1. Who these terms are with'>
         <p>
           These terms are between you and SOSCOM Technologies Company Limited
           (“Soscom”, “we”, “us”). They apply when you use Soscom SMS at
-          sms.soscom.co.tz, including the dashboard, the public SMS API, and
-          related billing and support.
+          sms.soscom.co.tz, including the dashboard
+          {developerApiVisible ? ', the public SMS API,' : ''} and related
+          billing and support.
         </p>
         <p>
           By creating an account or using the service, you agree to these
@@ -19,9 +23,19 @@ export function TermsPage() {
 
       <LegalSection title='2. The service'>
         <p>
-          Soscom SMS is a Tanzanian bulk SMS platform. You can send SMS from
-          the dashboard or through an API key, buy SMS credits, keep contacts,
-          request Sender IDs, and view delivery reports.
+          {developerApiVisible ? (
+            <>
+              Soscom SMS is a Tanzanian bulk SMS platform. You can send SMS
+              from the dashboard or through an API key, buy SMS credits, keep
+              contacts, request Sender IDs, and view delivery reports.
+            </>
+          ) : (
+            <>
+              Soscom SMS is a Tanzanian bulk SMS platform. You can send SMS
+              from the dashboard, buy SMS credits, keep contacts, request
+              Sender IDs, and view delivery reports.
+            </>
+          )}
         </p>
         <p>
           We send traffic through our own wholesale provider. You deal only
@@ -37,9 +51,18 @@ export function TermsPage() {
           confirm a sign-in with a one-time code sent to your email.
         </p>
         <p>
-          You are responsible for activity on your account, including API keys
-          you create. If you think someone else has access, change your
-          password and revoke the keys.
+          {developerApiVisible ? (
+            <>
+              You are responsible for activity on your account, including API
+              keys you create. If you think someone else has access, change
+              your password and revoke the keys.
+            </>
+          ) : (
+            <>
+              You are responsible for activity on your account. If you think
+              someone else has access, change your password.
+            </>
+          )}
         </p>
         <p>
           We may suspend an account that is unpaid, abused, or used in a way
@@ -114,19 +137,21 @@ export function TermsPage() {
         </p>
       </LegalSection>
 
-      <LegalSection title='8. API use'>
-        <p>
-          API keys let your own software send SMS through sms.soscom.co.tz/api/v1.
-          Keep keys secret. You must stay within the published rate limits and
-          only send traffic you are allowed to send under these terms.
-        </p>
-        <p>
-          We may throttle, revoke a key, or reject a request that looks abusive
-          or unsafe.
-        </p>
-      </LegalSection>
+      {developerApiVisible ? (
+        <LegalSection title='8. API use'>
+          <p>
+            API keys let your own software send SMS through sms.soscom.co.tz/api/v1.
+            Keep keys secret. You must stay within the published rate limits and
+            only send traffic you are allowed to send under these terms.
+          </p>
+          <p>
+            We may throttle, revoke a key, or reject a request that looks abusive
+            or unsafe.
+          </p>
+        </LegalSection>
+      ) : null}
 
-      <LegalSection title='9. Availability'>
+      <LegalSection title={`${section(9)}. Availability`}>
         <p>
           We aim to keep Soscom SMS available, but maintenance, network faults,
           and provider outages happen. The service is provided as is. We are
@@ -140,7 +165,7 @@ export function TermsPage() {
         </p>
       </LegalSection>
 
-      <LegalSection title='10. Ending the account'>
+      <LegalSection title={`${section(10)}. Ending the account`}>
         <p>
           You can stop using Soscom SMS at any time. We can close or suspend
           an account if you break these terms, if payment is not confirmed, or
@@ -152,7 +177,7 @@ export function TermsPage() {
         </p>
       </LegalSection>
 
-      <LegalSection title='11. Changes'>
+      <LegalSection title={`${section(11)}. Changes`}>
         <p>
           We may update these terms. The date at the top of this page is the
           current version. Continued use after a change means you accept the
@@ -160,7 +185,7 @@ export function TermsPage() {
         </p>
       </LegalSection>
 
-      <LegalSection title='12. Law and contact'>
+      <LegalSection title={`${section(12)}. Law and contact`}>
         <p>
           These terms are governed by the laws of the United Republic of
           Tanzania. Disputes are handled in Tanzanian courts.

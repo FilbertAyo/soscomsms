@@ -1,3 +1,4 @@
+import { developerApiVisible } from '@/lib/features'
 import { LegalLayout, LegalSection } from './layout'
 
 export function PrivacyPage() {
@@ -6,8 +7,9 @@ export function PrivacyPage() {
       <LegalSection title='1. Who we are'>
         <p>
           SOSCOM Technologies Company Limited runs Soscom SMS at
-          sms.soscom.co.tz. This page explains what we collect when you use
-          the dashboard or the SMS API, and how we use it.
+          {developerApiVisible
+            ? 'sms.soscom.co.tz. This page explains what we collect when you use the dashboard or the SMS API, and how we use it.'
+            : 'sms.soscom.co.tz. This page explains what we collect when you use the dashboard, and how we use it.'}
         </p>
         <p>
           Contact for privacy questions: sms@soscom.co.tz.
@@ -28,11 +30,13 @@ export function PrivacyPage() {
           Billing data: SMS balance, credit history, Lipa namba payer
           reference, purchase amounts in TZS, and admin confirmation notes.
         </p>
-        <p>
-          Developer data: API key names and prefixes, request paths, status
-          codes, and webhook delivery attempts. We do not show full live keys
-          again after you create them.
-        </p>
+        {developerApiVisible ? (
+          <p>
+            Developer data: API key names and prefixes, request paths, status
+            codes, and webhook delivery attempts. We do not show full live keys
+            again after you create them.
+          </p>
+        ) : null}
         <p>
           Technical data: IP address, browser, and basic server logs needed to
           run and secure the service.
@@ -60,7 +64,9 @@ export function PrivacyPage() {
         <p>
           Wholesale SMS provider: we pass the Sender ID, destination number,
           and message text needed to deliver SMS. We do not give them your
-          password, API keys, or billing records.
+          {developerApiVisible
+            ? 'password, API keys, or billing records.'
+            : 'password or billing records.'}
         </p>
         <p>
           Payment: Lipa namba payments are made on the mobile-money network.
@@ -75,8 +81,9 @@ export function PrivacyPage() {
           requires it.
         </p>
         <p>
-          Your staff: anyone you give login access or an API key can see the
-          data in that account.
+          Your staff: anyone you give login access
+          {developerApiVisible ? 'or an API key ' : ''}
+          can see the data in that account.
         </p>
       </LegalSection>
 
@@ -122,16 +129,17 @@ export function PrivacyPage() {
         <p>
           Passwords are hashed. Provider credentials and API secrets are
           stored so customers cannot read them. Sessions use CSRF protection.
-          No method is perfect; you still need a strong password and to keep
-          API keys off public computers.
+          {developerApiVisible
+            ? 'No method is perfect; you still need a strong password and to keep API keys off public computers.'
+            : 'No method is perfect; you still need a strong password.'}
         </p>
       </LegalSection>
 
       <LegalSection title='9. Your choices'>
         <p>
           You can update your name, email, business profile, and password in
-          Settings. You can add, edit, deactivate, or import contacts. You can
-          revoke API keys.
+          Settings. You can add, edit, deactivate, or import contacts.
+          {developerApiVisible ? ' You can revoke API keys.' : ''}
         </p>
         <p>
           For a copy of your account data, or to ask us to close the account,
