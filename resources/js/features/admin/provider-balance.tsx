@@ -1,15 +1,35 @@
-import { useQuery } from '@tanstack/react-query'
+import { useState } from 'react'
+import { useMutation, useQuery } from '@tanstack/react-query'
+import { toast } from 'sonner'
+import { applyValidationErrors } from '@/lib/auth'
 import { formatNumber } from '@/lib/format'
 import {
   adminProviderBalanceQueryKey,
+  checkAdminProviderDlr,
   fetchAdminProviderBalance,
+  type ProviderDlrCheck,
 } from '@/lib/credits'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { AdminPage } from './page'
 
 export function AdminProviderBalance() {
+  const [messageId, setMessageId] = useState('1871080898')
+  const [dlrResult, setDlrResult] = useState<ProviderDlrCheck | null>(null)
   const balanceQuery = useQuery({
     queryKey: adminProviderBalanceQueryKey,
     queryFn: fetchAdminProviderBalance,
+  })
+  const dlrCheck = useMutation({
+    mutationFn: () => checkAdminProviderDlr(messageId.trim()),
+    onSuccess: (result) => {
+      setDlrResult(result)
+    },
+    onError: (error) => {
+      setDlrResult(null)
+      toast.error(applyValidationErrors(error, () => undefined))
+    },
   })
   const snapshot = balanceQuery.data
 
@@ -97,6 +117,66 @@ export function AdminProviderBalance() {
                 : 'Not confirmed'}
             </p>
           </div>
+          <form
+            className='rounded-xl border bg-card p-5'
+            onSubmit={(event) => {
+              event.preventDefault()
+              if (!messageId.trim()) {
+                toast.error('Enter a Mobishastra message ID.')
+                return
+              }
+              dlrCheck.mutate()
+            }}
+          >
+            <h2 className='font-medium'>Test DLR status</h2>
+            <p className='mt-1 text-sm text-muted-foreground'>
+              Calls dlrstatus_api from this server with the saved profile and
+              password. The reply is shown here and is not saved onto a campaign.
+            </p>
+            <div className='mt-4 flex flex-col gap-3 sm:flex-row sm:items-end'>
+              <div className='flex-1 space-y-2'>
+                <Label htmlFor='dlr-message-id'>Message ID</Label>
+                <Input
+                  id='dlr-message-id'
+                  value={messageId}
+                  onChange={(event) => setMessageId(event.target.value)}
+                  placeholder='1871080898'
+                />
+              </div>
+              <Button type='submit' disabled={dlrCheck.isPending}>
+                {dlrCheck.isPending ? 'Checking…' : 'Check DLR'}
+              </Button>
+            </div>
+            {dlrResult ? (
+              <dl className='mt-4 space-y-2 text-sm'>
+                <div>
+                  <dt className='text-muted-foreground'>Request</dt>
+                  <dd className='break-all font-mono text-xs'>
+                    {dlrResult.requestUrl || dlrResult.driver}
+                    ?messageid={dlrResult.messageId}
+                  </dd>
+                </div>
+                <div>
+                  <dt className='text-muted-foreground'>Raw response</dt>
+                  <dd className='break-all font-mono text-xs'>
+                    {dlrResult.rawResponse || 'Empty response'}
+                  </dd>
+                </div>
+                <div>
+                  <dt className='text-muted-foreground'>Parsed DLR status</dt>
+                  <dd>{dlrResult.dlrStatus || '—'}</dd>
+                </div>
+                <div>
+                  <dt className='text-muted-foreground'>DLR time</dt>
+                  <dd>{dlrResult.dlrTime || '—'}</dd>
+                </div>
+                <div>
+                  <dt className='text-muted-foreground'>Soscom status</dt>
+                  <dd>{dlrResult.soscomStatus || 'Not mapped'}</dd>
+                </div>
+              </dl>
+            ) : null}
+          </form>
         </div>
       )}
     </AdminPage>

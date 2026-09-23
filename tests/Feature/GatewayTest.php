@@ -101,6 +101,42 @@ it('refunds only rejected recipients and does not retry a timed-out send', funct
         ->and(Delivery::query()->whereNotNull('provider_message_id')->count())->toBe(0);
 });
 
+it('lets an admin probe a Mobishastra DLR without saving it', function () {
+    $admin = User::factory()->admin()->create();
+    config([
+        'sms.gateway' => GatewayDriver::Mobishastra->value,
+        'sms.provider.base_url' => 'https://example.invalid',
+        'sms.provider.profile_id' => 'SOSCOM',
+        'sms.provider.password' => 'secret',
+        'sms.provider.dlr_path' => 'dlrstatus_api.aspx',
+    ]);
+    Provider::query()->delete();
+    Provider::factory()->mobishastra()->create([
+        'base_url' => 'https://example.invalid',
+        'profile_id' => 'SOSCOM',
+        'password' => 'secret',
+    ]);
+
+    Http::fake([
+        'https://example.invalid/dlrstatus_api.aspx*' => Http::response(
+            '1871080898,DELIVRD,2026-09-23 11:20:00',
+            200
+        ),
+    ]);
+
+    $this->actingAs($admin)
+        ->postJson('/api/admin/provider-balance/dlr', [
+            'message_id' => '1871080898',
+        ])
+        ->assertOk()
+        ->assertJsonPath('rawResponse', '1871080898,DELIVRD,2026-09-23 11:20:00')
+        ->assertJsonPath('dlrStatus', 'DELIVRD')
+        ->assertJsonPath('soscomStatus', CampaignRecipientStatus::Delivered->value)
+        ->assertJsonMissingPath('password');
+
+    expect(Delivery::query()->count())->toBe(0);
+});
+
 it('lets an admin read the fake provider balance', function () {
     $admin = User::factory()->admin()->create();
     Provider::current();

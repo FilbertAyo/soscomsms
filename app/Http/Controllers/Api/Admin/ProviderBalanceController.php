@@ -6,8 +6,10 @@ use App\Contracts\SmsGatewayInterface;
 use App\Http\Controllers\Controller;
 use App\Models\Customer;
 use App\Models\Provider;
+use App\Services\Gateway\ProviderDeliveryStatus;
 use App\Services\ProviderReadinessService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 class ProviderBalanceController extends Controller
 {
@@ -36,6 +38,30 @@ class ProviderBalanceController extends Controller
             'countryCode' => $production->countryCode(),
             'credentialsConfirmedAt' => $production->credentials_confirmed_at?->toIso8601String(),
             'checkedAt' => $provider->fresh()?->last_balance_at?->toIso8601String(),
+        ]);
+    }
+
+    public function checkDlr(Request $request, SmsGatewayInterface $gateway): JsonResponse
+    {
+        $validated = $request->validate([
+            'message_id' => ['required', 'string', 'max:64'],
+        ]);
+
+        $messageId = trim($validated['message_id']);
+        $report = $gateway->checkDeliveryStatus($messageId);
+        $normalized = ProviderDeliveryStatus::normalize($report->status);
+        $provider = Provider::current();
+        $path = (string) config('sms.provider.dlr_path', 'dlrstatus_api.aspx');
+        $base = rtrim((string) (config('sms.provider.dlr_base_url') ?: $provider->base_url ?: config('sms.provider.base_url')), '/');
+
+        return response()->json([
+            'messageId' => $messageId,
+            'rawResponse' => mb_substr($report->raw !== '' ? $report->raw : $report->status, 0, 1000),
+            'dlrStatus' => $report->status,
+            'dlrTime' => $report->occurredAt,
+            'soscomStatus' => $normalized?->value,
+            'requestUrl' => $path === '' ? '' : $base.'/'.ltrim($path, '/'),
+            'driver' => $provider->driver->value,
         ]);
     }
 }

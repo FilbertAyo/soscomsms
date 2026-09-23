@@ -180,6 +180,26 @@ export async function fetchAdminProviderBalance(): Promise<ProviderBalance> {
   return data
 }
 
+export type ProviderDlrCheck = {
+  messageId: string
+  rawResponse: string
+  dlrStatus: string
+  dlrTime: string | null
+  soscomStatus: string | null
+  requestUrl: string
+  driver: string
+}
+
+export async function checkAdminProviderDlr(
+  messageId: string
+): Promise<ProviderDlrCheck> {
+  const { data } = await api.post<ProviderDlrCheck>(
+    '/api/admin/provider-balance/dlr',
+    { message_id: messageId }
+  )
+  return data
+}
+
 export const adminPaymentsQueryKey = ['admin', 'payments'] as const
 export const paymentsQueryKey = ['payments'] as const
 
