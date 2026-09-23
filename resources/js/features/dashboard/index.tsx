@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 import {
@@ -8,7 +8,7 @@ import {
   Wallet,
   X,
 } from 'lucide-react'
-import { onboardingCompleted, onboardingSteps } from '@/data/sms'
+import { onboardingSteps, type OnboardingStepId } from '@/data/sms'
 import { campaignsQueryKey, dashboardStatsQueryKey, fetchCampaigns, fetchDashboardStats } from '@/lib/campaigns'
 import {
   creditTransactionsQueryKey,
@@ -61,10 +61,41 @@ const actions = [
   },
 ] as const
 
+function onboardingSkipKey(customerId: number): string {
+  return `soscom-onboarding-skipped-${customerId}`
+}
+
+function readOnboardingSkipped(customerId: number | undefined): boolean {
+  if (customerId === undefined || typeof window === 'undefined') {
+    return false
+  }
+
+  try {
+    return window.localStorage.getItem(onboardingSkipKey(customerId)) === '1'
+  } catch {
+    return false
+  }
+}
+
+function writeOnboardingSkipped(customerId: number): void {
+  try {
+    window.localStorage.setItem(onboardingSkipKey(customerId), '1')
+  } catch {
+    // Ignore storage failures (private mode, quota, etc.).
+  }
+}
+
 export function Dashboard() {
-  const [onboardingOpen, setOnboardingOpen] = useState(true)
-  const completedCount = onboardingCompleted.length
   const user = useAuthStore((state) => state.user)
+  const customerId = user?.customer?.id
+  const [onboardingSkipped, setOnboardingSkipped] = useState(() =>
+    readOnboardingSkipped(customerId)
+  )
+
+  useEffect(() => {
+    setOnboardingSkipped(readOnboardingSkipped(customerId))
+  }, [customerId])
+
   const displayName = user?.name ?? 'there'
   const statsQuery = useQuery({
     queryKey: dashboardStatsQueryKey,
@@ -87,6 +118,35 @@ export function Dashboard() {
   const delivered = statsQuery.data?.delivered ?? 0
   const failed = statsQuery.data?.failed ?? 0
   const campaignCount = statsQuery.data?.campaignCount ?? campaigns.length
+  const hasSentSms = campaignCount > 0 || campaigns.length > 0
+
+  const completedSteps = useMemo((): OnboardingStepId[] => {
+    const done: OnboardingStepId[] = []
+
+    if (user && !needsProfileCompletion(user)) {
+      done.push('profile')
+    }
+
+    const hasCredits =
+      (user?.customer?.smsBalance ?? 0) > 0 ||
+      transactions.some((item) =>
+        ['purchase', 'grant'].includes(item.type)
+      )
+    if (hasCredits) {
+      done.push('buy')
+    }
+
+    if (hasSentSms) {
+      done.push('send')
+    }
+
+    return done
+  }, [user, transactions, hasSentSms])
+
+  const completedCount = completedSteps.length
+  const onboardingComplete = completedCount >= onboardingSteps.length
+  const showOnboarding =
+    !onboardingSkipped && !hasSentSms && !onboardingComplete
 
   return (
     <>
@@ -109,7 +169,7 @@ export function Dashboard() {
         <div className='space-y-6'>
           <LowBalanceBanner balance={user?.customer?.smsBalance ?? 0} />
 
-          {onboardingOpen ? (
+          {showOnboarding ? (
             <div className='rounded-xl border bg-card p-5'>
               <div className='flex items-start justify-between gap-3'>
                 <div>
@@ -124,7 +184,12 @@ export function Dashboard() {
                 <Button
                   variant='ghost'
                   size='sm'
-                  onClick={() => setOnboardingOpen(false)}
+                  onClick={() => {
+                    if (customerId !== undefined) {
+                      writeOnboardingSkipped(customerId)
+                    }
+                    setOnboardingSkipped(true)
+                  }}
                 >
                   Skip
                   <X />
@@ -132,9 +197,7 @@ export function Dashboard() {
               </div>
               <div className='mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3'>
                 {onboardingSteps.map((step, index) => {
-                  const done = (onboardingCompleted as readonly string[]).includes(
-                    step.id
-                  )
+                  const done = completedSteps.includes(step.id)
                   return (
                     <Link
                       key={step.id}

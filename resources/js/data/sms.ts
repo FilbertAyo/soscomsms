@@ -536,7 +536,7 @@ export const onboardingSteps = [
   { id: 'send', label: 'Send your first SMS', href: '/send-sms' },
 ] as const
 
-export const onboardingCompleted = ['profile', 'buy'] as const
+export type OnboardingStepId = (typeof onboardingSteps)[number]['id']
 
 export const adminOverview = {
   customers: 186,
