@@ -63,6 +63,7 @@ import { Route as AuthenticatedSettingsBusinessRouteImport } from './routes/_aut
 import { Route as AuthenticatedSettingsDisplayRouteImport } from './routes/_authenticated/settings/display'
 import { Route as AuthenticatedSettingsNotificationsRouteImport } from './routes/_authenticated/settings/notifications'
 import { Route as AuthenticatedSettingsPasswordRouteImport } from './routes/_authenticated/settings/password'
+import { Route as AuthenticatedTemplatesIndexRouteImport } from './routes/_authenticated/templates/index'
 import { Route as AuthenticatedWalletIndexRouteImport } from './routes/_authenticated/wallet/index'
 import { Route as AuthenticatedWalletBuyRouteImport } from './routes/_authenticated/wallet/buy'
 import { Route as AuthenticatedWalletTransactionsRouteImport } from './routes/_authenticated/wallet/transactions'
@@ -371,6 +372,12 @@ const AuthenticatedSettingsPasswordRoute =
     path: '/password',
     getParentRoute: () => AuthenticatedSettingsRouteRoute,
   } as any)
+const AuthenticatedTemplatesIndexRoute =
+  AuthenticatedTemplatesIndexRouteImport.update({
+    id: '/templates/',
+    path: '/templates/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedWalletIndexRoute =
   AuthenticatedWalletIndexRouteImport.update({
     id: '/wallet/',
@@ -444,6 +451,7 @@ export interface FileRoutesByFullPath {
   '/send-sms/': typeof AuthenticatedSendSmsIndexRoute
   '/sender-ids/': typeof AuthenticatedSenderIdsIndexRoute
   '/settings/': typeof AuthenticatedSettingsIndexRoute
+  '/templates/': typeof AuthenticatedTemplatesIndexRoute
   '/wallet/': typeof AuthenticatedWalletIndexRoute
 }
 export interface FileRoutesByTo {
@@ -499,6 +507,7 @@ export interface FileRoutesByTo {
   '/send-sms': typeof AuthenticatedSendSmsIndexRoute
   '/sender-ids': typeof AuthenticatedSenderIdsIndexRoute
   '/settings': typeof AuthenticatedSettingsIndexRoute
+  '/templates': typeof AuthenticatedTemplatesIndexRoute
   '/wallet': typeof AuthenticatedWalletIndexRoute
 }
 export interface FileRoutesById {
@@ -559,6 +568,7 @@ export interface FileRoutesById {
   '/_authenticated/send-sms/': typeof AuthenticatedSendSmsIndexRoute
   '/_authenticated/sender-ids/': typeof AuthenticatedSenderIdsIndexRoute
   '/_authenticated/settings/': typeof AuthenticatedSettingsIndexRoute
+  '/_authenticated/templates/': typeof AuthenticatedTemplatesIndexRoute
   '/_authenticated/wallet/': typeof AuthenticatedWalletIndexRoute
 }
 export interface FileRouteTypes {
@@ -618,6 +628,7 @@ export interface FileRouteTypes {
     | '/send-sms/'
     | '/sender-ids/'
     | '/settings/'
+    | '/templates/'
     | '/wallet/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -673,6 +684,7 @@ export interface FileRouteTypes {
     | '/send-sms'
     | '/sender-ids'
     | '/settings'
+    | '/templates'
     | '/wallet'
   id:
     | '__root__'
@@ -732,6 +744,7 @@ export interface FileRouteTypes {
     | '/_authenticated/send-sms/'
     | '/_authenticated/sender-ids/'
     | '/_authenticated/settings/'
+    | '/_authenticated/templates/'
     | '/_authenticated/wallet/'
   fileRoutesById: FileRoutesById
 }
@@ -1128,6 +1141,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSettingsPasswordRouteImport
       parentRoute: typeof AuthenticatedSettingsRouteRoute
     }
+    '/_authenticated/templates/': {
+      id: '/_authenticated/templates/'
+      path: '/templates'
+      fullPath: '/templates/'
+      preLoaderRoute: typeof AuthenticatedTemplatesIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/wallet/': {
       id: '/_authenticated/wallet/'
       path: '/wallet'
@@ -1261,6 +1281,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedReportsIndexRoute: typeof AuthenticatedReportsIndexRoute
   AuthenticatedSendSmsIndexRoute: typeof AuthenticatedSendSmsIndexRoute
   AuthenticatedSenderIdsIndexRoute: typeof AuthenticatedSenderIdsIndexRoute
+  AuthenticatedTemplatesIndexRoute: typeof AuthenticatedTemplatesIndexRoute
   AuthenticatedWalletIndexRoute: typeof AuthenticatedWalletIndexRoute
 }
 
@@ -1285,6 +1306,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedReportsIndexRoute: AuthenticatedReportsIndexRoute,
   AuthenticatedSendSmsIndexRoute: AuthenticatedSendSmsIndexRoute,
   AuthenticatedSenderIdsIndexRoute: AuthenticatedSenderIdsIndexRoute,
+  AuthenticatedTemplatesIndexRoute: AuthenticatedTemplatesIndexRoute,
   AuthenticatedWalletIndexRoute: AuthenticatedWalletIndexRoute,
 }
 

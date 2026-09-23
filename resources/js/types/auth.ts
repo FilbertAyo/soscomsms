@@ -66,6 +66,7 @@ export function needsProfileCompletion(user: AuthUser): boolean {
 
 const PROFILE_LOCKED_PREFIXES = [
   '/send-sms',
+  '/templates',
   '/campaigns',
   '/reports',
   '/contacts',

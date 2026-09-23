@@ -38,6 +38,11 @@ const customerNavGroups: SidebarData['navGroups'] = [
         url: '/send-sms',
         icon: Send,
       },
+      {
+        title: 'Templates',
+        url: '/templates',
+        icon: FileText,
+      },
     ],
   },
   {
@@ -177,6 +182,7 @@ function sidebarUser(user: AuthUser): SidebarData['user'] {
 
 const lockableNavTitles = new Set([
   'Send SMS',
+  'Templates',
   'Campaigns',
   'Contacts',
   'Sender IDs',
