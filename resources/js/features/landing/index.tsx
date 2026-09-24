@@ -71,14 +71,7 @@ export function LandingPage() {
             <p className='mb-4 text-sm font-medium text-primary'>
               Bulk SMS for Tanzania
             </p>
-            <h1 className='text-4xl font-semibold tracking-tight sm:text-5xl'>
-              Send SMS. Reach Everyone.
-            </h1>
-            <p className='mt-4 max-w-2xl text-lg text-muted-foreground'>
-              {developerApiVisible
-                ? 'A simple and reliable platform for sending bulk SMS and connecting your applications through SMS APIs.'
-                : 'A simple and reliable platform for sending bulk SMS.'}
-            </p>
+            <h1 className='text-4xl font-semibold tracking-tight sm:text-5xl'> Send SMS. Reach Everyone. Grow Faster. </h1> <p className='mt-4 max-w-2xl text-lg text-muted-foreground'> {developerApiVisible ? 'A fast, reliable, and affordable SMS platform built for businesses, organizations, and developers. Send bulk messages to your customers, teams, and communities, or connect your applications through our powerful SMS API.' : 'A fast, reliable, and affordable bulk SMS platform built for businesses and organizations in Tanzania. Send important updates, notifications, reminders, promotions, and announcements to thousands of people with ease.'} </p>
             <div className='mt-8 flex flex-col gap-3 sm:flex-row'>
               {user ? (
                 <Button size='lg' asChild>
