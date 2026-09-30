@@ -14,6 +14,19 @@ export function CardSkeletonGrid({ count = 4 }: { count?: number }) {
   )
 }
 
+export function DashboardStatsSkeleton() {
+  return (
+    <div className='grid gap-4 sm:grid-cols-2 lg:col-span-2'>
+      {Array.from({ length: 4 }).map((_, index) => (
+        <div key={index} className='rounded-xl border bg-card p-5'>
+          <Skeleton className='h-4 w-28' />
+          <Skeleton className='mt-3 h-8 w-16' />
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export function TableSkeleton({ rows = 6 }: { rows?: number }) {
   return (
     <div className='space-y-3 rounded-xl border bg-card p-4'>

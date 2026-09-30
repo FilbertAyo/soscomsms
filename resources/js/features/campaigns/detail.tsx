@@ -56,9 +56,9 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
         useAuthStore.getState().setUser(withSmsBalance(current, result.smsBalance))
       }
       queryClient.setQueryData(campaignQueryKey(campaignId), result.campaign)
-      await queryClient.invalidateQueries({ queryKey: campaignsQueryKey })
-      await queryClient.invalidateQueries({ queryKey: walletQueryKey })
-      await queryClient.invalidateQueries({ queryKey: creditTransactionsQueryKey })
+      void queryClient.invalidateQueries({ queryKey: campaignsQueryKey })
+      void queryClient.invalidateQueries({ queryKey: walletQueryKey })
+      void queryClient.invalidateQueries({ queryKey: creditTransactionsQueryKey })
       setCancelOpen(false)
       toast.success('Scheduled SMS cancelled. The SMS has been returned to your balance.')
     },

@@ -1,5 +1,6 @@
 import { AxiosError } from 'axios'
 import { api } from '@/lib/api'
+import { safeUserText, userFacingMessage } from '@/lib/handle-server-error'
 import { type AuthUser } from '@/types/auth'
 
 export const meQueryKey = ['auth', 'me'] as const
@@ -120,11 +121,11 @@ export function validationMessage(error: unknown, field: string): string | null 
 
   const messages = error.response?.data?.errors?.[field]
   if (Array.isArray(messages) && typeof messages[0] === 'string') {
-    return messages[0]
+    return safeUserText(messages[0], '') || null
   }
 
   if (typeof error.response?.data?.message === 'string') {
-    return error.response.data.message
+    return safeUserText(error.response.data.message, '') || null
   }
 
   return null
@@ -135,26 +136,19 @@ export function applyValidationErrors(
   setError: (field: string, error: { message: string }) => void,
   fieldMap: Record<string, string> = {}
 ): string {
-  if (!(error instanceof AxiosError)) {
-    return 'Something went wrong. Try again.'
-  }
-
-  if (error.response?.status === 419) {
-    return 'Your session expired. Refresh the page and try again.'
-  }
-
-  const errors = error.response?.data?.errors
-  if (errors && typeof errors === 'object') {
-    for (const [field, messages] of Object.entries(errors)) {
-      if (Array.isArray(messages) && typeof messages[0] === 'string') {
-        setError(fieldMap[field] ?? field, { message: messages[0] })
+  if (error instanceof AxiosError) {
+    const errors = error.response?.data?.errors
+    if (errors && typeof errors === 'object') {
+      for (const [field, messages] of Object.entries(errors)) {
+        if (Array.isArray(messages) && typeof messages[0] === 'string') {
+          const message = safeUserText(messages[0], '')
+          if (message !== '') {
+            setError(fieldMap[field] ?? field, { message })
+          }
+        }
       }
     }
   }
 
-  if (typeof error.response?.data?.message === 'string') {
-    return error.response.data.message
-  }
-
-  return 'Something went wrong. Try again.'
+  return userFacingMessage(error, 'Something went wrong. Try again.')
 }

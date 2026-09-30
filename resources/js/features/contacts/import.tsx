@@ -122,8 +122,8 @@ export function ImportContacts() {
     },
     onSuccess: async (payload) => {
       setResult(payload)
-      await queryClient.invalidateQueries({ queryKey: ['contacts'] })
-      await queryClient.invalidateQueries({ queryKey: contactGroupsQueryKey })
+      void queryClient.invalidateQueries({ queryKey: ['contacts'] })
+      void queryClient.invalidateQueries({ queryKey: contactGroupsQueryKey })
 
       if (payload.created > 0) {
         toast.success(

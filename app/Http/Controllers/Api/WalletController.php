@@ -35,7 +35,7 @@ class WalletController extends Controller
                     'quantity' => $quantity,
                     'unitPriceTzs' => $quote['unitPriceTzs'],
                     'totalTzs' => $quote['totalTzs'],
-                    'popular' => $quantity === 10000,
+                    'popular' => $quantity === 1000,
                 ];
             })
             ->values();
@@ -57,7 +57,7 @@ class WalletController extends Controller
                 'sms.billing.lipa_namba_name',
                 'SOSCOM TECHNOLOGIES COMPANY LIMITED',
             ),
-            'minPurchaseQuantity' => (int) config('sms.min_purchase_quantity', 50),
+            'minPurchaseQuantity' => (int) config('sms.min_purchase_quantity', 100),
             'tiers' => $tiers,
             'packages' => $packages,
             'recentTransactions' => $recent,

@@ -37,8 +37,8 @@ export function RequestSenderId() {
       }),
     onSuccess: async (request) => {
       toast.success('Sender ID request submitted.')
-      await queryClient.invalidateQueries({ queryKey: senderIdRequestsQueryKey })
-      await queryClient.invalidateQueries({
+      void queryClient.invalidateQueries({ queryKey: senderIdRequestsQueryKey })
+      void queryClient.invalidateQueries({
         queryKey: senderIdRequestQueryKey(request.id),
       })
       await navigate({

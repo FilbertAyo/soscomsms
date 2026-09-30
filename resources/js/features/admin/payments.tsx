@@ -57,10 +57,10 @@ export function AdminPayments() {
       toast.success(
         `Marked paid. Customer balance is now ${formatNumber(result.smsBalance ?? 0)} SMS.`
       )
-      await queryClient.invalidateQueries({ queryKey: adminPaymentsQueryKey })
-      await queryClient.invalidateQueries({ queryKey: adminTransactionsQueryKey })
-      await queryClient.invalidateQueries({ queryKey: adminCustomersQueryKey })
-      await queryClient.invalidateQueries({ queryKey: walletQueryKey })
+      void queryClient.invalidateQueries({ queryKey: adminPaymentsQueryKey })
+      void queryClient.invalidateQueries({ queryKey: adminTransactionsQueryKey })
+      void queryClient.invalidateQueries({ queryKey: adminCustomersQueryKey })
+      void queryClient.invalidateQueries({ queryKey: walletQueryKey })
     },
     onError: (error) => {
       toast.error(applyValidationErrors(error, () => undefined))
@@ -74,7 +74,7 @@ export function AdminPayments() {
       toast.success('Payment rejected. No credits were issued.')
       setRejectTarget(null)
       setReason('')
-      await queryClient.invalidateQueries({ queryKey: adminPaymentsQueryKey })
+      void queryClient.invalidateQueries({ queryKey: adminPaymentsQueryKey })
     },
     onError: (error) => {
       toast.error(applyValidationErrors(error, () => undefined))

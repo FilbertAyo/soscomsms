@@ -91,11 +91,11 @@ export function AdminCustomers() {
   }
 
   const invalidateCustomers = async () => {
-    await queryClient.invalidateQueries({ queryKey: adminCustomersQueryKey })
-    await queryClient.invalidateQueries({ queryKey: adminOverviewQueryKey })
-    await queryClient.invalidateQueries({ queryKey: adminLogsQueryKey })
-    await queryClient.invalidateQueries({ queryKey: adminTransactionsQueryKey })
-    await queryClient.invalidateQueries({ queryKey: adminPricingTiersQueryKey })
+    void queryClient.invalidateQueries({ queryKey: adminCustomersQueryKey })
+    void queryClient.invalidateQueries({ queryKey: adminOverviewQueryKey })
+    void queryClient.invalidateQueries({ queryKey: adminLogsQueryKey })
+    void queryClient.invalidateQueries({ queryKey: adminTransactionsQueryKey })
+    void queryClient.invalidateQueries({ queryKey: adminPricingTiersQueryKey })
   }
 
   const grantMutation = useMutation({

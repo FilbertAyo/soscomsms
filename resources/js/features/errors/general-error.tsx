@@ -1,36 +1,39 @@
-import { useNavigate, useRouter } from '@tanstack/react-router'
+import { useEffect } from 'react'
 import { cn } from '@/lib/utils'
-import { Button } from '@/components/ui/button'
+import { FriendlyError } from './friendly-error'
 
 type GeneralErrorProps = React.HTMLAttributes<HTMLDivElement> & {
   minimal?: boolean
+  error?: unknown
 }
 
 export function GeneralError({
   className,
   minimal = false,
+  error,
 }: GeneralErrorProps) {
-  const navigate = useNavigate()
-  const { history } = useRouter()
+  useEffect(() => {
+    if (error) {
+      console.error(error)
+    }
+  }, [error])
+
+  if (minimal) {
+    return (
+      <p className={cn('text-sm text-muted-foreground', className)}>
+        Something went wrong. Please try again.
+      </p>
+    )
+  }
+
   return (
-    <div className={cn('h-svh w-full', className)}>
-      <div className='m-auto flex h-full w-full flex-col items-center justify-center gap-2'>
-        {!minimal && (
-          <h1 className='text-[7rem] leading-tight font-bold'>500</h1>
-        )}
-        <span className='font-medium'>Oops! Something went wrong {`:')`}</span>
-        <p className='text-center text-muted-foreground'>
-          We apologize for the inconvenience. <br /> Please try again later.
-        </p>
-        {!minimal && (
-          <div className='mt-6 flex gap-4'>
-            <Button variant='outline' onClick={() => history.go(-1)}>
-              Go Back
-            </Button>
-            <Button onClick={() => navigate({ to: '/' })}>Back to Home</Button>
-          </div>
-        )}
-      </div>
+    <div className={className}>
+      <FriendlyError
+        title='Something went wrong'
+        description='We could not finish that. Try again in a moment. If it keeps happening, contact Soscom.'
+        homeTo='/dashboard'
+        homeLabel='Back to dashboard'
+      />
     </div>
   )
 }

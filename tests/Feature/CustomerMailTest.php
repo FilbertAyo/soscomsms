@@ -51,7 +51,7 @@ it('emails payment requested, confirmed, and rejected notices', function () {
 
     $create = $this->actingAs($user)
         ->postJson('/api/payments', [
-            'quantity' => 50,
+            'quantity' => 100,
             'payer_reference' => '0754221890',
         ])
         ->assertCreated();
@@ -66,7 +66,7 @@ it('emails payment requested, confirmed, and rejected notices', function () {
 
     $second = $this->actingAs($user)
         ->postJson('/api/payments', [
-            'quantity' => 50,
+            'quantity' => 100,
             'payer_reference' => '0754221890',
         ])
         ->assertCreated();

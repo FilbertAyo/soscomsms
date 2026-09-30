@@ -40,11 +40,11 @@ export function AdminProduction() {
   }, [snapshot])
 
   async function refreshRelated() {
-    await queryClient.invalidateQueries({ queryKey: adminProductionQueryKey })
-    await queryClient.invalidateQueries({
+    void queryClient.invalidateQueries({ queryKey: adminProductionQueryKey })
+    void queryClient.invalidateQueries({
       queryKey: adminProviderBalanceQueryKey,
     })
-    await queryClient.invalidateQueries({ queryKey: adminLogsQueryKey })
+    void queryClient.invalidateQueries({ queryKey: adminLogsQueryKey })
   }
 
   const saveMutation = useMutation({

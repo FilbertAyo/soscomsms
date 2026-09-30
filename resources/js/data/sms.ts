@@ -685,7 +685,7 @@ export const faqs = [
     items: [
       {
         q: 'How do I buy more SMS?',
-        a: 'Go to Buy SMS, enter how many SMS you need (from 50), pay the quoted amount to Lipa namba 123456, then submit the mobile number you paid with. Credits appear after Soscom confirms the payment.',
+        a: 'Go to Buy SMS, enter how many SMS you need (from 100), pay the quoted amount to Lipa namba 123456, then submit the mobile number you paid with. Credits appear after Soscom confirms the payment.',
       },
       {
         q: 'Do unused SMS expire?',

@@ -71,8 +71,8 @@ export function ContactGroupsPage() {
       setCreating(false)
       setEditing(null)
       setForm(emptyForm)
-      await queryClient.invalidateQueries({ queryKey: contactGroupsQueryKey })
-      await queryClient.invalidateQueries({ queryKey: ['contacts'] })
+      void queryClient.invalidateQueries({ queryKey: contactGroupsQueryKey })
+      void queryClient.invalidateQueries({ queryKey: ['contacts'] })
       return group
     },
     onError: (error) => {
@@ -85,8 +85,8 @@ export function ContactGroupsPage() {
     onSuccess: async () => {
       toast.success('Group deleted. Contacts were kept.')
       setDeleting(null)
-      await queryClient.invalidateQueries({ queryKey: contactGroupsQueryKey })
-      await queryClient.invalidateQueries({ queryKey: ['contacts'] })
+      void queryClient.invalidateQueries({ queryKey: contactGroupsQueryKey })
+      void queryClient.invalidateQueries({ queryKey: ['contacts'] })
     },
     onError: (error) => {
       toast.error(applyValidationErrors(error, () => undefined))

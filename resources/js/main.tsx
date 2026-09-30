@@ -64,9 +64,9 @@ const queryClient = new QueryClient({
         }
       }
 
-      if (error.response?.status === 500 && import.meta.env.PROD) {
+      if ((error.response?.status ?? 0) >= 500) {
+        console.error(error)
         toast.error('Something went wrong. Please try again.')
-        router.navigate({ to: '/500' })
       }
     },
   }),

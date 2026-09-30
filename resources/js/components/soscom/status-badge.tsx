@@ -56,6 +56,10 @@ type StatusBadgeProps = {
   className?: string
 }
 
+export function statusLabel(status: string): string {
+  return labels[status]?.label ?? status.replaceAll('_', ' ')
+}
+
 export function StatusBadge({ status, className }: StatusBadgeProps) {
   const config = labels[status] ?? {
     label: status,

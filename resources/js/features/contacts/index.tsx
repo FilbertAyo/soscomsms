@@ -136,8 +136,8 @@ export function ContactsPage() {
       setCreating(false)
       setEditing(null)
       setForm(emptyForm)
-      await queryClient.invalidateQueries({ queryKey: ['contacts'] })
-      await queryClient.invalidateQueries({ queryKey: contactGroupsQueryKey })
+      void queryClient.invalidateQueries({ queryKey: ['contacts'] })
+      void queryClient.invalidateQueries({ queryKey: contactGroupsQueryKey })
     },
     onError: (error) => {
       toast.error(applyValidationErrors(error, () => undefined))
@@ -161,7 +161,7 @@ export function ContactsPage() {
           : 'Contact reactivated.'
       )
       setStatusTarget(null)
-      await queryClient.invalidateQueries({ queryKey: ['contacts'] })
+      void queryClient.invalidateQueries({ queryKey: ['contacts'] })
     },
     onError: (error) => {
       toast.error(applyValidationErrors(error, () => undefined))

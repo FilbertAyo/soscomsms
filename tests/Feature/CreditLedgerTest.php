@@ -67,26 +67,26 @@ it('quotes the matching volume tier', function () {
         ->postJson('/api/quotes', ['quantity' => 10000])
         ->assertOk()
         ->assertJsonPath('quote.quantity', 10000)
-        ->assertJsonPath('quote.unitPriceTzs', 22)
-        ->assertJsonPath('quote.totalTzs', 220000);
+        ->assertJsonPath('quote.unitPriceTzs', 20)
+        ->assertJsonPath('quote.totalTzs', 200000);
 
     $this->actingAs($user)
         ->postJson('/api/quotes', ['quantity' => 500])
         ->assertOk()
-        ->assertJsonPath('quote.unitPriceTzs', 30)
-        ->assertJsonPath('quote.totalTzs', 15000);
+        ->assertJsonPath('quote.unitPriceTzs', 25)
+        ->assertJsonPath('quote.totalTzs', 12500);
 
     $this->actingAs($user)
-        ->postJson('/api/quotes', ['quantity' => 50])
+        ->postJson('/api/quotes', ['quantity' => 100])
         ->assertOk()
-        ->assertJsonPath('quote.unitPriceTzs', 30)
-        ->assertJsonPath('quote.totalTzs', 1500);
+        ->assertJsonPath('quote.unitPriceTzs', 25)
+        ->assertJsonPath('quote.totalTzs', 2500);
 
     $this->actingAs($user)
         ->postJson('/api/quotes', ['quantity' => 499])
         ->assertOk()
-        ->assertJsonPath('quote.unitPriceTzs', 30)
-        ->assertJsonPath('quote.totalTzs', 14970);
+        ->assertJsonPath('quote.unitPriceTzs', 25)
+        ->assertJsonPath('quote.totalTzs', 12475);
 });
 
 it('rejects quotes below the minimum package', function () {
@@ -110,21 +110,21 @@ it('lets an admin grant credits and the customer wallet shows them', function ()
         ])
         ->assertCreated()
         ->assertJsonPath('smsBalance', 1000)
-        ->assertJsonPath('transaction.customerUnitPrice', 28)
-        ->assertJsonPath('transaction.amountTzs', 28000);
+        ->assertJsonPath('transaction.customerUnitPrice', 23)
+        ->assertJsonPath('transaction.amountTzs', 23000);
 
     $this->actingAs($admin)
         ->getJson('/api/admin/overview')
         ->assertOk()
-        ->assertJsonPath('purchaseRevenueTzs', 28000);
+        ->assertJsonPath('purchaseRevenueTzs', 23000);
 
     $this->actingAs($customerUser)
         ->getJson('/api/wallet')
         ->assertOk()
         ->assertJsonPath('smsBalance', 1000)
-        ->assertJsonPath('minPurchaseQuantity', 50)
-        ->assertJsonPath('tiers.0.minQuantity', 500)
-        ->assertJsonPath('tiers.0.unitPriceTzs', 30);
+        ->assertJsonPath('minPurchaseQuantity', 100)
+        ->assertJsonPath('tiers.0.minQuantity', 100)
+        ->assertJsonPath('tiers.0.unitPriceTzs', 25);
 });
 
 it('lets an admin override the grant price for a preferred customer', function () {
@@ -154,8 +154,8 @@ it('prices grants below the first published range at the first-range unit price'
     $customer = Customer::factory()->complete()->create(['user_id' => $user->id]);
     $grant = app(CreditLedger::class)->grant($customer, 20, 'Small grant');
 
-    expect($grant->customer_unit_price)->toBe(30)
-        ->and($grant->amount_tzs)->toBe(600);
+    expect($grant->customer_unit_price)->toBe(25)
+        ->and($grant->amount_tzs)->toBe(500);
 });
 
 it('lets an admin reverse a grant and keeps both ledger rows', function () {
@@ -186,7 +186,7 @@ it('updates a pricing tier for future quotes only', function () {
     $tierId = $this->actingAs($admin)
         ->getJson('/api/admin/pricing-tiers')
         ->assertOk()
-        ->json('tiers.4.id');
+        ->json('tiers.2.id');
 
     $this->actingAs($admin)
         ->patchJson("/api/admin/pricing-tiers/{$tierId}", [
@@ -225,7 +225,7 @@ it('values the signup bonus at the first-range price and hides SMS usage from th
     $ledger->purchase($customer->fresh(), 300, 30, 'PAY-300', 'Purchase of 300 SMS via Lipa namba');
 
     expect($welcome->quantity)->toBe(20)
-        ->and($welcome->amount_tzs)->toBe(600);
+        ->and($welcome->amount_tzs)->toBe(500);
 
     $admin = User::factory()->admin()->create();
     $this->actingAs($admin)
@@ -240,7 +240,7 @@ it('values the signup bonus at the first-range price and hides SMS usage from th
         ->assertJsonPath('transactions.0.quantity', 300)
         ->assertJsonPath('transactions.0.amountTzs', 9000)
         ->assertJsonPath('transactions.1.quantity', 20)
-        ->assertJsonPath('transactions.1.amountTzs', 600);
+        ->assertJsonPath('transactions.1.amountTzs', 500);
 
     $this->actingAs($user)
         ->getJson('/api/wallet')

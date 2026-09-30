@@ -51,9 +51,9 @@ export function AdminSenderIds() {
     requests.find((item) => item.id === selectedId) ?? requests[0] ?? null
 
   async function refresh() {
-    await queryClient.invalidateQueries({ queryKey: adminSenderIdRequestsQueryKey })
-    await queryClient.invalidateQueries({ queryKey: usableSenderIdsQueryKey })
-    await queryClient.invalidateQueries({ queryKey: ['sender-id-requests'] })
+    void queryClient.invalidateQueries({ queryKey: adminSenderIdRequestsQueryKey })
+    void queryClient.invalidateQueries({ queryKey: usableSenderIdsQueryKey })
+    void queryClient.invalidateQueries({ queryKey: ['sender-id-requests'] })
   }
 
   const reviewMutation = useMutation({

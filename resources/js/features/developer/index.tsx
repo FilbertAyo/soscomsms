@@ -60,7 +60,7 @@ export function DeveloperPage() {
       setName('')
       setPlaintext(result.key)
       toast.success('API key created. Copy it now — it will not be shown again.')
-      await queryClient.invalidateQueries({ queryKey: apiKeysQueryKey })
+      void queryClient.invalidateQueries({ queryKey: apiKeysQueryKey })
     },
     onError: (error) => {
       toast.error(applyValidationErrors(error, () => undefined))
@@ -72,7 +72,7 @@ export function DeveloperPage() {
     onSuccess: async () => {
       setRevokeTarget(null)
       toast.success('API key revoked.')
-      await queryClient.invalidateQueries({ queryKey: apiKeysQueryKey })
+      void queryClient.invalidateQueries({ queryKey: apiKeysQueryKey })
     },
     onError: (error) => {
       toast.error(applyValidationErrors(error, () => undefined))

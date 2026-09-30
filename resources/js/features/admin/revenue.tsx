@@ -25,9 +25,9 @@ export function AdminRevenue() {
       updatePricingTier(id, unitPriceTzs),
     onSuccess: async (tier) => {
       toast.success(`Updated ${tier.label} to ${formatTZS(tier.unitPriceTzs)} per SMS.`)
-      await queryClient.invalidateQueries({ queryKey: adminPricingTiersQueryKey })
-      await queryClient.invalidateQueries({ queryKey: adminOverviewQueryKey })
-      await queryClient.invalidateQueries({ queryKey: adminLogsQueryKey })
+      void queryClient.invalidateQueries({ queryKey: adminPricingTiersQueryKey })
+      void queryClient.invalidateQueries({ queryKey: adminOverviewQueryKey })
+      void queryClient.invalidateQueries({ queryKey: adminLogsQueryKey })
     },
     onError: (error) => {
       toast.error(applyValidationErrors(error, () => undefined))

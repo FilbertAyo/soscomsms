@@ -78,7 +78,7 @@ export function WebhooksPage() {
       setUrl('')
       setSecret(result.secret)
       toast.success('Webhook created. Copy the signing secret now.')
-      await queryClient.invalidateQueries({ queryKey: webhooksQueryKey })
+      void queryClient.invalidateQueries({ queryKey: webhooksQueryKey })
     },
     onError: (error) => {
       toast.error(applyValidationErrors(error, () => undefined))
@@ -89,7 +89,7 @@ export function WebhooksPage() {
     mutationFn: (webhook: WebhookRecord) =>
       updateWebhook(webhook.id, { enabled: !webhook.enabled }),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: webhooksQueryKey })
+      void queryClient.invalidateQueries({ queryKey: webhooksQueryKey })
     },
     onError: (error) => {
       toast.error(applyValidationErrors(error, () => undefined))
@@ -101,7 +101,7 @@ export function WebhooksPage() {
     onSuccess: async (result) => {
       setSecret(result.secret)
       toast.success('New signing secret created. Copy it now.')
-      await queryClient.invalidateQueries({ queryKey: webhooksQueryKey })
+      void queryClient.invalidateQueries({ queryKey: webhooksQueryKey })
     },
     onError: (error) => {
       toast.error(applyValidationErrors(error, () => undefined))
@@ -113,7 +113,7 @@ export function WebhooksPage() {
     onSuccess: async () => {
       setDeleteTarget(null)
       toast.success('Webhook removed.')
-      await queryClient.invalidateQueries({ queryKey: webhooksQueryKey })
+      void queryClient.invalidateQueries({ queryKey: webhooksQueryKey })
     },
     onError: (error) => {
       toast.error(applyValidationErrors(error, () => undefined))

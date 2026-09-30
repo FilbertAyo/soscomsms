@@ -69,7 +69,7 @@ export function MessageTemplatesPage() {
       setCreating(false)
       setEditing(null)
       setForm(emptyForm)
-      await queryClient.invalidateQueries({ queryKey: messageTemplatesQueryKey })
+      void queryClient.invalidateQueries({ queryKey: messageTemplatesQueryKey })
     },
     onError: (error) => {
       toast.error(applyValidationErrors(error, () => undefined))
@@ -87,7 +87,7 @@ export function MessageTemplatesPage() {
     onSuccess: async () => {
       toast.success('Template deleted.')
       setDeleteTarget(null)
-      await queryClient.invalidateQueries({ queryKey: messageTemplatesQueryKey })
+      void queryClient.invalidateQueries({ queryKey: messageTemplatesQueryKey })
     },
     onError: (error) => {
       toast.error(applyValidationErrors(error, () => undefined))

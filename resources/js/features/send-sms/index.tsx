@@ -185,9 +185,9 @@ export function SendSms() {
       if (current) {
         useAuthStore.getState().setUser(withSmsBalance(current, result.smsBalance))
       }
-      await queryClient.invalidateQueries({ queryKey: campaignsQueryKey })
-      await queryClient.invalidateQueries({ queryKey: walletQueryKey })
-      await queryClient.invalidateQueries({ queryKey: creditTransactionsQueryKey })
+      void queryClient.invalidateQueries({ queryKey: campaignsQueryKey })
+      void queryClient.invalidateQueries({ queryKey: walletQueryKey })
+      void queryClient.invalidateQueries({ queryKey: creditTransactionsQueryKey })
       toast.success(
         result.campaign.status === 'scheduled'
           ? 'Your SMS is scheduled. We will send it at the time you chose.'

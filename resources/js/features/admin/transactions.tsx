@@ -34,8 +34,8 @@ export function AdminTransactions() {
     mutationFn: reverseCreditTransaction,
     onSuccess: async () => {
       toast.success('Reversal recorded. The original row was not changed.')
-      await queryClient.invalidateQueries({ queryKey: adminTransactionsQueryKey })
-      await queryClient.invalidateQueries({ queryKey: adminCustomersQueryKey })
+      void queryClient.invalidateQueries({ queryKey: adminTransactionsQueryKey })
+      void queryClient.invalidateQueries({ queryKey: adminCustomersQueryKey })
     },
     onError: (error) => {
       toast.error(applyValidationErrors(error, () => undefined))

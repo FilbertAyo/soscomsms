@@ -1,4 +1,3 @@
-import { useEffect, useMemo, useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 import {
@@ -6,9 +5,7 @@ import {
   Send,
   Upload,
   Wallet,
-  X,
 } from 'lucide-react'
-import { onboardingSteps, type OnboardingStepId } from '@/data/sms'
 import { campaignsQueryKey, dashboardStatsQueryKey, fetchCampaigns, fetchDashboardStats } from '@/lib/campaigns'
 import {
   creditTransactionsQueryKey,
@@ -20,8 +17,11 @@ import { useAuthStore } from '@/stores/auth-store'
 import { needsProfileCompletion } from '@/types/auth'
 import { Button } from '@/components/ui/button'
 import { AppHeader } from '@/components/soscom/app-header'
-import { LowBalanceBanner } from '@/components/soscom/low-balance-banner'
-import { StatusBadge } from '@/components/soscom/status-badge'
+import { statusLabel } from '@/components/soscom/status-badge'
+import {
+  DashboardStatsSkeleton,
+  TableSkeleton,
+} from '@/components/soscom/skeletons'
 import { TableWrap } from '@/components/soscom/table-wrap'
 import { Main } from '@/components/layout/main'
 import {
@@ -61,56 +61,24 @@ const actions = [
   },
 ] as const
 
-function onboardingSkipKey(customerId: number): string {
-  return `soscom-onboarding-skipped-${customerId}`
-}
-
-function readOnboardingSkipped(customerId: number | undefined): boolean {
-  if (customerId === undefined || typeof window === 'undefined') {
-    return false
-  }
-
-  try {
-    return window.localStorage.getItem(onboardingSkipKey(customerId)) === '1'
-  } catch {
-    return false
-  }
-}
-
-function writeOnboardingSkipped(customerId: number): void {
-  try {
-    window.localStorage.setItem(onboardingSkipKey(customerId), '1')
-  } catch {
-    // Ignore storage failures (private mode, quota, etc.).
-  }
-}
-
 export function Dashboard() {
   const user = useAuthStore((state) => state.user)
-  const customerId = user?.customer?.id
-  const [onboardingSkipped, setOnboardingSkipped] = useState(() =>
-    readOnboardingSkipped(customerId)
-  )
-
-  useEffect(() => {
-    setOnboardingSkipped(readOnboardingSkipped(customerId))
-  }, [customerId])
-
   const displayName = user?.name ?? 'there'
+  const profileReady = Boolean(user && !needsProfileCompletion(user))
   const statsQuery = useQuery({
     queryKey: dashboardStatsQueryKey,
     queryFn: fetchDashboardStats,
-    enabled: Boolean(user && !needsProfileCompletion(user)),
+    enabled: profileReady,
   })
   const campaignsQuery = useQuery({
     queryKey: [...campaignsQueryKey, 'recent'],
     queryFn: () => fetchCampaigns({ perPage: 10 }),
-    enabled: Boolean(user && !needsProfileCompletion(user)),
+    enabled: profileReady,
   })
   const transactionsQuery = useQuery({
     queryKey: [...creditTransactionsQueryKey, 'recent'],
     queryFn: () => fetchCreditTransactions(1),
-    enabled: Boolean(user && !needsProfileCompletion(user)),
+    enabled: profileReady,
   })
   const campaigns = campaignsQuery.data?.campaigns ?? []
   const transactions = transactionsQuery.data?.transactions ?? []
@@ -118,106 +86,36 @@ export function Dashboard() {
   const delivered = statsQuery.data?.delivered ?? 0
   const failed = statsQuery.data?.failed ?? 0
   const campaignCount = statsQuery.data?.campaignCount ?? campaigns.length
-  const hasSentSms = campaignCount > 0 || campaigns.length > 0
-
-  const completedSteps = useMemo((): OnboardingStepId[] => {
-    const done: OnboardingStepId[] = []
-
-    if (user && !needsProfileCompletion(user)) {
-      done.push('profile')
-    }
-
-    const hasCredits =
-      (user?.customer?.smsBalance ?? 0) > 0 ||
-      transactions.some((item) =>
-        ['purchase', 'grant'].includes(item.type)
-      )
-    if (hasCredits) {
-      done.push('buy')
-    }
-
-    if (hasSentSms) {
-      done.push('send')
-    }
-
-    return done
-  }, [user, transactions, hasSentSms])
-
-  const completedCount = completedSteps.length
-  const onboardingComplete = completedCount >= onboardingSteps.length
-  const showOnboarding =
-    !onboardingSkipped && !hasSentSms && !onboardingComplete
 
   return (
     <>
       <AppHeader />
       <Main>
-        <div className='mb-6 space-y-1'>
-          <h1 className='text-2xl font-semibold tracking-tight'>
-            {getGreeting()}, {firstName(displayName)}
-          </h1>
-          <p className='text-sm text-muted-foreground'>
-            {user && needsProfileCompletion(user)
-              ? 'Finish your profile to start sending SMS.'
-              : "Here's what's happening with your SMS account."}
-          </p>
+        <div className='mb-6 flex items-start justify-between gap-4'>
+          <div className='space-y-1'>
+            <h1 className='text-2xl font-semibold tracking-tight'>
+              {getGreeting()}, {firstName(displayName)}
+            </h1>
+            <p className='text-sm text-muted-foreground'>
+              {user && needsProfileCompletion(user)
+                ? 'Finish your profile to start sending SMS.'
+                : "Here's what's happening with your SMS account."}
+            </p>
+          </div>
+          {profileReady ? (
+            <Button asChild className='shrink-0'>
+              <Link to='/send-sms'>
+                <Send />
+                Send SMS
+              </Link>
+            </Button>
+          ) : null}
         </div>
 
         {user && needsProfileCompletion(user) ? (
           <CompleteProfileCard />
         ) : (
         <div className='space-y-6'>
-          <LowBalanceBanner balance={user?.customer?.smsBalance ?? 0} />
-
-          {showOnboarding ? (
-            <div className='rounded-xl border bg-card p-5'>
-              <div className='flex items-start justify-between gap-3'>
-                <div>
-                  <h2 className='text-lg font-semibold'>
-                    Welcome to Soscom SMS
-                  </h2>
-                  <p className='text-sm text-muted-foreground'>
-                    Let's get your account ready. {completedCount} of{' '}
-                    {onboardingSteps.length} completed.
-                  </p>
-                </div>
-                <Button
-                  variant='ghost'
-                  size='sm'
-                  onClick={() => {
-                    if (customerId !== undefined) {
-                      writeOnboardingSkipped(customerId)
-                    }
-                    setOnboardingSkipped(true)
-                  }}
-                >
-                  Skip
-                  <X />
-                </Button>
-              </div>
-              <div className='mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3'>
-                {onboardingSteps.map((step, index) => {
-                  const done = completedSteps.includes(step.id)
-                  return (
-                    <Link
-                      key={step.id}
-                      to={step.href}
-                      className='rounded-lg border p-4 hover:bg-muted/40'
-                    >
-                      <p className='text-xs text-muted-foreground'>
-                        Step {index + 1}
-                      </p>
-                      <p className='mt-1 font-medium'>{step.label}</p>
-                      <p className='mt-2 text-xs text-muted-foreground'>
-                        {done ? 'Completed' : 'Not done yet'}
-                      </p>
-                    </Link>
-                  )
-                })}
-              </div>
-            </div>
-          ) : null}
-
           <div className='grid gap-4 lg:grid-cols-3'>
             <div className='rounded-xl border bg-card p-6 lg:col-span-1'>
               <p className='text-sm text-muted-foreground'>SMS Balance</p>
@@ -231,12 +129,20 @@ export function Dashboard() {
                 <Link to='/wallet/buy'>Buy SMS</Link>
               </Button>
             </div>
+            {statsQuery.isLoading ? (
+              <DashboardStatsSkeleton />
+            ) : statsQuery.isError ? (
+              <p className='text-sm text-muted-foreground lg:col-span-2'>
+                We couldn't load your totals. Refresh the page and try again.
+              </p>
+            ) : (
             <div className='grid gap-4 sm:grid-cols-2 lg:col-span-2'>
               <Stat label='SMS being sent' value={formatNumber(smsQueued)} />
               <Stat label='Campaigns' value={formatNumber(campaignCount)} />
               <Stat label='Delivered' value={formatNumber(delivered)} />
               <Stat label='Failed' value={formatNumber(failed)} />
             </div>
+            )}
           </div>
 
           <div>
@@ -248,7 +154,7 @@ export function Dashboard() {
                 <Link
                   key={action.title}
                   to={action.to}
-                  className='rounded-xl border bg-card p-5 transition-colors hover:bg-muted/40'
+                  className='rounded-xl border bg-card p-5 transition-colors hover:bg-muted/40 active:scale-[0.99] active:bg-muted/60'
                 >
                   <action.icon className='mb-4 size-5 text-primary' />
                   <h3 className='font-medium'>{action.title}</h3>
@@ -268,6 +174,13 @@ export function Dashboard() {
                   <Link to='/campaigns'>View all</Link>
                 </Button>
               </div>
+              {campaignsQuery.isLoading ? (
+                <TableSkeleton rows={4} />
+              ) : campaignsQuery.isError ? (
+                <p className='text-sm text-muted-foreground'>
+                  We couldn't load campaigns. Refresh the page and try again.
+                </p>
+              ) : (
               <TableWrap>
                 <Table>
                   <TableHeader>
@@ -292,8 +205,8 @@ export function Dashboard() {
                             {campaign.senderId}
                           </p>
                         </TableCell>
-                        <TableCell>
-                          <StatusBadge status={campaign.status} />
+                        <TableCell className='text-sm text-muted-foreground'>
+                          {statusLabel(campaign.status)}
                         </TableCell>
                         <TableCell className='text-end'>
                           {formatNumber(campaign.recipients)}
@@ -313,6 +226,7 @@ export function Dashboard() {
                   </TableBody>
                 </Table>
               </TableWrap>
+              )}
             </div>
 
             <div>
@@ -322,6 +236,13 @@ export function Dashboard() {
                   <Link to='/wallet/transactions'>View all</Link>
                 </Button>
               </div>
+              {transactionsQuery.isLoading ? (
+                <TableSkeleton rows={4} />
+              ) : transactionsQuery.isError ? (
+                <p className='text-sm text-muted-foreground'>
+                  We couldn't load transactions. Refresh the page and try again.
+                </p>
+              ) : (
               <TableWrap>
                 <Table>
                   <TableHeader>
@@ -344,8 +265,8 @@ export function Dashboard() {
                           {item.quantity > 0 ? '+' : ''}
                           {formatNumber(item.quantity)}
                         </TableCell>
-                        <TableCell>
-                          <StatusBadge status={item.type} />
+                        <TableCell className='text-sm text-muted-foreground'>
+                          {statusLabel(item.type)}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -362,6 +283,7 @@ export function Dashboard() {
                   </TableBody>
                 </Table>
               </TableWrap>
+              )}
             </div>
           </div>
         </div>

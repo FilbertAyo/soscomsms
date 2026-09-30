@@ -52,7 +52,7 @@ export function BuySmsPage() {
     queryFn: () => fetchPayments(1, 100),
   })
   const tiers = walletQuery.data?.tiers ?? []
-  const minPurchaseQuantity = walletQuery.data?.minPurchaseQuantity ?? 50
+  const minPurchaseQuantity = walletQuery.data?.minPurchaseQuantity ?? 100
   const lipaNamba =
     walletQuery.data?.lipaNamba ?? paymentsQuery.data?.lipaNamba ?? '123456'
   const lipaNambaName =
@@ -90,8 +90,8 @@ export function BuySmsPage() {
       setStep('quantity')
       setQuantityInput('')
       setPayerReference(profilePhone)
-      await queryClient.invalidateQueries({ queryKey: walletQueryKey })
-      await queryClient.invalidateQueries({ queryKey: paymentsQueryKey })
+      void queryClient.invalidateQueries({ queryKey: walletQueryKey })
+      void queryClient.invalidateQueries({ queryKey: paymentsQueryKey })
     },
     onError: (error) => {
       toast.error(applyValidationErrors(error, () => undefined))
@@ -126,7 +126,7 @@ export function BuySmsPage() {
         ) : (
           <div className='w-full space-y-6'>
             {tiers.length > 0 ? (
-              <div className='grid w-full gap-4 sm:grid-cols-2 xl:grid-cols-4'>
+              <div className='grid w-full gap-4 sm:grid-cols-2 xl:grid-cols-3'>
                 {tiers.map((tier) => (
                   <button
                     key={tier.id}

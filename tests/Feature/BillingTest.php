@@ -22,19 +22,26 @@ beforeEach(function () {
     $this->seed(PricingTierSeeder::class);
 });
 
-it('prices purchases below 500 SMS at the first range unit price', function () {
+it('prices the first SMS range at 25 TZS and rejects less than 100', function () {
     [$user, $customer] = billingCustomer();
+
+    $this->actingAs($user)
+        ->postJson('/api/payments', [
+            'quantity' => 100,
+            'payer_reference' => '0754221890',
+        ])
+        ->assertCreated()
+        ->assertJsonPath('payment.quantity', 100)
+        ->assertJsonPath('payment.unitPriceTzs', 25)
+        ->assertJsonPath('payment.amountTzs', 2500)
+        ->assertJsonPath('smsBalance', 9);
 
     $this->actingAs($user)
         ->postJson('/api/payments', [
             'quantity' => 50,
             'payer_reference' => '0754221890',
         ])
-        ->assertCreated()
-        ->assertJsonPath('payment.quantity', 50)
-        ->assertJsonPath('payment.unitPriceTzs', 30)
-        ->assertJsonPath('payment.amountTzs', 1500)
-        ->assertJsonPath('smsBalance', 9);
+        ->assertUnprocessable();
 
     expect($customer->fresh()->sms_balance)->toBe(9);
 });
@@ -49,8 +56,8 @@ it('prices a custom SMS quantity at the matching volume range', function () {
         ])
         ->assertCreated()
         ->assertJsonPath('payment.quantity', 3500)
-        ->assertJsonPath('payment.unitPriceTzs', 25)
-        ->assertJsonPath('payment.amountTzs', 87500)
+        ->assertJsonPath('payment.unitPriceTzs', 23)
+        ->assertJsonPath('payment.amountTzs', 80500)
         ->assertJsonPath('smsBalance', 9);
 
     expect($customer->fresh()->sms_balance)->toBe(9);
@@ -67,8 +74,8 @@ it('creates a pending Lipa namba purchase without changing the SMS balance', fun
         ->assertCreated()
         ->assertJsonPath('payment.status', PaymentStatus::Pending->value)
         ->assertJsonPath('payment.quantity', 10000)
-        ->assertJsonPath('payment.unitPriceTzs', 22)
-        ->assertJsonPath('payment.amountTzs', 220000)
+        ->assertJsonPath('payment.unitPriceTzs', 20)
+        ->assertJsonPath('payment.amountTzs', 200000)
         ->assertJsonPath('payment.lipaNamba', '123456')
         ->assertJsonPath('smsBalance', 9);
 
@@ -103,8 +110,8 @@ it('lets an admin confirm payment and credits the quoted package', function () {
 
     expect($purchase)->not->toBeNull()
         ->and($purchase->quantity)->toBe(10000)
-        ->and($purchase->customer_unit_price)->toBe(22)
-        ->and($purchase->amount_tzs)->toBe(220000)
+        ->and($purchase->customer_unit_price)->toBe(20)
+        ->and($purchase->amount_tzs)->toBe(200000)
         ->and($purchase->reference)->toBe('PAY-'.$paymentId);
 });
 
