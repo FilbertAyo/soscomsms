@@ -11,6 +11,7 @@ import { toast } from 'sonner'
 import { useAuthStore } from '@/stores/auth-store'
 import { handleServerError } from '@/lib/handle-server-error'
 import { meQueryKey } from '@/lib/auth'
+import { RoutePending } from '@/components/soscom/page-loader'
 import { isPublicAuthPath } from '@/lib/session'
 import { DirectionProvider } from './context/direction-provider'
 import { FontProvider } from './context/font-provider'
@@ -76,7 +77,10 @@ const router = createRouter({
   routeTree,
   context: { queryClient, user: null },
   defaultPreload: 'intent',
-  defaultPreloadStaleTime: 0,
+  defaultPreloadStaleTime: 30_000,
+  defaultPendingMs: 0,
+  defaultPendingMinMs: 0,
+  defaultPendingComponent: RoutePending,
 })
 
 declare module '@tanstack/react-router' {
