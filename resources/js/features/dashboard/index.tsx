@@ -116,7 +116,7 @@ export function Dashboard() {
           <CompleteProfileCard />
         ) : (
         <div className='space-y-6'>
-          <div className='grid gap-4 lg:grid-cols-3'>
+          <div className='grid grid-cols-1 gap-4 lg:grid-cols-3'>
             <div className='rounded-xl border bg-card p-6 lg:col-span-1'>
               <p className='text-sm text-muted-foreground'>SMS Balance</p>
               <p className='mt-2 text-4xl font-semibold tracking-tight'>
@@ -166,8 +166,8 @@ export function Dashboard() {
             </div>
           </div>
 
-          <div className='grid gap-4 xl:grid-cols-2'>
-            <div>
+          <div className='grid grid-cols-1 gap-4 xl:grid-cols-2'>
+            <div className='min-w-0'>
               <div className='mb-3 flex items-center justify-between'>
                 <h2 className='text-lg font-semibold'>Recent campaigns</h2>
                 <Button variant='ghost' size='sm' asChild>
@@ -197,7 +197,8 @@ export function Dashboard() {
                           <Link
                             to='/campaigns/$campaignId'
                             params={{ campaignId: String(campaign.id) }}
-                            className='font-medium hover:underline'
+                            className='block max-w-48 truncate font-medium hover:underline sm:max-w-xs'
+                            title={campaign.name}
                           >
                             {campaign.name}
                           </Link>
@@ -229,7 +230,7 @@ export function Dashboard() {
               )}
             </div>
 
-            <div>
+            <div className='min-w-0'>
               <div className='mb-3 flex items-center justify-between'>
                 <h2 className='text-lg font-semibold'>Recent transactions</h2>
                 <Button variant='ghost' size='sm' asChild>
@@ -256,7 +257,12 @@ export function Dashboard() {
                     {transactions.slice(0, 4).map((item) => (
                       <TableRow key={item.id}>
                         <TableCell>
-                          <p className='font-medium'>{item.description}</p>
+                          <p
+                            className='max-w-48 truncate font-medium sm:max-w-xs'
+                            title={item.description}
+                          >
+                            {item.description}
+                          </p>
                           <p className='text-xs text-muted-foreground'>
                             {item.createdAt ? formatDateTime(item.createdAt) : ''}
                           </p>
