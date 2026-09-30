@@ -6,9 +6,11 @@ import { fetchWallet, walletQueryKey, withSmsBalance } from '@/lib/credits'
 import { formatNumber } from '@/lib/format'
 import { useAuthStore } from '@/stores/auth-store'
 import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
 import { AppHeader } from '@/components/soscom/app-header'
 import { EmptyState } from '@/components/soscom/empty-state'
 import { PageHeader } from '@/components/soscom/page-header'
+import { ListSkeleton } from '@/components/soscom/skeletons'
 import { StatusBadge } from '@/components/soscom/status-badge'
 import { Main } from '@/components/layout/main'
 
@@ -48,9 +50,13 @@ export function WalletPage() {
           <>
             <div className='mb-8 rounded-xl border bg-card p-6'>
               <p className='text-sm text-muted-foreground'>Available SMS</p>
-              <p className='mt-2 text-4xl font-semibold'>
-                {formatNumber(wallet?.smsBalance ?? 0)} SMS
-              </p>
+              {walletQuery.isLoading ? (
+                <Skeleton className='mt-2 h-10 w-40' />
+              ) : (
+                <p className='mt-2 text-4xl font-semibold'>
+                  {formatNumber(wallet?.smsBalance ?? 0)} SMS
+                </p>
+              )}
               <div className='mt-6 flex flex-wrap gap-2'>
                 <Button asChild>
                   <Link to='/wallet/buy'>Buy SMS</Link>
@@ -62,7 +68,9 @@ export function WalletPage() {
             </div>
             <div>
               <h2 className='mb-3 text-lg font-semibold'>Latest purchases</h2>
-              {wallet && wallet.recentTransactions.length === 0 ? (
+              {walletQuery.isLoading ? (
+                <ListSkeleton rows={3} />
+              ) : wallet && wallet.recentTransactions.length === 0 ? (
                 <EmptyState
                   icon={Receipt}
                   title='No purchases yet'

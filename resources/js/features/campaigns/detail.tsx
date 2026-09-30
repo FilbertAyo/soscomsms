@@ -16,6 +16,11 @@ import { ConfirmDialog } from '@/components/confirm-dialog'
 import { AppHeader } from '@/components/soscom/app-header'
 import { EmptyState } from '@/components/soscom/empty-state'
 import { PageHeader } from '@/components/soscom/page-header'
+import {
+  CardSkeletonGrid,
+  PanelSkeleton,
+  TableSkeleton,
+} from '@/components/soscom/skeletons'
 import { StatusBadge } from '@/components/soscom/status-badge'
 import { ListPagination } from '@/components/soscom/list-pagination'
 import { TableWrap } from '@/components/soscom/table-wrap'
@@ -197,7 +202,13 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
               />
             ) : null}
           </>
-        ) : null}
+        ) : (
+          <div className='space-y-6'>
+            <CardSkeletonGrid />
+            <PanelSkeleton lines={2} />
+            <TableSkeleton rows={5} />
+          </div>
+        )}
       </Main>
       <ConfirmDialog
         open={cancelOpen}

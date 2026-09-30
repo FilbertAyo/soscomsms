@@ -32,6 +32,7 @@ import { ConfirmDialog } from '@/components/confirm-dialog'
 import { AppHeader } from '@/components/soscom/app-header'
 import { EmptyState } from '@/components/soscom/empty-state'
 import { PageHeader } from '@/components/soscom/page-header'
+import { TableSkeleton } from '@/components/soscom/skeletons'
 import { StatusBadge } from '@/components/soscom/status-badge'
 import { TableWrap } from '@/components/soscom/table-wrap'
 import { Main } from '@/components/layout/main'
@@ -141,7 +142,9 @@ export function WebhooksPage() {
         />
         {webhooksQuery.isError ? (
           <p className='text-sm text-destructive'>Could not load webhooks.</p>
-        ) : webhooks.length === 0 && !webhooksQuery.isLoading ? (
+        ) : webhooksQuery.isLoading ? (
+          <TableSkeleton rows={3} />
+        ) : webhooks.length === 0 ? (
           <EmptyState
             icon={Webhook}
             title='No webhooks yet'
@@ -218,6 +221,9 @@ export function WebhooksPage() {
             </TableWrap>
             <section>
               <h2 className='mb-3 text-lg font-semibold'>Recent deliveries</h2>
+              {deliveriesQuery.isLoading ? (
+                <TableSkeleton rows={4} />
+              ) : (
               <TableWrap>
                 <Table>
                   <TableHeader>
@@ -264,6 +270,7 @@ export function WebhooksPage() {
                   </TableBody>
                 </Table>
               </TableWrap>
+              )}
             </section>
           </div>
         )}

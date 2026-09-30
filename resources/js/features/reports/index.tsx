@@ -23,6 +23,7 @@ import {
 import { AppHeader } from '@/components/soscom/app-header'
 import { EmptyState } from '@/components/soscom/empty-state'
 import { PageHeader } from '@/components/soscom/page-header'
+import { TableSkeleton } from '@/components/soscom/skeletons'
 import { StatusBadge } from '@/components/soscom/status-badge'
 import { TableWrap } from '@/components/soscom/table-wrap'
 import { ListPagination } from '@/components/soscom/list-pagination'
@@ -179,7 +180,7 @@ export function DeliveryReportsPage() {
             Could not load delivery reports.
           </p>
         ) : reportsQuery.isPending ? (
-          <p className='text-sm text-muted-foreground'>Loading reports…</p>
+          <TableSkeleton rows={8} />
         ) : reports.length === 0 ? (
           <EmptyState
             icon={FileText}

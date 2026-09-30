@@ -27,6 +27,7 @@ import { ConfirmDialog } from '@/components/confirm-dialog'
 import { AppHeader } from '@/components/soscom/app-header'
 import { EmptyState } from '@/components/soscom/empty-state'
 import { PageHeader } from '@/components/soscom/page-header'
+import { ListSkeleton } from '@/components/soscom/skeletons'
 import { Main } from '@/components/layout/main'
 import { type MessageTemplate } from '@/types/message-templates'
 
@@ -139,9 +140,7 @@ export function MessageTemplatesPage() {
           actions={<Button onClick={openCreate}>New template</Button>}
         />
 
-        {templatesQuery.isPending ? (
-          <p className='text-sm text-muted-foreground'>Loading templates…</p>
-        ) : null}
+        {templatesQuery.isPending ? <ListSkeleton /> : null}
 
         {!templatesQuery.isPending && templates.length === 0 ? (
           <EmptyState

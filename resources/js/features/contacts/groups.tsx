@@ -27,6 +27,7 @@ import { ConfirmDialog } from '@/components/confirm-dialog'
 import { AppHeader } from '@/components/soscom/app-header'
 import { EmptyState } from '@/components/soscom/empty-state'
 import { PageHeader } from '@/components/soscom/page-header'
+import { CardSkeletonGrid } from '@/components/soscom/skeletons'
 import { Main } from '@/components/layout/main'
 import { type ContactGroup } from '@/types/contacts'
 
@@ -123,7 +124,9 @@ export function ContactGroupsPage() {
           <p className='text-sm text-destructive'>
             Could not load groups. Refresh and try again.
           </p>
-        ) : groups.length === 0 && !groupsQuery.isPending ? (
+        ) : groupsQuery.isPending ? (
+          <CardSkeletonGrid />
+        ) : groups.length === 0 ? (
           <EmptyState
             icon={Users}
             title='No groups yet'

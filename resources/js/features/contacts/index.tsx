@@ -34,6 +34,7 @@ import { ConfirmDialog } from '@/components/confirm-dialog'
 import { AppHeader } from '@/components/soscom/app-header'
 import { EmptyState } from '@/components/soscom/empty-state'
 import { PageHeader } from '@/components/soscom/page-header'
+import { TableSkeleton } from '@/components/soscom/skeletons'
 import { StatusBadge } from '@/components/soscom/status-badge'
 import { TableWrap } from '@/components/soscom/table-wrap'
 import { ListPagination } from '@/components/soscom/list-pagination'
@@ -257,7 +258,9 @@ export function ContactsPage() {
           <p className='text-sm text-destructive'>
             Could not load contacts. Refresh and try again.
           </p>
-        ) : contacts.length === 0 && !contactsQuery.isPending ? (
+        ) : contactsQuery.isPending ? (
+          <TableSkeleton />
+        ) : contacts.length === 0 ? (
           <EmptyState
             icon={Users}
             title={hasFilters ? 'No contacts found' : 'No contacts yet'}

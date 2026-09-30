@@ -15,6 +15,7 @@ import { formatDateTime } from '@/lib/format'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Skeleton } from '@/components/ui/skeleton'
 import {
   Dialog,
   DialogContent,
@@ -26,6 +27,7 @@ import { ConfirmDialog } from '@/components/confirm-dialog'
 import { AppHeader } from '@/components/soscom/app-header'
 import { EmptyState } from '@/components/soscom/empty-state'
 import { PageHeader } from '@/components/soscom/page-header'
+import { TableSkeleton } from '@/components/soscom/skeletons'
 import { StatusBadge } from '@/components/soscom/status-badge'
 import { TableWrap } from '@/components/soscom/table-wrap'
 import { Main } from '@/components/layout/main'
@@ -97,18 +99,29 @@ export function DeveloperPage() {
         />
         <div className='mb-6 rounded-xl border bg-card p-5'>
           <p className='text-sm text-muted-foreground'>API Status</p>
-          <p className='mt-1 text-lg font-semibold'>
-            {activeCount > 0 ? 'Live' : 'No active keys'}
-          </p>
-          <p className='mt-1 text-sm text-muted-foreground'>
-            {activeCount > 0
-              ? `${activeCount} active key${activeCount === 1 ? '' : 's'} can send SMS through /api/v1.`
-              : 'Create a key to send SMS from your application.'}
-          </p>
+          {keysQuery.isLoading ? (
+            <>
+              <Skeleton className='mt-2 h-6 w-28' />
+              <Skeleton className='mt-2 h-4 w-72 max-w-full' />
+            </>
+          ) : (
+            <>
+              <p className='mt-1 text-lg font-semibold'>
+                {activeCount > 0 ? 'Live' : 'No active keys'}
+              </p>
+              <p className='mt-1 text-sm text-muted-foreground'>
+                {activeCount > 0
+                  ? `${activeCount} active key${activeCount === 1 ? '' : 's'} can send SMS through /api/v1.`
+                  : 'Create a key to send SMS from your application.'}
+              </p>
+            </>
+          )}
         </div>
         {keysQuery.isError ? (
           <p className='text-sm text-destructive'>Could not load API keys.</p>
-        ) : keys.length === 0 && !keysQuery.isLoading ? (
+        ) : keysQuery.isLoading ? (
+          <TableSkeleton rows={3} />
+        ) : keys.length === 0 ? (
           <EmptyState
             icon={KeyRound}
             title='No API keys yet'

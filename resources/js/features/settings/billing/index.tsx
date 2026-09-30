@@ -7,6 +7,7 @@ import { useAuthStore } from '@/stores/auth-store'
 import { Button } from '@/components/ui/button'
 import { StatusBadge } from '@/components/soscom/status-badge'
 import { ListPagination } from '@/components/soscom/list-pagination'
+import { TableSkeleton } from '@/components/soscom/skeletons'
 import { TableWrap } from '@/components/soscom/table-wrap'
 import {
   Table,
@@ -62,6 +63,8 @@ export function SettingsBilling() {
         </div>
         {paymentsQuery.isError ? (
           <p className='text-sm text-destructive'>Could not load payments.</p>
+        ) : paymentsQuery.isLoading ? (
+          <TableSkeleton rows={4} />
         ) : payments.length === 0 ? (
           <p className='text-sm text-muted-foreground'>No purchase requests yet.</p>
         ) : (

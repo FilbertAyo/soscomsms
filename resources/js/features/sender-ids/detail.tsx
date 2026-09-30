@@ -9,6 +9,7 @@ import { AppHeader } from '@/components/soscom/app-header'
 import { EmptyState } from '@/components/soscom/empty-state'
 import { PageHeader } from '@/components/soscom/page-header'
 import { RequestTimeline } from '@/components/soscom/request-timeline'
+import { PanelSkeleton } from '@/components/soscom/skeletons'
 import { StatusBadge } from '@/components/soscom/status-badge'
 import { Main } from '@/components/layout/main'
 import { CUSTOMER_REQUEST_STEPS } from '@/types/sender-ids'
@@ -80,7 +81,9 @@ export function SenderIdRequestDetail({ senderId }: { senderId: string }) {
               </Button>
             ) : null}
           </div>
-        ) : null}
+        ) : (
+          <PanelSkeleton lines={4} className='max-w-xl' />
+        )}
       </Main>
     </>
   )

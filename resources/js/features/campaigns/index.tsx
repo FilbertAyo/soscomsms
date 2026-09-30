@@ -9,6 +9,7 @@ import { AppHeader } from '@/components/soscom/app-header'
 import { EmptyState } from '@/components/soscom/empty-state'
 import { ListPagination } from '@/components/soscom/list-pagination'
 import { PageHeader } from '@/components/soscom/page-header'
+import { TableSkeleton } from '@/components/soscom/skeletons'
 import { StatusBadge } from '@/components/soscom/status-badge'
 import { TableWrap } from '@/components/soscom/table-wrap'
 import { Main } from '@/components/layout/main'
@@ -71,16 +72,16 @@ export function Campaigns() {
               <TabsTrigger value='completed'>Completed</TabsTrigger>
             </TabsList>
             <TabsContent value='all'>
-              <CampaignTable items={items} />
+              <CampaignTable items={items} loading={campaignsQuery.isLoading} />
             </TabsContent>
             <TabsContent value='queued'>
-              <CampaignTable items={items} />
+              <CampaignTable items={items} loading={campaignsQuery.isLoading} />
             </TabsContent>
             <TabsContent value='scheduled'>
-              <CampaignTable items={items} />
+              <CampaignTable items={items} loading={campaignsQuery.isLoading} />
             </TabsContent>
             <TabsContent value='completed'>
-              <CampaignTable items={items} />
+              <CampaignTable items={items} loading={campaignsQuery.isLoading} />
             </TabsContent>
           </Tabs>
         )}
@@ -90,7 +91,17 @@ export function Campaigns() {
   )
 }
 
-function CampaignTable({ items }: { items: Campaign[] }) {
+function CampaignTable({
+  items,
+  loading,
+}: {
+  items: Campaign[]
+  loading: boolean
+}) {
+  if (loading) {
+    return <TableSkeleton />
+  }
+
   if (items.length === 0) {
     return (
       <EmptyState

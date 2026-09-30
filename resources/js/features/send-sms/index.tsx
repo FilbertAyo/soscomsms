@@ -26,6 +26,7 @@ import { useAuthStore } from '@/stores/auth-store'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Skeleton } from '@/components/ui/skeleton'
 import { Textarea } from '@/components/ui/textarea'
 import {
   Select,
@@ -45,6 +46,7 @@ import {
 } from '@/components/ui/dialog'
 import { AppHeader } from '@/components/soscom/app-header'
 import { PageHeader } from '@/components/soscom/page-header'
+import { ListSkeleton } from '@/components/soscom/skeletons'
 import { Main } from '@/components/layout/main'
 import { type CampaignPayload } from '@/types/campaigns'
 import { type MessageTemplate } from '@/types/message-templates'
@@ -282,28 +284,26 @@ export function SendSms() {
                   + Request new Sender ID
                 </Link>
               </div>
-              <Select
-                value={senderId || undefined}
-                onValueChange={setSenderId}
-                disabled={senderIds.length === 0}
-              >
-                <SelectTrigger id='sender-id' className='mt-2'>
-                  <SelectValue
-                    placeholder={
-                      senderIdsQuery.isPending
-                        ? 'Loading Sender IDs…'
-                        : 'No active Sender ID yet'
-                    }
-                  />
-                </SelectTrigger>
-                <SelectContent>
-                  {senderIds.map((item) => (
-                    <SelectItem key={item.id} value={item.name}>
-                      {item.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {senderIdsQuery.isPending ? (
+                <Skeleton className='mt-2 h-9 w-full' />
+              ) : (
+                <Select
+                  value={senderId || undefined}
+                  onValueChange={setSenderId}
+                  disabled={senderIds.length === 0}
+                >
+                  <SelectTrigger id='sender-id' className='mt-2'>
+                    <SelectValue placeholder='No active Sender ID yet' />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {senderIds.map((item) => (
+                      <SelectItem key={item.id} value={item.name}>
+                        {item.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </section>
 
             <section className='rounded-xl border bg-card p-5'>
@@ -494,9 +494,7 @@ export function SendSms() {
                 </span>
               </button>
             ))}
-            {templatesQuery.isPending ? (
-              <p className='text-sm text-muted-foreground'>Loading templates…</p>
-            ) : null}
+            {templatesQuery.isPending ? <ListSkeleton rows={3} /> : null}
             {!templatesQuery.isPending && templates.length === 0 ? (
               <p className='text-sm text-muted-foreground'>
                 No templates yet.{' '}

@@ -20,6 +20,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { AppHeader } from '@/components/soscom/app-header'
 import { PageHeader } from '@/components/soscom/page-header'
+import { CardSkeletonGrid } from '@/components/soscom/skeletons'
 import { StatusBadge } from '@/components/soscom/status-badge'
 import { TableWrap } from '@/components/soscom/table-wrap'
 import { Main } from '@/components/layout/main'
@@ -125,7 +126,9 @@ export function BuySmsPage() {
           </p>
         ) : (
           <div className='w-full space-y-6'>
-            {tiers.length > 0 ? (
+            {walletQuery.isLoading ? (
+              <CardSkeletonGrid count={3} className='w-full xl:grid-cols-3' />
+            ) : tiers.length > 0 ? (
               <div className='grid w-full gap-4 sm:grid-cols-2 xl:grid-cols-3'>
                 {tiers.map((tier) => (
                   <button

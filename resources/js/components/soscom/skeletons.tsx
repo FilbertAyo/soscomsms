@@ -1,8 +1,15 @@
+import { cn } from '@/lib/utils'
 import { Skeleton } from '@/components/ui/skeleton'
 
-export function CardSkeletonGrid({ count = 4 }: { count?: number }) {
+export function CardSkeletonGrid({
+  count = 4,
+  className,
+}: {
+  count?: number
+  className?: string
+}) {
   return (
-    <div className='grid gap-4 sm:grid-cols-2 xl:grid-cols-4'>
+    <div className={cn('grid gap-4 sm:grid-cols-2 xl:grid-cols-4', className)}>
       {Array.from({ length: count }).map((_, index) => (
         <div key={index} className='rounded-xl border bg-card p-5'>
           <Skeleton className='h-4 w-24' />
@@ -34,6 +41,47 @@ export function TableSkeleton({ rows = 6 }: { rows?: number }) {
       {Array.from({ length: rows }).map((_, index) => (
         <Skeleton key={index} className='h-10 w-full' />
       ))}
+    </div>
+  )
+}
+
+export function ListSkeleton({ rows = 4 }: { rows?: number }) {
+  return (
+    <div className='space-y-2'>
+      {Array.from({ length: rows }).map((_, index) => (
+        <div
+          key={index}
+          className='flex items-center justify-between gap-4 rounded-xl border bg-card px-4 py-3'
+        >
+          <div className='flex-1 space-y-2'>
+            <Skeleton className='h-4 w-1/3' />
+            <Skeleton className='h-3 w-1/4' />
+          </div>
+          <Skeleton className='h-5 w-16 rounded-full' />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+export function PanelSkeleton({
+  lines = 3,
+  className,
+}: {
+  lines?: number
+  className?: string
+}) {
+  return (
+    <div className={cn('rounded-xl border bg-card p-5', className)}>
+      <Skeleton className='h-5 w-20 rounded-full' />
+      <div className='mt-4 space-y-2'>
+        {Array.from({ length: lines }).map((_, index) => (
+          <Skeleton
+            key={index}
+            className={cn('h-4', index === lines - 1 ? 'w-2/3' : 'w-full')}
+          />
+        ))}
+      </div>
     </div>
   )
 }

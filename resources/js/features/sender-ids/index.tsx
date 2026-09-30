@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button'
 import { AppHeader } from '@/components/soscom/app-header'
 import { EmptyState } from '@/components/soscom/empty-state'
 import { PageHeader } from '@/components/soscom/page-header'
+import { CardSkeletonGrid } from '@/components/soscom/skeletons'
 import { StatusBadge } from '@/components/soscom/status-badge'
 import { Main } from '@/components/layout/main'
 import { type SenderIdRequestRecord } from '@/types/sender-ids'
@@ -32,7 +33,7 @@ export function SenderIdsPage() {
   )
   const isError = senderIdsQuery.isError || requestsQuery.isError
   const isPending = senderIdsQuery.isPending || requestsQuery.isPending
-  const empty = senderIds.length === 0 && openRequests.length === 0 && !isPending
+  const empty = senderIds.length === 0 && openRequests.length === 0
 
   return (
     <>
@@ -51,6 +52,8 @@ export function SenderIdsPage() {
           <p className='text-sm text-destructive'>
             Could not load Sender IDs. Refresh and try again.
           </p>
+        ) : isPending ? (
+          <CardSkeletonGrid count={3} className='md:grid-cols-2 xl:grid-cols-3' />
         ) : empty ? (
           <EmptyState
             icon={BadgeCheck}

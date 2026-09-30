@@ -9,6 +9,7 @@ import { formatDateTime, formatNumber, formatTZS } from '@/lib/format'
 import { AppHeader } from '@/components/soscom/app-header'
 import { EmptyState } from '@/components/soscom/empty-state'
 import { PageHeader } from '@/components/soscom/page-header'
+import { TableSkeleton } from '@/components/soscom/skeletons'
 import { StatusBadge } from '@/components/soscom/status-badge'
 import { TableWrap } from '@/components/soscom/table-wrap'
 import { ListPagination } from '@/components/soscom/list-pagination'
@@ -42,6 +43,8 @@ export function TransactionsPage() {
           <p className='text-sm text-destructive'>
             Could not load transactions. Refresh and try again.
           </p>
+        ) : transactionsQuery.isLoading ? (
+          <TableSkeleton />
         ) : transactions.length === 0 ? (
           <EmptyState
             icon={Receipt}
