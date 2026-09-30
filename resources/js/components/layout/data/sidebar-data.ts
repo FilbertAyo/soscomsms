@@ -10,6 +10,7 @@ import {
   Shield,
   Users,
   Wallet,
+  Tag,
   BadgeCheck,
   Activity,
   Building2,
@@ -137,6 +138,11 @@ const adminNavGroups: SidebarData['navGroups'] = [
         title: 'Production',
         url: '/admin/production',
         icon: Shield,
+      },
+      {
+        title: 'Sender IDs',
+        url: '/admin/sender-id-catalog',
+        icon: Tag,
       },
       {
         title: 'Sender ID Requests',

@@ -7,7 +7,6 @@ use App\Http\Controllers\Controller;
 use App\Models\SenderId;
 use App\Services\SenderIdService;
 use App\Support\SenderIdName;
-use Closure;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -38,16 +37,7 @@ class SenderIdController extends Controller
         }
 
         $validated = $request->validate([
-            'sender_id' => [
-                'required',
-                'string',
-                'max:13',
-                function (string $attribute, mixed $value, Closure $fail): void {
-                    if (! SenderIdName::isValid((string) $value)) {
-                        $fail(SenderIdName::invalidMessage());
-                    }
-                },
-            ],
+            'sender_id' => ['required', 'string', 'max:13'],
         ]);
 
         $senderId = $senderIds->assertUsable($customer, $validated['sender_id']);

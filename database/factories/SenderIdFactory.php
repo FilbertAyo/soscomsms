@@ -26,6 +26,7 @@ class SenderIdFactory extends Factory
             'name' => strtoupper(fake()->unique()->lexify('??????')),
             'status' => SenderIdStatus::Active,
             'source' => SenderIdSource::Request,
+            'available_to_all' => false,
         ];
     }
 
@@ -36,6 +37,7 @@ class SenderIdFactory extends Factory
             'sender_id_request_id' => null,
             'source' => SenderIdSource::Generic,
             'status' => SenderIdStatus::Active,
+            'available_to_all' => true,
         ]);
     }
 }

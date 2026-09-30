@@ -89,6 +89,10 @@ class AuditLog extends Model
             AuditAction::SenderIdReviewed,
             AuditAction::SenderIdSubmitted,
             AuditAction::SenderIdApproved,
+            AuditAction::SenderIdCreated,
+            AuditAction::SenderIdUpdated,
+            AuditAction::SenderIdGranted,
+            AuditAction::SenderIdRevoked,
             AuditAction::PricingUpdated,
             AuditAction::ProviderSettingsUpdated,
             AuditAction::ProviderWhitelistConfirmed,
@@ -140,6 +144,18 @@ class AuditLog extends Model
             AuditAction::SenderIdRejected => $name === null || $name === ''
                 ? "{$who} rejected a Sender ID request."
                 : "{$who} rejected Sender ID {$name}".($reason ? ": {$reason}" : '.'),
+            AuditAction::SenderIdCreated => $name === null || $name === ''
+                ? "{$who} added a Sender ID."
+                : "{$who} added Sender ID {$name}.",
+            AuditAction::SenderIdUpdated => $name === null || $name === ''
+                ? "{$who} updated a Sender ID."
+                : "{$who} updated Sender ID {$name}.",
+            AuditAction::SenderIdGranted => $name === null || $name === ''
+                ? "{$who} granted a Sender ID to {$customer}."
+                : "{$who} granted Sender ID {$name} to {$customer}.",
+            AuditAction::SenderIdRevoked => $name === null || $name === ''
+                ? "{$who} removed a Sender ID from {$customer}."
+                : "{$who} removed Sender ID {$name} from {$customer}.",
             AuditAction::PricingUpdated => $label === null || $from === null || $to === null
                 ? "{$who} updated a pricing tier."
                 : "{$who} updated {$label} from TZS {$from} to TZS {$to} per SMS.",

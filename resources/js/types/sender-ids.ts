@@ -1,4 +1,4 @@
-export const SENDER_ID_SOURCES = ['generic', 'request'] as const
+export const SENDER_ID_SOURCES = ['generic', 'request', 'admin'] as const
 
 export type SenderIdSource = (typeof SENDER_ID_SOURCES)[number]
 
@@ -24,6 +24,25 @@ export type SenderIdRecord = {
   customerId: number | null
   purpose: string | null
   organization: string | null
+  createdAt: string | null
+}
+
+export type SenderIdGrantCustomer = {
+  id: number
+  name: string | null
+  email: string | null
+  businessName: string | null
+}
+
+export type AdminSenderIdCatalogRecord = {
+  id: number
+  name: string
+  status: SenderIdStatus
+  source: SenderIdSource
+  availableToAll: boolean
+  customerId: number | null
+  campaignCount: number
+  grants: SenderIdGrantCustomer[]
   createdAt: string | null
 }
 

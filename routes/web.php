@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\Admin\PricingTierController as AdminPricingTierCont
 use App\Http\Controllers\Api\Admin\ProductionReadinessController as AdminProductionReadinessController;
 use App\Http\Controllers\Api\Admin\ProviderBalanceController as AdminProviderBalanceController;
 use App\Http\Controllers\Api\Admin\SenderIdRequestController as AdminSenderIdRequestController;
+use App\Http\Controllers\Api\Admin\SenderIdController as AdminSenderIdController;
 use App\Http\Controllers\Api\Admin\TrafficController as AdminTrafficController;
 use App\Http\Controllers\Api\ApiKeyController;
 use App\Http\Controllers\Api\CampaignController;
@@ -132,6 +133,12 @@ Route::prefix('api')->group(function (): void {
             Route::post('/production/whitelist', [AdminProductionReadinessController::class, 'confirmWhitelist']);
             Route::post('/production/account', [AdminProductionReadinessController::class, 'confirmAccount']);
             Route::post('/production/backups', [AdminProductionReadinessController::class, 'backup']);
+            Route::get('/sender-ids', [AdminSenderIdController::class, 'index']);
+            Route::post('/sender-ids', [AdminSenderIdController::class, 'store']);
+            Route::patch('/sender-ids/{senderId}', [AdminSenderIdController::class, 'update']);
+            Route::delete('/sender-ids/{senderId}', [AdminSenderIdController::class, 'destroy']);
+            Route::post('/sender-ids/{senderId}/grants', [AdminSenderIdController::class, 'grant']);
+            Route::delete('/sender-ids/{senderId}/grants/{customer}', [AdminSenderIdController::class, 'revoke']);
             Route::get('/sender-id-requests', [AdminSenderIdRequestController::class, 'index']);
             Route::get('/sender-id-requests/{senderIdRequest}', [AdminSenderIdRequestController::class, 'show']);
             Route::post('/sender-id-requests/{senderIdRequest}/review', [AdminSenderIdRequestController::class, 'review']);

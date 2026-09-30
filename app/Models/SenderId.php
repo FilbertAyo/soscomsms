@@ -9,6 +9,8 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class SenderId extends Model
 {
@@ -24,6 +26,7 @@ class SenderId extends Model
         'name',
         'status',
         'source',
+        'available_to_all',
     ];
 
     /**
@@ -34,6 +37,7 @@ class SenderId extends Model
         return [
             'status' => SenderIdStatus::class,
             'source' => SenderIdSource::class,
+            'available_to_all' => 'boolean',
         ];
     }
 
@@ -54,6 +58,30 @@ class SenderId extends Model
     }
 
     /**
+     * @return HasMany<SenderIdGrant, $this>
+     */
+    public function grants(): HasMany
+    {
+        return $this->hasMany(SenderIdGrant::class);
+    }
+
+    /**
+     * @return BelongsToMany<Customer, $this>
+     */
+    public function grantedCustomers(): BelongsToMany
+    {
+        return $this->belongsToMany(Customer::class, 'sender_id_grants')->withTimestamps();
+    }
+
+    /**
+     * @return HasMany<Campaign, $this>
+     */
+    public function campaigns(): HasMany
+    {
+        return $this->hasMany(Campaign::class);
+    }
+
+    /**
      * @param  Builder<static>  $query
      * @return Builder<static>
      */
@@ -62,8 +90,11 @@ class SenderId extends Model
         return $query
             ->where('status', SenderIdStatus::Active)
             ->where(function (Builder $inner) use ($customer): void {
-                $inner->whereNull('customer_id')
-                    ->orWhere('customer_id', $customer->id);
+                $inner->where('available_to_all', true)
+                    ->orWhere('customer_id', $customer->id)
+                    ->orWhereHas('grants', function (Builder $grants) use ($customer): void {
+                        $grants->where('customer_id', $customer->id);
+                    });
             });
     }
 
@@ -73,7 +104,11 @@ class SenderId extends Model
             return false;
         }
 
-        return $this->customer_id === null || $this->customer_id === $customer->id;
+        if ($this->available_to_all || $this->customer_id === $customer->id) {
+            return true;
+        }
+
+        return $this->grants()->where('customer_id', $customer->id)->exists();
     }
 
     /**
@@ -93,6 +128,34 @@ class SenderId extends Model
             'customerId' => $this->customer_id,
             'purpose' => $generic ? 'Shared SOSCOM Sender ID' : $this->request?->purpose,
             'organization' => $generic ? 'SOSCOM' : $this->request?->organization,
+            'createdAt' => $this->created_at?->toIso8601String(),
+        ];
+    }
+
+    /**
+     * @return array{id: int, name: string, status: string, source: string, availableToAll: bool, customerId: int|null, campaignCount: int, grants: list<array{id: int, name: string|null, email: string|null, businessName: string|null}>, createdAt: string|null}
+     */
+    public function toAdminCatalogArray(): array
+    {
+        $this->loadMissing(['grantedCustomers.user']);
+
+        return [
+            'id' => $this->id,
+            'name' => $this->name,
+            'status' => $this->status->value,
+            'source' => $this->source->value,
+            'availableToAll' => $this->available_to_all,
+            'customerId' => $this->customer_id,
+            'campaignCount' => $this->campaigns()->count(),
+            'grants' => $this->grantedCustomers
+                ->map(fn (Customer $customer): array => [
+                    'id' => $customer->id,
+                    'name' => $customer->user?->name,
+                    'email' => $customer->user?->email,
+                    'businessName' => $customer->business_name,
+                ])
+                ->values()
+                ->all(),
             'createdAt' => $this->created_at?->toIso8601String(),
         ];
     }

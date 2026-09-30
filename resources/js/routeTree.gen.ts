@@ -35,6 +35,7 @@ import { Route as AuthenticatedAdminProductionRouteImport } from './routes/_auth
 import { Route as AuthenticatedAdminProviderBalanceRouteImport } from './routes/_authenticated/admin/provider-balance'
 import { Route as AuthenticatedAdminReportsRouteImport } from './routes/_authenticated/admin/reports'
 import { Route as AuthenticatedAdminRevenueRouteImport } from './routes/_authenticated/admin/revenue'
+import { Route as AuthenticatedAdminSenderIdCatalogRouteImport } from './routes/_authenticated/admin/sender-id-catalog'
 import { Route as AuthenticatedAdminSenderIdsRouteImport } from './routes/_authenticated/admin/sender-ids'
 import { Route as AuthenticatedAdminTrafficRouteImport } from './routes/_authenticated/admin/traffic'
 import { Route as AuthenticatedAdminTransactionsRouteImport } from './routes/_authenticated/admin/transactions'
@@ -202,6 +203,12 @@ const AuthenticatedAdminRevenueRoute =
   AuthenticatedAdminRevenueRouteImport.update({
     id: '/revenue',
     path: '/revenue',
+    getParentRoute: () => AuthenticatedAdminRouteRoute,
+  } as any)
+const AuthenticatedAdminSenderIdCatalogRoute =
+  AuthenticatedAdminSenderIdCatalogRouteImport.update({
+    id: '/sender-id-catalog',
+    path: '/sender-id-catalog',
     getParentRoute: () => AuthenticatedAdminRouteRoute,
   } as any)
 const AuthenticatedAdminSenderIdsRoute =
@@ -420,6 +427,7 @@ export interface FileRoutesByFullPath {
   '/admin/provider-balance': typeof AuthenticatedAdminProviderBalanceRoute
   '/admin/reports': typeof AuthenticatedAdminReportsRoute
   '/admin/revenue': typeof AuthenticatedAdminRevenueRoute
+  '/admin/sender-id-catalog': typeof AuthenticatedAdminSenderIdCatalogRoute
   '/admin/sender-ids': typeof AuthenticatedAdminSenderIdsRoute
   '/admin/traffic': typeof AuthenticatedAdminTrafficRoute
   '/admin/transactions': typeof AuthenticatedAdminTransactionsRoute
@@ -476,6 +484,7 @@ export interface FileRoutesByTo {
   '/admin/provider-balance': typeof AuthenticatedAdminProviderBalanceRoute
   '/admin/reports': typeof AuthenticatedAdminReportsRoute
   '/admin/revenue': typeof AuthenticatedAdminRevenueRoute
+  '/admin/sender-id-catalog': typeof AuthenticatedAdminSenderIdCatalogRoute
   '/admin/sender-ids': typeof AuthenticatedAdminSenderIdsRoute
   '/admin/traffic': typeof AuthenticatedAdminTrafficRoute
   '/admin/transactions': typeof AuthenticatedAdminTransactionsRoute
@@ -537,6 +546,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/provider-balance': typeof AuthenticatedAdminProviderBalanceRoute
   '/_authenticated/admin/reports': typeof AuthenticatedAdminReportsRoute
   '/_authenticated/admin/revenue': typeof AuthenticatedAdminRevenueRoute
+  '/_authenticated/admin/sender-id-catalog': typeof AuthenticatedAdminSenderIdCatalogRoute
   '/_authenticated/admin/sender-ids': typeof AuthenticatedAdminSenderIdsRoute
   '/_authenticated/admin/traffic': typeof AuthenticatedAdminTrafficRoute
   '/_authenticated/admin/transactions': typeof AuthenticatedAdminTransactionsRoute
@@ -597,6 +607,7 @@ export interface FileRouteTypes {
     | '/admin/provider-balance'
     | '/admin/reports'
     | '/admin/revenue'
+    | '/admin/sender-id-catalog'
     | '/admin/sender-ids'
     | '/admin/traffic'
     | '/admin/transactions'
@@ -653,6 +664,7 @@ export interface FileRouteTypes {
     | '/admin/provider-balance'
     | '/admin/reports'
     | '/admin/revenue'
+    | '/admin/sender-id-catalog'
     | '/admin/sender-ids'
     | '/admin/traffic'
     | '/admin/transactions'
@@ -713,6 +725,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/provider-balance'
     | '/_authenticated/admin/reports'
     | '/_authenticated/admin/revenue'
+    | '/_authenticated/admin/sender-id-catalog'
     | '/_authenticated/admin/sender-ids'
     | '/_authenticated/admin/traffic'
     | '/_authenticated/admin/transactions'
@@ -943,6 +956,13 @@ declare module '@tanstack/react-router' {
       path: '/revenue'
       fullPath: '/admin/revenue'
       preLoaderRoute: typeof AuthenticatedAdminRevenueRouteImport
+      parentRoute: typeof AuthenticatedAdminRouteRoute
+    }
+    '/_authenticated/admin/sender-id-catalog': {
+      id: '/_authenticated/admin/sender-id-catalog'
+      path: '/sender-id-catalog'
+      fullPath: '/admin/sender-id-catalog'
+      preLoaderRoute: typeof AuthenticatedAdminSenderIdCatalogRouteImport
       parentRoute: typeof AuthenticatedAdminRouteRoute
     }
     '/_authenticated/admin/sender-ids': {
@@ -1201,6 +1221,7 @@ interface AuthenticatedAdminRouteRouteChildren {
   AuthenticatedAdminProviderBalanceRoute: typeof AuthenticatedAdminProviderBalanceRoute
   AuthenticatedAdminReportsRoute: typeof AuthenticatedAdminReportsRoute
   AuthenticatedAdminRevenueRoute: typeof AuthenticatedAdminRevenueRoute
+  AuthenticatedAdminSenderIdCatalogRoute: typeof AuthenticatedAdminSenderIdCatalogRoute
   AuthenticatedAdminSenderIdsRoute: typeof AuthenticatedAdminSenderIdsRoute
   AuthenticatedAdminTrafficRoute: typeof AuthenticatedAdminTrafficRoute
   AuthenticatedAdminTransactionsRoute: typeof AuthenticatedAdminTransactionsRoute
@@ -1218,6 +1239,7 @@ const AuthenticatedAdminRouteRouteChildren: AuthenticatedAdminRouteRouteChildren
       AuthenticatedAdminProviderBalanceRoute,
     AuthenticatedAdminReportsRoute: AuthenticatedAdminReportsRoute,
     AuthenticatedAdminRevenueRoute: AuthenticatedAdminRevenueRoute,
+    AuthenticatedAdminSenderIdCatalogRoute: AuthenticatedAdminSenderIdCatalogRoute,
     AuthenticatedAdminSenderIdsRoute: AuthenticatedAdminSenderIdsRoute,
     AuthenticatedAdminTrafficRoute: AuthenticatedAdminTrafficRoute,
     AuthenticatedAdminTransactionsRoute: AuthenticatedAdminTransactionsRoute,

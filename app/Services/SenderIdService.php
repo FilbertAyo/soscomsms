@@ -144,6 +144,7 @@ class SenderIdService
                     'name' => $saved->name,
                     'status' => SenderIdStatus::Active,
                     'source' => SenderIdSource::Request,
+                    'available_to_all' => false,
                 ]);
 
                 return $saved->load(['senderId', 'customer.user']);
@@ -196,6 +197,102 @@ class SenderIdService
                 'status' => 'This request is already closed.',
             ]),
         };
+    }
+
+    /**
+     * @param  array{name: string, generic?: bool, available_to_all?: bool}  $payload
+     */
+    public function createCatalog(array $payload): SenderId
+    {
+        $name = SenderIdName::normalize($payload['name']);
+
+        if (! SenderIdName::isValid($name)) {
+            throw ValidationException::withMessages([
+                'name' => SenderIdName::invalidMessage(),
+            ]);
+        }
+
+        if (SenderIdName::isBlocked($name)) {
+            throw ValidationException::withMessages([
+                'name' => 'This Sender ID is reserved and cannot be added.',
+            ]);
+        }
+
+        $taken = SenderId::query()
+            ->whereRaw('LOWER(name) = ?', [SenderIdName::key($name)])
+            ->exists();
+
+        if ($taken) {
+            throw ValidationException::withMessages([
+                'name' => 'This Sender ID is already in use.',
+            ]);
+        }
+
+        $generic = (bool) ($payload['generic'] ?? true);
+
+        return SenderId::query()->create([
+            'customer_id' => null,
+            'sender_id_request_id' => null,
+            'name' => $name,
+            'status' => SenderIdStatus::Active,
+            'source' => $generic ? SenderIdSource::Generic : SenderIdSource::Admin,
+            'available_to_all' => (bool) ($payload['available_to_all'] ?? false),
+        ]);
+    }
+
+    /**
+     * @param  array{available_to_all?: bool, status?: string, generic?: bool}  $payload
+     */
+    public function updateCatalog(SenderId $senderId, array $payload): SenderId
+    {
+        if (array_key_exists('available_to_all', $payload)) {
+            $senderId->available_to_all = (bool) $payload['available_to_all'];
+        }
+
+        if (array_key_exists('generic', $payload)) {
+            if ($senderId->source === SenderIdSource::Request) {
+                throw ValidationException::withMessages([
+                    'generic' => 'A customer request Sender ID cannot change type.',
+                ]);
+            }
+
+            $senderId->source = $payload['generic']
+                ? SenderIdSource::Generic
+                : SenderIdSource::Admin;
+        }
+
+        if (isset($payload['status'])) {
+            $senderId->status = SenderIdStatus::from($payload['status']);
+        }
+
+        $senderId->save();
+
+        return $senderId->fresh(['grantedCustomers.user']) ?? $senderId;
+    }
+
+    public function grant(SenderId $senderId, Customer $customer): SenderId
+    {
+        $senderId->grantedCustomers()->syncWithoutDetaching([$customer->id]);
+
+        return $senderId->fresh(['grantedCustomers.user']) ?? $senderId;
+    }
+
+    public function revoke(SenderId $senderId, Customer $customer): SenderId
+    {
+        $senderId->grantedCustomers()->detach($customer->id);
+
+        return $senderId->fresh(['grantedCustomers.user']) ?? $senderId;
+    }
+
+    public function deleteCatalog(SenderId $senderId): void
+    {
+        if ($senderId->campaigns()->exists()) {
+            throw ValidationException::withMessages([
+                'sender_id' => 'This Sender ID has been used on campaigns. Deactivate it instead.',
+            ]);
+        }
+
+        $senderId->delete();
     }
 
     /**

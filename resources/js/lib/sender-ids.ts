@@ -1,5 +1,6 @@
 import { api } from '@/lib/api'
 import {
+  type AdminSenderIdCatalogRecord,
   type SenderIdRecord,
   type SenderIdRequestRecord,
 } from '@/types/sender-ids'
@@ -9,6 +10,10 @@ export const senderIdRequestsQueryKey = ['sender-id-requests'] as const
 export const adminSenderIdRequestsQueryKey = [
   'admin',
   'sender-id-requests',
+] as const
+export const adminSenderIdCatalogQueryKey = [
+  'admin',
+  'sender-ids',
 ] as const
 
 export function senderIdRequestQueryKey(id: number | string) {
@@ -110,4 +115,65 @@ export async function rejectSenderIdRequest(
     { rejection_reason: rejectionReason }
   )
   return data.request
+}
+
+export async function fetchAdminSenderIdCatalog(): Promise<
+  AdminSenderIdCatalogRecord[]
+> {
+  const { data } = await api.get<{ senderIds: AdminSenderIdCatalogRecord[] }>(
+    '/api/admin/sender-ids'
+  )
+  return data.senderIds
+}
+
+export async function createAdminSenderId(payload: {
+  name: string
+  generic: boolean
+  available_to_all: boolean
+}): Promise<AdminSenderIdCatalogRecord> {
+  const { data } = await api.post<{ senderId: AdminSenderIdCatalogRecord }>(
+    '/api/admin/sender-ids',
+    payload
+  )
+  return data.senderId
+}
+
+export async function updateAdminSenderId(
+  id: number,
+  payload: {
+    generic?: boolean
+    available_to_all?: boolean
+    status?: 'active' | 'inactive'
+  }
+): Promise<AdminSenderIdCatalogRecord> {
+  const { data } = await api.patch<{ senderId: AdminSenderIdCatalogRecord }>(
+    `/api/admin/sender-ids/${id}`,
+    payload
+  )
+  return data.senderId
+}
+
+export async function grantAdminSenderId(
+  id: number,
+  customerId: number
+): Promise<AdminSenderIdCatalogRecord> {
+  const { data } = await api.post<{ senderId: AdminSenderIdCatalogRecord }>(
+    `/api/admin/sender-ids/${id}/grants`,
+    { customer_id: customerId }
+  )
+  return data.senderId
+}
+
+export async function revokeAdminSenderId(
+  id: number,
+  customerId: number
+): Promise<AdminSenderIdCatalogRecord> {
+  const { data } = await api.delete<{ senderId: AdminSenderIdCatalogRecord }>(
+    `/api/admin/sender-ids/${id}/grants/${customerId}`
+  )
+  return data.senderId
+}
+
+export async function deleteAdminSenderId(id: number): Promise<void> {
+  await api.delete(`/api/admin/sender-ids/${id}`)
 }

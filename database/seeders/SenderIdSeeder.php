@@ -41,6 +41,7 @@ class SenderIdSeeder extends Seeder
                     'sender_id_request_id' => null,
                     'status' => SenderIdStatus::Active,
                     'source' => SenderIdSource::Generic,
+                    'available_to_all' => true,
                 ],
             );
         }

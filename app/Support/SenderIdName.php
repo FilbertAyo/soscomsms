@@ -26,7 +26,7 @@ final class SenderIdName
             return false;
         }
 
-        return (bool) preg_match('/^[A-Za-z0-9]+(?: [A-Za-z0-9]+)*$/', $name);
+        return (bool) preg_match('/^[A-Za-z0-9]+$/', $name);
     }
 
     public static function isBlocked(string $value): bool
@@ -44,6 +44,6 @@ final class SenderIdName
     {
         $max = (int) config('sms.sender_id_max_length', 13);
 
-        return "Enter a Sender ID of 3 to {$max} letters, numbers, or spaces.";
+        return "Enter a Sender ID of 3 to {$max} letters or numbers, with no spaces.";
     }
 }

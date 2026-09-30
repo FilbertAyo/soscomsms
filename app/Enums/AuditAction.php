@@ -14,6 +14,10 @@ enum AuditAction: string
     case SenderIdSubmitted = 'sender_id.submitted';
     case SenderIdApproved = 'sender_id.approved';
     case SenderIdRejected = 'sender_id.rejected';
+    case SenderIdCreated = 'sender_id.created';
+    case SenderIdUpdated = 'sender_id.updated';
+    case SenderIdGranted = 'sender_id.granted';
+    case SenderIdRevoked = 'sender_id.revoked';
     case PricingUpdated = 'pricing.updated';
     case ProviderSettingsUpdated = 'provider.settings_updated';
     case ProviderWhitelistConfirmed = 'provider.whitelist_confirmed';

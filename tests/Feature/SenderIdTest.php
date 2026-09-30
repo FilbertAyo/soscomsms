@@ -19,10 +19,11 @@ function senderCustomer(): array
     return [$user, $customer];
 }
 
-it('keeps sender id spaces and original letter case', function () {
-    expect(SenderIdName::normalize('  Adi  TZ '))->toBe('Adi TZ')
-        ->and(SenderIdName::isValid('ADI TZ'))->toBeTrue()
-        ->and(SenderIdName::isValid('SEND OFF'))->toBeTrue()
+it('keeps sender id letter case and rejects spaces', function () {
+    expect(SenderIdName::normalize('  AdiTZ '))->toBe('AdiTZ')
+        ->and(SenderIdName::isValid('ADITZ'))->toBeTrue()
+        ->and(SenderIdName::isValid('ADI TZ'))->toBeFalse()
+        ->and(SenderIdName::isValid('SEND OFF'))->toBeFalse()
         ->and(SenderIdName::isValid('LI'))->toBeFalse()
         ->and(SenderIdName::isValid('TOO-LONG-NAME'))->toBeFalse();
 });
@@ -53,7 +54,7 @@ it('lets a customer request a sender id and hides it from another customer', fun
         ->assertNotFound();
 });
 
-it('lets a customer request a sender id with a space and keeps that name', function () {
+it('rejects a sender id request that contains a space', function () {
     [$owner] = senderCustomer();
 
     $this->actingAs($owner)
@@ -62,11 +63,11 @@ it('lets a customer request a sender id with a space and keeps that name', funct
             'purpose' => 'Customer updates',
             'organization' => 'Adi Ltd',
         ])
-        ->assertCreated()
-        ->assertJsonPath('request.name', 'ADI TZ');
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('name');
 });
 
-it('lets every customer use a generic sender id that contains a space', function () {
+it('lets every customer use a generic sender id that already contains a space', function () {
     [$firstUser] = senderCustomer();
     [$secondUser] = senderCustomer();
 
@@ -225,5 +226,131 @@ it('forbids customers from recording provider outcomes', function () {
 
     $this->actingAs($user)
         ->postJson("/api/admin/sender-id-requests/{$request->id}/provider-submissions")
+        ->assertForbidden();
+});
+
+it('hides an assigned-only catalog name until an admin grants it', function () {
+    $admin = User::factory()->admin()->create();
+    [$user, $customer] = senderCustomer();
+    [$otherUser] = senderCustomer();
+
+    $create = $this->actingAs($admin)
+        ->postJson('/api/admin/sender-ids', [
+            'name' => 'NDOA',
+            'generic' => true,
+            'available_to_all' => false,
+        ])
+        ->assertCreated()
+        ->assertJsonPath('senderId.name', 'NDOA')
+        ->assertJsonPath('senderId.availableToAll', false)
+        ->assertJsonPath('senderId.source', SenderIdSource::Generic->value);
+
+    $id = $create->json('senderId.id');
+
+    $this->actingAs($user)
+        ->getJson('/api/sender-ids')
+        ->assertOk()
+        ->assertJsonCount(0, 'senderIds');
+
+    $this->actingAs($admin)
+        ->postJson("/api/admin/sender-ids/{$id}/grants", [
+            'customer_id' => $customer->id,
+        ])
+        ->assertOk()
+        ->assertJsonPath('senderId.grants.0.id', $customer->id);
+
+    $this->actingAs($user)
+        ->getJson('/api/sender-ids')
+        ->assertOk()
+        ->assertJsonPath('senderIds.0.name', 'NDOA');
+
+    $this->actingAs($otherUser)
+        ->getJson('/api/sender-ids')
+        ->assertOk()
+        ->assertJsonCount(0, 'senderIds');
+
+    $this->actingAs($otherUser)
+        ->postJson('/api/sender-ids/assert', ['sender_id' => 'NDOA'])
+        ->assertUnprocessable();
+});
+
+it('lets every customer use a catalog name marked available to all', function () {
+    $admin = User::factory()->admin()->create();
+    [$firstUser] = senderCustomer();
+    [$secondUser] = senderCustomer();
+
+    $this->actingAs($admin)
+        ->postJson('/api/admin/sender-ids', [
+            'name' => 'KIKAO',
+            'generic' => true,
+            'available_to_all' => true,
+        ])
+        ->assertCreated();
+
+    $this->actingAs($firstUser)
+        ->getJson('/api/sender-ids')
+        ->assertOk()
+        ->assertJsonPath('senderIds.0.name', 'KIKAO');
+
+    $this->actingAs($secondUser)
+        ->postJson('/api/sender-ids/assert', ['sender_id' => 'kikao'])
+        ->assertOk()
+        ->assertJsonPath('senderId.name', 'KIKAO');
+});
+
+it('lets an admin add a non-generic name and keep it off the public list', function () {
+    $admin = User::factory()->admin()->create();
+    [$user, $customer] = senderCustomer();
+
+    $this->actingAs($admin)
+        ->postJson('/api/admin/sender-ids', [
+            'name' => 'SOSCOM',
+            'generic' => false,
+            'available_to_all' => false,
+        ])
+        ->assertCreated()
+        ->assertJsonPath('senderId.source', SenderIdSource::Admin->value);
+
+    $this->actingAs($user)
+        ->getJson('/api/sender-ids')
+        ->assertOk()
+        ->assertJsonCount(0, 'senderIds');
+
+    $id = SenderId::query()->where('name', 'SOSCOM')->value('id');
+
+    $this->actingAs($admin)
+        ->postJson("/api/admin/sender-ids/{$id}/grants", [
+            'customer_id' => $customer->id,
+        ])
+        ->assertOk();
+
+    $this->actingAs($user)
+        ->getJson('/api/sender-ids')
+        ->assertOk()
+        ->assertJsonPath('senderIds.0.name', 'SOSCOM');
+});
+
+it('rejects a catalog name that contains a space', function () {
+    $admin = User::factory()->admin()->create();
+
+    $this->actingAs($admin)
+        ->postJson('/api/admin/sender-ids', [
+            'name' => 'SEND OFF',
+            'generic' => true,
+            'available_to_all' => false,
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('name');
+});
+
+it('forbids customers from managing the sender id catalog', function () {
+    [$user] = senderCustomer();
+
+    $this->actingAs($user)
+        ->postJson('/api/admin/sender-ids', [
+            'name' => 'NDOA',
+            'generic' => true,
+            'available_to_all' => false,
+        ])
         ->assertForbidden();
 });

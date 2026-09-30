@@ -75,11 +75,13 @@ export function RequestSenderId() {
             <Input
               id='sender-id'
               value={name}
-              onChange={(event) => setName(event.target.value)}
+              onChange={(event) =>
+                setName(event.target.value.replaceAll(/\s+/g, ''))
+              }
               maxLength={13}
             />
             <p className='text-xs text-muted-foreground'>
-              3 to 13 letters, numbers, or spaces.
+              3 to 13 letters or numbers. Spaces are not allowed.
             </p>
           </div>
           <div className='space-y-2'>
