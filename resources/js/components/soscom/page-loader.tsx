@@ -1,6 +1,16 @@
+import { useRouterState } from '@tanstack/react-router'
 import { Main } from '@/components/layout/main'
 import { TableSkeleton } from '@/components/soscom/skeletons'
 import { Skeleton } from '@/components/ui/skeleton'
+
+export function DefaultPending() {
+  const insideApp = useRouterState({
+    select: (state) =>
+      state.matches.some((match) => match.routeId.startsWith('/_authenticated/')),
+  })
+
+  return insideApp ? <RoutePending /> : <PageLoader />
+}
 
 export function RoutePending() {
   return (

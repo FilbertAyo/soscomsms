@@ -99,7 +99,7 @@ export function LandingPage() {
 
         <section
           id='features'
-          className='border-y bg-muted/30 py-16 sm:py-20'
+          className='bg-muted/30 py-16 sm:py-20'
         >
           <div className='mx-auto max-w-6xl px-4'>
             <h2 className='text-2xl font-semibold tracking-tight'>
