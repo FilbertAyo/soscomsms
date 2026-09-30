@@ -248,3 +248,32 @@ it('values the signup bonus at the first-range price and hides SMS usage from th
         ->assertJsonCount(2, 'recentTransactions')
         ->assertJsonMissing(['type' => 'usage']);
 });
+
+it('shows admin grants in the customer wallet, transactions, and dashboard feed', function () {
+    $user = User::factory()->create();
+    $customer = Customer::factory()->complete()->create([
+        'user_id' => $user->id,
+        'sms_balance' => 0,
+    ]);
+    $ledger = app(CreditLedger::class);
+
+    $ledger->grantWelcome($customer);
+    $ledger->grant($customer->fresh(), 800, 'Admin grant of 800 SMS');
+    $ledger->debitUsage($customer->fresh(), 5, 'Campaign send');
+
+    $this->actingAs($user)
+        ->getJson('/api/credit-transactions')
+        ->assertOk()
+        ->assertJsonPath('smsBalance', 815)
+        ->assertJsonCount(2, 'transactions')
+        ->assertJsonPath('transactions.0.type', 'grant')
+        ->assertJsonPath('transactions.0.quantity', 800)
+        ->assertJsonPath('transactions.1.quantity', 20);
+
+    $this->actingAs($user)
+        ->getJson('/api/wallet')
+        ->assertOk()
+        ->assertJsonCount(2, 'recentTransactions')
+        ->assertJsonPath('recentTransactions.0.quantity', 800)
+        ->assertJsonMissing(['type' => 'usage']);
+});

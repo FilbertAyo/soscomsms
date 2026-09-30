@@ -91,13 +91,10 @@ class CreditTransaction extends Model
      */
     public function scopePurchasesForCustomer(Builder $query): Builder
     {
-        return $query->where(function (Builder $inner): void {
-            $inner->where('type', CreditTransactionType::Purchase->value)
-                ->orWhere(function (Builder $welcome): void {
-                    $welcome->where('type', CreditTransactionType::Grant->value)
-                        ->where('reference', 'like', 'WELCOME-%');
-                });
-        });
+        return $query->whereIn('type', [
+            CreditTransactionType::Purchase->value,
+            CreditTransactionType::Grant->value,
+        ]);
     }
 
     /**
