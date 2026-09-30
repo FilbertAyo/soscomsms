@@ -23,6 +23,13 @@ export function AdminReports() {
   const reportsQuery = useQuery({
     queryKey: [...adminDeliveryReportsQueryKey, page],
     queryFn: () => fetchAdminDeliveryReports(page),
+    refetchInterval: (query) => {
+      const items = query.state.data?.reports ?? []
+      const live = items.some((item) =>
+        ['queued', 'pending', 'sent', 'unknown'].includes(item.status ?? '')
+      )
+      return live ? 5000 : false
+    },
   })
   const reports = reportsQuery.data?.reports ?? []
   const meta = reportsQuery.data?.meta

@@ -17,61 +17,7 @@ class MobishastraGateway implements SmsGatewayInterface
 {
     public function send(OutboundSms $message): GatewaySendResult
     {
-        app(ProviderReadinessService::class)->assertReadyToSend();
-
-        $provider = Provider::current();
-        $query = [
-            'user' => $provider->profile_id,
-            'pwd' => $provider->password,
-            'senderid' => $message->sender,
-            'mobileno' => ProviderPhone::digits($message->phone),
-            'msgtext' => $this->encodedBody($message),
-            'priority' => 'High',
-            'CountryCode' => $provider->countryCode(),
-            'ShowError' => 'C',
-        ];
-
-        if ($message->encoding === MessageEncoding::Unicode) {
-            $query['language'] = 'Unicode';
-        }
-
-        try {
-            $response = $this->http()
-                ->get($this->url($provider, (string) config('sms.provider.send_path', 'sendurl.aspx')), $query);
-        } catch (ConnectionException $exception) {
-            $this->log(
-                $provider,
-                'send',
-                $this->safeSendRequest($query, $message),
-                null,
-                null,
-                'timeout',
-                $exception->getMessage(),
-                $message->campaignId,
-            );
-
-            return new GatewaySendResult(
-                recipientId: $message->recipientId,
-                phone: $message->phone,
-                accepted: false,
-                timedOut: true,
-                code: 'timeout',
-                raw: $exception->getMessage(),
-            );
-        }
-
-        $body = trim($response->body());
-        $this->log(
-            $provider,
-            'send',
-            $this->safeSendRequest($query, $message),
-            ['body' => $body],
-            $response->status(),
-            $response->successful() ? 'ok' : 'error',
-            campaignId: $message->campaignId,
-        );
-
-        return $this->mapCode($message, $body);
+        return $this->sendBulk([$message])[0];
     }
 
     /**
@@ -80,10 +26,6 @@ class MobishastraGateway implements SmsGatewayInterface
      */
     public function sendBulk(array $messages): array
     {
-        if (count($messages) === 1) {
-            return [$this->send($messages[0])];
-        }
-
         app(ProviderReadinessService::class)->assertReadyToSend();
 
         $provider = Provider::current();
@@ -256,10 +198,13 @@ class MobishastraGateway implements SmsGatewayInterface
             return new DeliveryReport($providerMessageId, $raw, $raw);
         }
 
-        $parts = array_map('trim', explode(',', $raw, 3));
+        $parts = array_map('trim', explode(',', $raw));
         $messageId = ($parts[0] ?? '') !== '' ? $parts[0] : $providerMessageId;
         $status = ($parts[1] ?? '') !== '' ? $parts[1] : $raw;
-        $occurredAt = ($parts[2] ?? '') !== '' ? $parts[2] : null;
+        $occurredAt = count($parts) > 2
+            ? implode(', ', array_slice($parts, 2))
+            : null;
+        $occurredAt = $occurredAt !== '' ? $occurredAt : null;
 
         return new DeliveryReport($messageId, $status, $raw, $occurredAt);
     }
@@ -267,10 +212,30 @@ class MobishastraGateway implements SmsGatewayInterface
     private function mapCode(OutboundSms $message, string $body): GatewaySendResult
     {
         $code = $this->normalizeCode($body);
+        $messageId = $this->extractMessageId($body);
 
-        if (in_array($code, ['000', 'send successful'], true)) {
-            $messageId = $this->extractMessageId($body);
+        if (in_array($code, ['013', 'timeout'], true)) {
+            return new GatewaySendResult(
+                recipientId: $message->recipientId,
+                phone: $message->phone,
+                accepted: false,
+                timedOut: true,
+                code: $code,
+                raw: $body,
+            );
+        }
 
+        if ($this->isHardFail($code)) {
+            return new GatewaySendResult(
+                recipientId: $message->recipientId,
+                phone: $message->phone,
+                accepted: false,
+                code: $code,
+                raw: $body,
+            );
+        }
+
+        if ($this->isSuccessCode($code) || $messageId !== null) {
             if ($messageId === null) {
                 // Accepted by code but no trackable id — treat as uncertain (do not invent MSH-R*).
                 return new GatewaySendResult(
@@ -293,22 +258,11 @@ class MobishastraGateway implements SmsGatewayInterface
             );
         }
 
-        if (in_array($code, ['013', 'timeout'], true)) {
-            return new GatewaySendResult(
-                recipientId: $message->recipientId,
-                phone: $message->phone,
-                accepted: false,
-                timedOut: true,
-                code: $code,
-                raw: $body,
-            );
-        }
-
         return new GatewaySendResult(
             recipientId: $message->recipientId,
             phone: $message->phone,
             accepted: false,
-            code: $code,
+            code: $code !== '' ? $code : '001',
             raw: $body,
         );
     }
@@ -347,8 +301,7 @@ class MobishastraGateway implements SmsGatewayInterface
             }
 
             $code = $this->normalizeCode((string) ($row['response'] ?? $row['str_response'] ?? ''));
-            $msgId = isset($row['msg_id']) ? trim((string) $row['msg_id']) : '';
-            $msgId = $msgId !== '' ? $msgId : null;
+            $msgId = $this->messageIdFromRow($row);
 
             if ($code === '013') {
                 $results[] = new GatewaySendResult(
@@ -363,10 +316,7 @@ class MobishastraGateway implements SmsGatewayInterface
                 continue;
             }
 
-            $hardFail = in_array($code, ['001', '003', '005', '006', '007', '008', '009', '010', '011', '012'], true);
-            $successCode = $code === '000' || $code === 'send successful';
-
-            if ($hardFail) {
+            if ($this->isHardFail($code)) {
                 $results[] = new GatewaySendResult(
                     recipientId: $message->recipientId,
                     phone: $message->phone,
@@ -378,14 +328,14 @@ class MobishastraGateway implements SmsGatewayInterface
                 continue;
             }
 
-            if ($successCode || $msgId !== null) {
+            if ($this->isSuccessCode($code) || $msgId !== null) {
                 if ($msgId === null) {
                     $results[] = new GatewaySendResult(
                         recipientId: $message->recipientId,
                         phone: $message->phone,
                         accepted: false,
                         timedOut: true,
-                        code: $successCode ? '000' : ($code !== '' ? $code : 'unknown'),
+                        code: '000',
                         raw: json_encode($row) ?: '',
                     );
 
@@ -397,7 +347,7 @@ class MobishastraGateway implements SmsGatewayInterface
                     phone: $message->phone,
                     accepted: true,
                     providerMessageId: $msgId,
-                    code: $successCode ? '000' : ($code !== '' ? $code : '000'),
+                    code: '000',
                     raw: json_encode($row) ?: '',
                 );
 
@@ -438,14 +388,17 @@ class MobishastraGateway implements SmsGatewayInterface
     {
         $trimmed = trim($body);
 
-        if (preg_match('/\b(M-\d+)\b/i', $trimmed, $matches) === 1) {
+        if (preg_match('/\b(M-\d+)\b/i', $trimmed, $matches) === 1 && $this->looksLikeProviderMessageId($matches[1])) {
+            return $matches[1];
+        }
+
+        if (preg_match('/\b(\d{6,})\b/', $trimmed, $matches) === 1) {
             return $matches[1];
         }
 
         if (str_contains($trimmed, ',')) {
             foreach (array_map('trim', explode(',', $trimmed)) as $part) {
-                $code = $this->normalizeCode($part);
-                if ($part !== '' && ! in_array($code, ['000', 'send successful', '013'], true)) {
+                if ($this->looksLikeProviderMessageId($part)) {
                     return $part;
                 }
             }
@@ -455,19 +408,41 @@ class MobishastraGateway implements SmsGatewayInterface
     }
 
     /**
-     * @param  array<string, mixed>  $query
-     * @return array<string, mixed>
+     * @param  array<string, mixed>  $row
      */
-    private function safeSendRequest(array $query, OutboundSms $message): array
+    private function messageIdFromRow(array $row): ?string
     {
-        return [
-            'user' => $this->maskedUser((string) ($query['user'] ?? '')),
-            'senderid' => $message->sender,
-            'mobileno' => ProviderPhone::digits($message->phone),
-            'CountryCode' => $query['CountryCode'] ?? null,
-            'language' => $query['language'] ?? 'English',
-            'characters' => mb_strlen($message->body),
-        ];
+        foreach (['msg_id', 'msgid', 'message_id', 'messageid', 'MessageId'] as $key) {
+            if (! array_key_exists($key, $row) || $row[$key] === null) {
+                continue;
+            }
+
+            $id = trim((string) $row[$key]);
+            if ($this->looksLikeProviderMessageId($id)) {
+                return $id;
+            }
+        }
+
+        return null;
+    }
+
+    private function looksLikeProviderMessageId(string $id): bool
+    {
+        if ($id === '' || $this->isSuccessCode(strtolower($id)) || $this->isHardFail(strtolower($id))) {
+            return false;
+        }
+
+        return preg_match('/^(?:M-\d+|\d{6,})$/i', $id) === 1;
+    }
+
+    private function isSuccessCode(string $code): bool
+    {
+        return in_array($code, ['000', 'send successful', 'send success', 'success'], true);
+    }
+
+    private function isHardFail(string $code): bool
+    {
+        return in_array($code, ['001', '003', '005', '006', '007', '008', '009', '010', '011', '012'], true);
     }
 
     /**
@@ -503,15 +478,6 @@ class MobishastraGateway implements SmsGatewayInterface
             'http_status' => $httpStatus,
             'body' => mb_substr(trim($rawBody), 0, 500),
         ];
-    }
-
-    private function maskedUser(string $user): string
-    {
-        if ($user === '') {
-            return '';
-        }
-
-        return str_repeat('*', max(strlen($user) - 4, 0)).substr($user, -4);
     }
 
     /**

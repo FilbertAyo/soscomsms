@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Contracts\SmsGatewayInterface;
+use App\Enums\CampaignRecipientStatus;
 use App\Enums\CampaignStatus;
 use App\Enums\DeliveryStatus;
 use App\Enums\GatewayDriver;
@@ -64,8 +65,13 @@ class PollDeliveryReportsCommand extends Command
         }
 
         Campaign::query()
-            ->where('status', CampaignStatus::Sending)
-            ->orderBy('id')
+            ->where(function ($query): void {
+                $query->where('status', CampaignStatus::Sending)
+                    ->orWhereHas('recipients', function ($recipients): void {
+                        $recipients->where('status', CampaignRecipientStatus::Unknown);
+                    });
+            })
+            ->orderByDesc('id')
             ->limit(100)
             ->get()
             ->each(fn (Campaign $campaign) => $campaign->refreshCounts());

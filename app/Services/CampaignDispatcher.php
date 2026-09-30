@@ -6,6 +6,7 @@ use App\Contracts\SmsGatewayInterface;
 use App\Enums\CampaignRecipientStatus;
 use App\Enums\CampaignStatus;
 use App\Enums\DeliveryStatus;
+use App\Enums\GatewayDriver;
 use App\Enums\MessageEncoding;
 use App\Exceptions\ProviderNotReadyException;
 use App\Jobs\DispatchCampaignJob;
@@ -17,6 +18,7 @@ use App\Models\Provider;
 use App\Models\ProviderLog;
 use App\Services\Gateway\GatewaySendResult;
 use App\Services\Gateway\OutboundSms;
+use App\Services\Gateway\ProviderDeliveryStatus;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Throwable;
@@ -351,6 +353,7 @@ class CampaignDispatcher
             $this->applyResult($campaign, $recipient, $result);
         }
 
+        $this->confirmSubmittedDeliveries($funded);
         $this->finishDispatch($campaign);
     }
 
@@ -527,6 +530,50 @@ class CampaignDispatcher
         }
 
         $this->refundFailedRecipient($campaign, $recipient);
+    }
+
+    /**
+     * Ask Mobishastra for DLR immediately after a small instant send.
+     * Bulk campaigns are left to the minute poller so one request cannot
+     * wait on a status call per recipient.
+     *
+     * @param  list<CampaignRecipient>  $recipients
+     */
+    private function confirmSubmittedDeliveries(array $recipients): void
+    {
+        if ((string) config('sms.gateway') !== GatewayDriver::Mobishastra->value) {
+            return;
+        }
+
+        if (count($recipients) > 10) {
+            return;
+        }
+
+        foreach ($recipients as $recipient) {
+            $recipient->refresh();
+            $delivery = $recipient->delivery()->first();
+            $messageId = $delivery?->provider_message_id;
+
+            if ($delivery === null || ! filled($messageId)) {
+                continue;
+            }
+
+            if (ProviderDeliveryStatus::isSyntheticProviderId((string) $messageId)) {
+                continue;
+            }
+
+            if (ProviderDeliveryStatus::isTerminal($recipient->status)) {
+                continue;
+            }
+
+            $report = $this->gateway->checkDeliveryStatus((string) $messageId);
+            $this->deliveryReports->apply(
+                $report->providerMessageId !== '' ? $report->providerMessageId : (string) $messageId,
+                $report->status,
+                $recipient->phone,
+                $report->occurredAt,
+            );
+        }
     }
 
     private function markCreditExhausted(Campaign $campaign, CampaignRecipient $recipient): void

@@ -76,7 +76,7 @@ it('refunds only rejected recipients and does not retry a timed-out send', funct
             'numbers' => ['+255712445221', '+255754221891'],
         ])
         ->assertCreated()
-        ->assertJsonPath('campaign.status', CampaignStatus::Failed->value)
+        ->assertJsonPath('campaign.status', CampaignStatus::Sending->value)
         ->assertJsonPath('smsBalance', 19);
 
     expect($customer->fresh()->sms_balance)->toBe(19)
@@ -244,7 +244,13 @@ it('keeps the Mobishastra message id from a single send reply', function () {
     ]);
 
     Http::fake([
-        'https://example.invalid/sendurl.aspx*' => Http::response('000,M-77', 200),
+        'https://example.invalid/sendsms_api_json.aspx' => Http::response([
+            [
+                'msg_id' => '1884503411',
+                'number' => '255755237692',
+                'response' => 'send success',
+            ],
+        ], 200),
     ]);
 
     $gateway = new MobishastraGateway;
@@ -257,12 +263,118 @@ it('keeps the Mobishastra message id from a single send reply', function () {
     ));
 
     expect($result->accepted)->toBeTrue()
-        ->and($result->providerMessageId)->toBe('M-77');
+        ->and($result->providerMessageId)->toBe('1884503411')
+        ->and($result->code)->toBe('000');
+
+    Http::assertSent(fn ($request): bool => str_contains($request->url(), 'sendsms_api_json.aspx'));
+    Http::assertNotSent(fn ($request): bool => str_contains($request->url(), 'sendurl.aspx'));
 
     $this->assertDatabaseHas('provider_logs', [
-        'action' => 'send',
+        'action' => 'send_bulk',
         'status' => 'ok',
     ]);
+});
+
+it('stores the Mobishastra message id for an instant send and applies DELIVRD', function () {
+    [$user, , $sender] = gatewayCustomer(20);
+    config([
+        'sms.gateway' => GatewayDriver::Mobishastra->value,
+        'sms.provider.base_url' => 'https://example.invalid',
+        'sms.provider.profile_id' => 'SOSCOM',
+        'sms.provider.password' => 'secret',
+        'sms.provider.dlr_path' => 'dlrstatus_api.aspx',
+    ]);
+    Provider::query()->delete();
+    Provider::factory()->mobishastra()->create([
+        'base_url' => 'https://example.invalid',
+        'profile_id' => 'SOSCOM',
+        'password' => 'secret',
+        'static_ip' => '1.1.1.1',
+        'static_ip_whitelisted_at' => now(),
+        'credentials_confirmed_at' => now(),
+    ]);
+
+    Http::fake([
+        'https://example.invalid/sendsms_api_json.aspx' => Http::response([
+            [
+                'msg_id' => '1884503411',
+                'number' => '255755237692',
+                'response' => 'send success',
+            ],
+        ], 200),
+        'https://example.invalid/dlrstatus_api.aspx*' => Http::response(
+            '1884503411,DELIVRD,9/30/2026 11:55:38 AM',
+            200,
+        ),
+    ]);
+
+    $this->actingAs($user)
+        ->postJson('/api/campaigns', [
+            'source' => 'numbers',
+            'message' => 'Hello SOSCOM',
+            'sender_id' => $sender->name,
+            'numbers' => ['0755237692'],
+        ])
+        ->assertCreated()
+        ->assertJsonPath('campaign.status', CampaignStatus::Completed->value)
+        ->assertJsonPath('campaign.scheduledAt', null)
+        ->assertJsonPath('campaign.delivered', 1);
+
+    $this->assertDatabaseHas('deliveries', [
+        'provider_message_id' => '1884503411',
+        'status' => DeliveryStatus::Delivered->value,
+    ]);
+    $this->assertDatabaseHas('campaign_recipients', [
+        'phone' => '+255755237692',
+        'status' => CampaignRecipientStatus::Delivered->value,
+    ]);
+
+    Http::assertNotSent(fn ($request): bool => str_contains($request->url(), 'sendurl.aspx'));
+});
+
+it('keeps an instant campaign sending when Mobishastra accepts without a message id', function () {
+    [$user, , $sender] = gatewayCustomer(20);
+    config([
+        'sms.gateway' => GatewayDriver::Mobishastra->value,
+        'sms.provider.base_url' => 'https://example.invalid',
+        'sms.provider.profile_id' => 'SOSCOM',
+        'sms.provider.password' => 'secret',
+    ]);
+    Provider::query()->delete();
+    Provider::factory()->mobishastra()->create([
+        'base_url' => 'https://example.invalid',
+        'profile_id' => 'SOSCOM',
+        'password' => 'secret',
+        'static_ip' => '1.1.1.1',
+        'static_ip_whitelisted_at' => now(),
+        'credentials_confirmed_at' => now(),
+    ]);
+
+    Http::fake([
+        'https://example.invalid/sendsms_api_json.aspx' => Http::response([
+            [
+                'number' => '255755237692',
+                'response' => '000',
+            ],
+        ], 200),
+    ]);
+
+    $this->actingAs($user)
+        ->postJson('/api/campaigns', [
+            'source' => 'numbers',
+            'message' => 'Test',
+            'sender_id' => $sender->name,
+            'numbers' => ['0755237692'],
+        ])
+        ->assertCreated()
+        ->assertJsonPath('campaign.status', CampaignStatus::Sending->value)
+        ->assertJsonPath('campaign.delivered', 0);
+
+    $this->assertDatabaseHas('campaign_recipients', [
+        'phone' => '+255755237692',
+        'status' => CampaignRecipientStatus::Unknown->value,
+    ]);
+    expect(Delivery::query()->whereNotNull('provider_message_id')->count())->toBe(0);
 });
 
 it('posts Mobishastra JSON for bulk send and hex-encodes Unicode', function () {

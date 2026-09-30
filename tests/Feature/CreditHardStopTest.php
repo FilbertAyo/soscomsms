@@ -16,9 +16,11 @@ use App\Models\Provider;
 use App\Models\SenderId;
 use App\Models\User;
 use App\Services\CampaignDispatcher;
+use App\Services\Gateway\DeliveryReport;
 use App\Services\Gateway\GatewaySendResult;
 use App\Services\Gateway\MobishastraGateway;
 use App\Services\Gateway\OutboundSms;
+use App\Services\Gateway\ProviderBalance;
 use Illuminate\Support\Facades\Http;
 
 beforeEach(function () {
@@ -63,14 +65,14 @@ it('never calls the gateway after the campaign reservation is exhausted', functi
             return $results;
         }
 
-        public function checkBalance(): \App\Services\Gateway\ProviderBalance
+        public function checkBalance(): ProviderBalance
         {
-            return new \App\Services\Gateway\ProviderBalance(100000, 'fake');
+            return new ProviderBalance(100000, 'fake');
         }
 
-        public function checkDeliveryStatus(string $providerMessageId): \App\Services\Gateway\DeliveryReport
+        public function checkDeliveryStatus(string $providerMessageId): DeliveryReport
         {
-            return new \App\Services\Gateway\DeliveryReport($providerMessageId, 'delivered', 'fake');
+            return new DeliveryReport($providerMessageId, 'delivered', 'fake');
         }
     };
 
@@ -160,14 +162,14 @@ it('does not resend an already-submitted recipient after a simulated worker rest
             return $results;
         }
 
-        public function checkBalance(): \App\Services\Gateway\ProviderBalance
+        public function checkBalance(): ProviderBalance
         {
-            return new \App\Services\Gateway\ProviderBalance(100000, 'fake');
+            return new ProviderBalance(100000, 'fake');
         }
 
-        public function checkDeliveryStatus(string $providerMessageId): \App\Services\Gateway\DeliveryReport
+        public function checkDeliveryStatus(string $providerMessageId): DeliveryReport
         {
-            return new \App\Services\Gateway\DeliveryReport($providerMessageId, 'delivered', 'fake');
+            return new DeliveryReport($providerMessageId, 'delivered', 'fake');
         }
     };
 
@@ -233,7 +235,7 @@ it('treats Mobishastra success without a real message id as uncertain', function
     ]);
 
     Http::fake([
-        'https://example.invalid/sendurl.aspx*' => Http::response('000', 200),
+        'https://example.invalid/sendsms_api_json.aspx' => Http::response('000', 200),
     ]);
 
     $result = (new MobishastraGateway)->send(new OutboundSms(

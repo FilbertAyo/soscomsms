@@ -40,10 +40,14 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
     queryFn: () => fetchCampaign(campaignId, recipientPage),
     enabled: /^\d+$/.test(campaignId),
     refetchInterval: (query) => {
-      const status = query.state.data?.status
-      return status && LIVE_STATUSES.includes(status as (typeof LIVE_STATUSES)[number])
-        ? 5000
-        : false
+      const campaign = query.state.data
+      if (!campaign) {
+        return false
+      }
+      if (LIVE_STATUSES.includes(campaign.status as (typeof LIVE_STATUSES)[number])) {
+        return 5000
+      }
+      return campaign.delivered + campaign.failed < campaign.recipients ? 5000 : false
     },
   })
   const campaign = campaignQuery.data
@@ -143,9 +147,14 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
                   taken from your balance.
                 </p>
               ) : null}
-              {campaign.status === 'sending' ? (
+              {campaign.status === 'sending' ||
+              (!['queued', 'scheduled', 'cancelled', 'draft'].includes(
+                campaign.status
+              ) &&
+                campaign.delivered + campaign.failed < campaign.recipients) ? (
                 <p className='mt-3 text-sm text-muted-foreground'>
                   We are waiting to hear if each number received the message.
+                  This page updates on its own.
                 </p>
               ) : null}
               {campaign.status === 'cancelled' ? (
@@ -161,6 +170,7 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
                   <TableRow>
                     <TableHead>Recipient</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead>Message ID</TableHead>
                     <TableHead>SMS</TableHead>
                     <TableHead>Delivered At</TableHead>
                   </TableRow>
@@ -171,6 +181,9 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
                       <TableCell>{item.phone}</TableCell>
                       <TableCell>
                         <StatusBadge status={item.status} />
+                      </TableCell>
+                      <TableCell className='font-mono text-sm'>
+                        {item.providerMessageId || '—'}
                       </TableCell>
                       <TableCell>{item.segmentCount}</TableCell>
                       <TableCell>

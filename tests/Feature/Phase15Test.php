@@ -86,7 +86,7 @@ it('maps Mobishastra ShowError codes 000 through 013', function (string $body, b
     $gateway = phase15Mobishastra();
 
     Http::fake([
-        'https://example.invalid/sendurl.aspx*' => Http::response($body, 200),
+        'https://example.invalid/sendsms_api_json.aspx' => Http::response($body, 200),
     ]);
 
     $result = $gateway->send(new OutboundSms(
