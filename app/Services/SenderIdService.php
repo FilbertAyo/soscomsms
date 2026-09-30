@@ -206,9 +206,9 @@ class SenderIdService
     {
         $name = SenderIdName::normalize($payload['name']);
 
-        if (! SenderIdName::isValid($name)) {
+        if (! SenderIdName::isValid($name, allowSpaces: true)) {
             throw ValidationException::withMessages([
-                'name' => SenderIdName::invalidMessage(),
+                'name' => SenderIdName::invalidMessage(allowSpaces: true),
             ]);
         }
 

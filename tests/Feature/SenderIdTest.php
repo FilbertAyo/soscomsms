@@ -24,6 +24,8 @@ it('keeps sender id letter case and rejects spaces', function () {
         ->and(SenderIdName::isValid('ADITZ'))->toBeTrue()
         ->and(SenderIdName::isValid('ADI TZ'))->toBeFalse()
         ->and(SenderIdName::isValid('SEND OFF'))->toBeFalse()
+        ->and(SenderIdName::isValid('SEND OFF', allowSpaces: true))->toBeTrue()
+        ->and(SenderIdName::isValid('SEND-OFF', allowSpaces: true))->toBeFalse()
         ->and(SenderIdName::isValid('LI'))->toBeFalse()
         ->and(SenderIdName::isValid('TOO-LONG-NAME'))->toBeFalse();
 });
@@ -330,12 +332,31 @@ it('lets an admin add a non-generic name and keep it off the public list', funct
         ->assertJsonPath('senderIds.0.name', 'SOSCOM');
 });
 
-it('rejects a catalog name that contains a space', function () {
+it('lets an admin add a catalog name that contains a space', function () {
+    $admin = User::factory()->admin()->create();
+    [$user] = senderCustomer();
+
+    $this->actingAs($admin)
+        ->postJson('/api/admin/sender-ids', [
+            'name' => '  SEND   OFF ',
+            'generic' => true,
+            'available_to_all' => true,
+        ])
+        ->assertCreated()
+        ->assertJsonPath('senderId.name', 'SEND OFF');
+
+    $this->actingAs($user)
+        ->postJson('/api/sender-ids/assert', ['sender_id' => 'send off'])
+        ->assertOk()
+        ->assertJsonPath('senderId.name', 'SEND OFF');
+});
+
+it('rejects a catalog name with symbols', function () {
     $admin = User::factory()->admin()->create();
 
     $this->actingAs($admin)
         ->postJson('/api/admin/sender-ids', [
-            'name' => 'SEND OFF',
+            'name' => 'SEND-OFF',
             'generic' => true,
             'available_to_all' => false,
         ])

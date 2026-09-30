@@ -47,8 +47,8 @@ class SenderIdController extends Controller
                 'string',
                 'max:13',
                 function (string $attribute, mixed $value, Closure $fail): void {
-                    if (! SenderIdName::isValid((string) $value)) {
-                        $fail(SenderIdName::invalidMessage());
+                    if (! SenderIdName::isValid((string) $value, allowSpaces: true)) {
+                        $fail(SenderIdName::invalidMessage(allowSpaces: true));
                     }
                 },
             ],

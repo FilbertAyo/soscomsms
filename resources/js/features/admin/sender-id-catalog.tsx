@@ -234,7 +234,7 @@ export function AdminSenderIdCatalog() {
             onSubmit={(event) => {
               event.preventDefault()
               if (name.trim().length < 3) {
-                toast.error('Enter a Sender ID of at least 3 letters or numbers.')
+                toast.error('Enter a Sender ID of at least 3 characters.')
                 return
               }
               createMutation.mutate()
@@ -247,11 +247,11 @@ export function AdminSenderIdCatalog() {
                 value={name}
                 maxLength={13}
                 onChange={(event) =>
-                  setName(event.target.value.replaceAll(/\s+/g, ''))
+                  setName(event.target.value.replaceAll(/\s+/g, ' ').trimStart())
                 }
               />
               <p className='text-xs text-muted-foreground'>
-                3 to 13 letters or numbers. Spaces are not allowed.
+                3 to 13 letters, numbers, or single spaces (for example SEND OFF).
               </p>
             </div>
             <ToggleRow

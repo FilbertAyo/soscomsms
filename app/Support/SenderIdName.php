@@ -16,7 +16,7 @@ final class SenderIdName
         return mb_strtolower(self::normalize($raw));
     }
 
-    public static function isValid(string $value): bool
+    public static function isValid(string $value, bool $allowSpaces = false): bool
     {
         $name = self::normalize($value);
         $max = (int) config('sms.sender_id_max_length', 13);
@@ -26,7 +26,11 @@ final class SenderIdName
             return false;
         }
 
-        return (bool) preg_match('/^[A-Za-z0-9]+$/', $name);
+        $pattern = $allowSpaces
+            ? '/^[A-Za-z0-9]+( [A-Za-z0-9]+)*$/'
+            : '/^[A-Za-z0-9]+$/';
+
+        return (bool) preg_match($pattern, $name);
     }
 
     public static function isBlocked(string $value): bool
@@ -40,10 +44,12 @@ final class SenderIdName
         return in_array($name, $blocked, true);
     }
 
-    public static function invalidMessage(): string
+    public static function invalidMessage(bool $allowSpaces = false): string
     {
         $max = (int) config('sms.sender_id_max_length', 13);
 
-        return "Enter a Sender ID of 3 to {$max} letters or numbers, with no spaces.";
+        return $allowSpaces
+            ? "Enter a Sender ID of 3 to {$max} letters, numbers, or single spaces."
+            : "Enter a Sender ID of 3 to {$max} letters or numbers, with no spaces.";
     }
 }
