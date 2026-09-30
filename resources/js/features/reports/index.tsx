@@ -115,7 +115,7 @@ export function DeliveryReportsPage() {
           <strong className='font-medium text-foreground'>Delivered</strong>{' '}
           means the network confirmed the phone received the SMS.{' '}
           <strong className='font-medium text-foreground'>Sent</strong> means
-          the SMS was accepted by the network — not that it reached the phone.
+          the SMS was accepted by the network.
           A delivery report may still arrive later.{' '}
           <strong className='font-medium text-foreground'>Not confirmed</strong>{' '}
           means we have no delivery report yet. The SMS may still have reached
