@@ -76,7 +76,7 @@ it('refunds only rejected recipients and does not retry a timed-out send', funct
             'numbers' => ['+255712445221', '+255754221891'],
         ])
         ->assertCreated()
-        ->assertJsonPath('campaign.status', CampaignStatus::Sending->value)
+        ->assertJsonPath('campaign.status', CampaignStatus::PartiallyDelivered->value)
         ->assertJsonPath('smsBalance', 19);
 
     expect($customer->fresh()->sms_balance)->toBe(19)
@@ -367,7 +367,8 @@ it('keeps an instant campaign sending when Mobishastra accepts without a message
             'numbers' => ['0755237692'],
         ])
         ->assertCreated()
-        ->assertJsonPath('campaign.status', CampaignStatus::Sending->value)
+        ->assertJsonPath('campaign.status', CampaignStatus::Completed->value)
+        ->assertJsonPath('campaign.sent', 1)
         ->assertJsonPath('campaign.delivered', 0);
 
     $this->assertDatabaseHas('campaign_recipients', [

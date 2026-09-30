@@ -26,7 +26,7 @@ const labels: Record<string, { label: string; tone: keyof typeof tones }> = {
   failed: { label: 'Failed', tone: 'danger' },
   sent: { label: 'Sent', tone: 'info' },
   delivered: { label: 'Delivered', tone: 'success' },
-  unknown: { label: 'Not confirmed', tone: 'warning' },
+  unknown: { label: 'Sent', tone: 'info' },
   successful: { label: 'Successful', tone: 'success' },
   inactive: { label: 'Inactive', tone: 'muted' },
   suspended: { label: 'Paused', tone: 'danger' },

@@ -181,7 +181,7 @@ it('lets a later delivery report resolve an unknown send', function () {
     ]);
 });
 
-it('applies provider Unknown as not confirmed without changing credits', function () {
+it('applies provider Unknown as sent without changing credits', function () {
     [$user, $customer, $sender] = reportCustomer(20);
     config(['sms.fake.auto_dlr' => false]);
 
@@ -209,10 +209,11 @@ it('applies provider Unknown as not confirmed without changing credits', functio
         'phone' => '+255712445221',
         'status' => CampaignRecipientStatus::Unknown->value,
     ]);
-    expect($customer->fresh()->sms_balance)->toBe(19);
+    expect($customer->fresh()->sms_balance)->toBe(19)
+        ->and(Campaign::query()->first()?->status)->toBe(CampaignStatus::Completed);
 
     $this->actingAs($user)
-        ->getJson('/api/delivery-reports?status=unknown')
+        ->getJson('/api/delivery-reports?status=sent')
         ->assertOk()
         ->assertJsonPath('reports.0.status', CampaignRecipientStatus::Unknown->value)
         ->assertJsonPath('reports.0.phone', '+255712445221');

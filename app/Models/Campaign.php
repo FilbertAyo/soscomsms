@@ -267,9 +267,12 @@ class Campaign extends Model
 
         $delivered = $countFor(CampaignRecipientStatus::Delivered);
         $failed = $countFor(CampaignRecipientStatus::Failed, CampaignRecipientStatus::Rejected);
-        $accepted = $countFor(CampaignRecipientStatus::Sent, CampaignRecipientStatus::Delivered);
+        $accepted = $countFor(
+            CampaignRecipientStatus::Sent,
+            CampaignRecipientStatus::Delivered,
+            CampaignRecipientStatus::Unknown,
+        );
         $pending = $countFor(CampaignRecipientStatus::Queued, CampaignRecipientStatus::Pending);
-        $unconfirmed = $countFor(CampaignRecipientStatus::Unknown);
 
         $this->sent_count = $accepted;
         $this->delivered_count = $delivered;
@@ -285,7 +288,7 @@ class Campaign extends Model
             return $this;
         }
 
-        if ($pending > 0 || $unconfirmed > 0) {
+        if ($pending > 0) {
             $this->status = CampaignStatus::Sending;
         } elseif ($accepted > 0 && $failed > 0) {
             $this->status = CampaignStatus::PartiallyDelivered;

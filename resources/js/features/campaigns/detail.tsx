@@ -147,11 +147,7 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
                   taken from your balance.
                 </p>
               ) : null}
-              {campaign.status === 'sending' ||
-              (!['queued', 'scheduled', 'cancelled', 'draft'].includes(
-                campaign.status
-              ) &&
-                campaign.delivered + campaign.failed < campaign.recipients) ? (
+              {campaign.status === 'sending' ? (
                 <p className='mt-3 text-sm text-muted-foreground'>
                   We are waiting to hear if each number received the message.
                   This page updates on its own.

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\CampaignRecipientStatus;
 use App\Http\Controllers\Api\Concerns\ResolvesCustomer;
 use App\Http\Controllers\Controller;
 use App\Models\Customer;
@@ -62,7 +63,9 @@ class DeliveryReportController extends Controller
                         $report['campaignName'],
                         $report['senderId'],
                         $report['message'],
-                        $report['status'],
+                        $report['status'] === CampaignRecipientStatus::Unknown->value
+                            ? CampaignRecipientStatus::Sent->value
+                            : $report['status'],
                         $report['sentAt'],
                         $report['deliveredAt'],
                     ]);
@@ -98,8 +101,13 @@ class DeliveryReportController extends Controller
                 });
             })
             ->when($request->filled('status'), function (Builder $query) use ($request): void {
-                $query->whereHas('campaignRecipient', function (Builder $inner) use ($request): void {
-                    $inner->where('status', $request->string('status')->toString());
+                $status = $request->string('status')->toString();
+                $statuses = $status === CampaignRecipientStatus::Sent->value
+                    ? [CampaignRecipientStatus::Sent->value, CampaignRecipientStatus::Unknown->value]
+                    : [$status];
+
+                $query->whereHas('campaignRecipient', function (Builder $inner) use ($statuses): void {
+                    $inner->whereIn('status', $statuses);
                 });
             })
             ->when($request->filled('q'), function (Builder $query) use ($request): void {

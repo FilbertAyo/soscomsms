@@ -100,7 +100,7 @@ export function DeliveryReportsPage() {
       <Main>
         <PageHeader
           title='Delivery Reports'
-          description='See whether each message was delivered, sent, or not confirmed.'
+          description='See whether each message was delivered, sent, or failed.'
           actions={
             <Button
               variant='outline'
@@ -115,11 +115,8 @@ export function DeliveryReportsPage() {
           <strong className='font-medium text-foreground'>Delivered</strong>{' '}
           means the network confirmed the phone received the SMS.{' '}
           <strong className='font-medium text-foreground'>Sent</strong> means
-          the SMS was accepted by the network.
-          A delivery report may still arrive later.{' '}
-          <strong className='font-medium text-foreground'>Not confirmed</strong>{' '}
-          means we have no delivery report yet. The SMS may still have reached
-          the phone.
+          the SMS went out but there is no delivery report yet. It may still
+          change to Delivered later.
         </p>
         <div className='mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5'>
           <Input
@@ -169,7 +166,6 @@ export function DeliveryReportsPage() {
               <SelectItem value='sent'>Sent</SelectItem>
               <SelectItem value='failed'>Failed</SelectItem>
               <SelectItem value='rejected'>Rejected</SelectItem>
-              <SelectItem value='unknown'>Not confirmed</SelectItem>
             </SelectContent>
           </Select>
           <Input
