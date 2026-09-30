@@ -30,7 +30,7 @@ export function AdminReports() {
   return (
     <AdminPage
       title='Delivery Reports'
-      description='Platform-wide message status from live campaigns.'
+      description='Platform-wide message status. Message ID is the provider ID to match in the Mobishastra account.'
     >
       {reportsQuery.isError ? (
         <p className='text-sm text-destructive'>Could not load delivery reports.</p>
@@ -58,7 +58,7 @@ export function AdminReports() {
                 reports.map((item) => (
                   <TableRow key={item.id}>
                     <TableCell className='font-mono text-sm'>
-                      {item.providerMessageId ?? item.id}
+                      {item.providerMessageId || '—'}
                     </TableCell>
                     <TableCell>
                       <p>{item.customerName ?? '—'}</p>

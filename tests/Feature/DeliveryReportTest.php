@@ -78,7 +78,8 @@ it('marks fake gateway sends as delivered and lists them on reports', function (
 
     expect($csv)->toContain('+255712445221')
         ->and($csv)->toContain('delivered')
-        ->and($csv)->toContain('DLR demo');
+        ->and($csv)->toContain('DLR demo')
+        ->and($csv)->not->toContain('Gateway ID');
 });
 
 it('applies an inbound delivery report without refunding a later failure', function () {

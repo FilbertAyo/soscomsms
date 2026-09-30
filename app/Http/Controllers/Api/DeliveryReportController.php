@@ -44,7 +44,6 @@ class DeliveryReportController extends Controller
                 'Sender ID',
                 'Message',
                 'Status',
-                'Gateway ID',
                 'Sent at',
                 'Delivered at',
             ]);
@@ -64,7 +63,6 @@ class DeliveryReportController extends Controller
                         $report['senderId'],
                         $report['message'],
                         $report['status'],
-                        $report['providerMessageId'],
                         $report['sentAt'],
                         $report['deliveredAt'],
                     ]);

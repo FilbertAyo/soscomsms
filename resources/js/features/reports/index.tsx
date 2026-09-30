@@ -100,7 +100,7 @@ export function DeliveryReportsPage() {
       <Main>
         <PageHeader
           title='Delivery Reports'
-          description='See whether each message was delivered or failed.'
+          description='See whether each message was delivered, sent, or not confirmed.'
           actions={
             <Button
               variant='outline'
@@ -112,9 +112,14 @@ export function DeliveryReportsPage() {
           }
         />
         <p className='mb-4 rounded-xl border bg-muted/40 px-4 py-3 text-sm text-muted-foreground'>
-          We show the delivery report the telecom network provided. Not
-          confirmed means no delivery confirmation yet — the SMS may still
-          have reached the phone.
+          <strong className='font-medium text-foreground'>Delivered</strong>{' '}
+          means the network confirmed the phone received the SMS.{' '}
+          <strong className='font-medium text-foreground'>Sent</strong> means
+          the SMS was accepted by the network — not that it reached the phone.
+          A delivery report may still arrive later.{' '}
+          <strong className='font-medium text-foreground'>Not confirmed</strong>{' '}
+          means we have no delivery report yet. The SMS may still have reached
+          the phone.
         </p>
         <div className='mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5'>
           <Input

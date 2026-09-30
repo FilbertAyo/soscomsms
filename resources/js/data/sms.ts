@@ -671,8 +671,12 @@ export const faqs = [
         a: 'SMS is taken from your balance when you confirm send. If a number cannot be sent, that SMS is returned. If we do not get a send result, it stays as not confirmed and is not returned. If a phone later fails to receive the message, the SMS is not returned.',
       },
       {
+        q: 'What does Sent mean on a delivery report?',
+        a: 'Sent means the SMS was accepted by the network. It does not mean the phone received it. A delivery report may still arrive later and change the status to Delivered or Failed.',
+      },
+      {
         q: 'What does Not confirmed mean on a delivery report?',
-        a: 'Not confirmed means the telecom network has not confirmed delivery yet. The SMS may still have reached the phone. If a later confirmation arrives, the status can change to Delivered or Failed.',
+        a: 'Not confirmed means we have no delivery report yet. The SMS may still have reached the phone. If a later confirmation arrives, the status can change to Delivered or Failed.',
       },
     ],
   },
