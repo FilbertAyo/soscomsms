@@ -139,7 +139,7 @@ export function AdminOverview() {
             <div className='mb-4 flex items-center justify-between'>
               <h2 className='font-semibold'>Audit log</h2>
               <Button variant='ghost' size='sm' asChild>
-                <Link to='/admin/logs'>View all</Link>
+                <Link to='/admin/logs/audit'>View all</Link>
               </Button>
             </div>
             <div className='space-y-3'>

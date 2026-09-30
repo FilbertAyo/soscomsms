@@ -171,8 +171,11 @@ const adminNavGroups: SidebarData['navGroups'] = [
       },
       {
         title: 'System Logs',
-        url: '/admin/logs',
         icon: ScrollText,
+        items: [
+          { title: 'Audit', url: '/admin/logs/audit' },
+          { title: 'Gateway', url: '/admin/logs/gateway' },
+        ],
       },
     ],
   },

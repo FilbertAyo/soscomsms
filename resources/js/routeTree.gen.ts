@@ -29,7 +29,6 @@ import { Route as AuthenticatedSettingsRouteRouteImport } from './routes/_authen
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin/index'
 import { Route as AuthenticatedAdminApiUsageRouteImport } from './routes/_authenticated/admin/api-usage'
 import { Route as AuthenticatedAdminCustomersRouteImport } from './routes/_authenticated/admin/customers'
-import { Route as AuthenticatedAdminLogsRouteImport } from './routes/_authenticated/admin/logs'
 import { Route as AuthenticatedAdminPaymentsRouteImport } from './routes/_authenticated/admin/payments'
 import { Route as AuthenticatedAdminProductionRouteImport } from './routes/_authenticated/admin/production'
 import { Route as AuthenticatedAdminProviderBalanceRouteImport } from './routes/_authenticated/admin/provider-balance'
@@ -68,6 +67,9 @@ import { Route as AuthenticatedTemplatesIndexRouteImport } from './routes/_authe
 import { Route as AuthenticatedWalletIndexRouteImport } from './routes/_authenticated/wallet/index'
 import { Route as AuthenticatedWalletBuyRouteImport } from './routes/_authenticated/wallet/buy'
 import { Route as AuthenticatedWalletTransactionsRouteImport } from './routes/_authenticated/wallet/transactions'
+import { Route as AuthenticatedAdminLogsIndexRouteImport } from './routes/_authenticated/admin/logs/index'
+import { Route as AuthenticatedAdminLogsAuditRouteImport } from './routes/_authenticated/admin/logs/audit'
+import { Route as AuthenticatedAdminLogsGatewayRouteImport } from './routes/_authenticated/admin/logs/gateway'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -170,11 +172,6 @@ const AuthenticatedAdminCustomersRoute =
     path: '/customers',
     getParentRoute: () => AuthenticatedAdminRouteRoute,
   } as any)
-const AuthenticatedAdminLogsRoute = AuthenticatedAdminLogsRouteImport.update({
-  id: '/logs',
-  path: '/logs',
-  getParentRoute: () => AuthenticatedAdminRouteRoute,
-} as any)
 const AuthenticatedAdminPaymentsRoute =
   AuthenticatedAdminPaymentsRouteImport.update({
     id: '/payments',
@@ -402,6 +399,24 @@ const AuthenticatedWalletTransactionsRoute =
     path: '/wallet/transactions',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedAdminLogsIndexRoute =
+  AuthenticatedAdminLogsIndexRouteImport.update({
+    id: '/logs/',
+    path: '/logs/',
+    getParentRoute: () => AuthenticatedAdminRouteRoute,
+  } as any)
+const AuthenticatedAdminLogsAuditRoute =
+  AuthenticatedAdminLogsAuditRouteImport.update({
+    id: '/logs/audit',
+    path: '/logs/audit',
+    getParentRoute: () => AuthenticatedAdminRouteRoute,
+  } as any)
+const AuthenticatedAdminLogsGatewayRoute =
+  AuthenticatedAdminLogsGatewayRouteImport.update({
+    id: '/logs/gateway',
+    path: '/logs/gateway',
+    getParentRoute: () => AuthenticatedAdminRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -421,7 +436,6 @@ export interface FileRoutesByFullPath {
   '/503': typeof errors503Route
   '/admin/api-usage': typeof AuthenticatedAdminApiUsageRoute
   '/admin/customers': typeof AuthenticatedAdminCustomersRoute
-  '/admin/logs': typeof AuthenticatedAdminLogsRoute
   '/admin/payments': typeof AuthenticatedAdminPaymentsRoute
   '/admin/production': typeof AuthenticatedAdminProductionRoute
   '/admin/provider-balance': typeof AuthenticatedAdminProviderBalanceRoute
@@ -461,6 +475,9 @@ export interface FileRoutesByFullPath {
   '/settings/': typeof AuthenticatedSettingsIndexRoute
   '/templates/': typeof AuthenticatedTemplatesIndexRoute
   '/wallet/': typeof AuthenticatedWalletIndexRoute
+  '/admin/logs/audit': typeof AuthenticatedAdminLogsAuditRoute
+  '/admin/logs/gateway': typeof AuthenticatedAdminLogsGatewayRoute
+  '/admin/logs/': typeof AuthenticatedAdminLogsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -478,7 +495,6 @@ export interface FileRoutesByTo {
   '/503': typeof errors503Route
   '/admin/api-usage': typeof AuthenticatedAdminApiUsageRoute
   '/admin/customers': typeof AuthenticatedAdminCustomersRoute
-  '/admin/logs': typeof AuthenticatedAdminLogsRoute
   '/admin/payments': typeof AuthenticatedAdminPaymentsRoute
   '/admin/production': typeof AuthenticatedAdminProductionRoute
   '/admin/provider-balance': typeof AuthenticatedAdminProviderBalanceRoute
@@ -518,6 +534,9 @@ export interface FileRoutesByTo {
   '/settings': typeof AuthenticatedSettingsIndexRoute
   '/templates': typeof AuthenticatedTemplatesIndexRoute
   '/wallet': typeof AuthenticatedWalletIndexRoute
+  '/admin/logs/audit': typeof AuthenticatedAdminLogsAuditRoute
+  '/admin/logs/gateway': typeof AuthenticatedAdminLogsGatewayRoute
+  '/admin/logs': typeof AuthenticatedAdminLogsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -540,7 +559,6 @@ export interface FileRoutesById {
   '/(errors)/503': typeof errors503Route
   '/_authenticated/admin/api-usage': typeof AuthenticatedAdminApiUsageRoute
   '/_authenticated/admin/customers': typeof AuthenticatedAdminCustomersRoute
-  '/_authenticated/admin/logs': typeof AuthenticatedAdminLogsRoute
   '/_authenticated/admin/payments': typeof AuthenticatedAdminPaymentsRoute
   '/_authenticated/admin/production': typeof AuthenticatedAdminProductionRoute
   '/_authenticated/admin/provider-balance': typeof AuthenticatedAdminProviderBalanceRoute
@@ -580,6 +598,9 @@ export interface FileRoutesById {
   '/_authenticated/settings/': typeof AuthenticatedSettingsIndexRoute
   '/_authenticated/templates/': typeof AuthenticatedTemplatesIndexRoute
   '/_authenticated/wallet/': typeof AuthenticatedWalletIndexRoute
+  '/_authenticated/admin/logs/audit': typeof AuthenticatedAdminLogsAuditRoute
+  '/_authenticated/admin/logs/gateway': typeof AuthenticatedAdminLogsGatewayRoute
+  '/_authenticated/admin/logs/': typeof AuthenticatedAdminLogsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -601,7 +622,6 @@ export interface FileRouteTypes {
     | '/503'
     | '/admin/api-usage'
     | '/admin/customers'
-    | '/admin/logs'
     | '/admin/payments'
     | '/admin/production'
     | '/admin/provider-balance'
@@ -641,6 +661,9 @@ export interface FileRouteTypes {
     | '/settings/'
     | '/templates/'
     | '/wallet/'
+    | '/admin/logs/audit'
+    | '/admin/logs/gateway'
+    | '/admin/logs/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -658,7 +681,6 @@ export interface FileRouteTypes {
     | '/503'
     | '/admin/api-usage'
     | '/admin/customers'
-    | '/admin/logs'
     | '/admin/payments'
     | '/admin/production'
     | '/admin/provider-balance'
@@ -698,6 +720,9 @@ export interface FileRouteTypes {
     | '/settings'
     | '/templates'
     | '/wallet'
+    | '/admin/logs/audit'
+    | '/admin/logs/gateway'
+    | '/admin/logs'
   id:
     | '__root__'
     | '/'
@@ -719,7 +744,6 @@ export interface FileRouteTypes {
     | '/(errors)/503'
     | '/_authenticated/admin/api-usage'
     | '/_authenticated/admin/customers'
-    | '/_authenticated/admin/logs'
     | '/_authenticated/admin/payments'
     | '/_authenticated/admin/production'
     | '/_authenticated/admin/provider-balance'
@@ -759,6 +783,9 @@ export interface FileRouteTypes {
     | '/_authenticated/settings/'
     | '/_authenticated/templates/'
     | '/_authenticated/wallet/'
+    | '/_authenticated/admin/logs/audit'
+    | '/_authenticated/admin/logs/gateway'
+    | '/_authenticated/admin/logs/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -914,13 +941,6 @@ declare module '@tanstack/react-router' {
       path: '/customers'
       fullPath: '/admin/customers'
       preLoaderRoute: typeof AuthenticatedAdminCustomersRouteImport
-      parentRoute: typeof AuthenticatedAdminRouteRoute
-    }
-    '/_authenticated/admin/logs': {
-      id: '/_authenticated/admin/logs'
-      path: '/logs'
-      fullPath: '/admin/logs'
-      preLoaderRoute: typeof AuthenticatedAdminLogsRouteImport
       parentRoute: typeof AuthenticatedAdminRouteRoute
     }
     '/_authenticated/admin/payments': {
@@ -1189,6 +1209,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedWalletTransactionsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/admin/logs/': {
+      id: '/_authenticated/admin/logs/'
+      path: '/logs'
+      fullPath: '/admin/logs/'
+      preLoaderRoute: typeof AuthenticatedAdminLogsIndexRouteImport
+      parentRoute: typeof AuthenticatedAdminRouteRoute
+    }
+    '/_authenticated/admin/logs/audit': {
+      id: '/_authenticated/admin/logs/audit'
+      path: '/logs/audit'
+      fullPath: '/admin/logs/audit'
+      preLoaderRoute: typeof AuthenticatedAdminLogsAuditRouteImport
+      parentRoute: typeof AuthenticatedAdminRouteRoute
+    }
+    '/_authenticated/admin/logs/gateway': {
+      id: '/_authenticated/admin/logs/gateway'
+      path: '/logs/gateway'
+      fullPath: '/admin/logs/gateway'
+      preLoaderRoute: typeof AuthenticatedAdminLogsGatewayRouteImport
+      parentRoute: typeof AuthenticatedAdminRouteRoute
+    }
   }
 }
 
@@ -1215,7 +1256,6 @@ const authRouteRouteWithChildren = authRouteRoute._addFileChildren(
 interface AuthenticatedAdminRouteRouteChildren {
   AuthenticatedAdminApiUsageRoute: typeof AuthenticatedAdminApiUsageRoute
   AuthenticatedAdminCustomersRoute: typeof AuthenticatedAdminCustomersRoute
-  AuthenticatedAdminLogsRoute: typeof AuthenticatedAdminLogsRoute
   AuthenticatedAdminPaymentsRoute: typeof AuthenticatedAdminPaymentsRoute
   AuthenticatedAdminProductionRoute: typeof AuthenticatedAdminProductionRoute
   AuthenticatedAdminProviderBalanceRoute: typeof AuthenticatedAdminProviderBalanceRoute
@@ -1226,24 +1266,30 @@ interface AuthenticatedAdminRouteRouteChildren {
   AuthenticatedAdminTrafficRoute: typeof AuthenticatedAdminTrafficRoute
   AuthenticatedAdminTransactionsRoute: typeof AuthenticatedAdminTransactionsRoute
   AuthenticatedAdminIndexRoute: typeof AuthenticatedAdminIndexRoute
+  AuthenticatedAdminLogsAuditRoute: typeof AuthenticatedAdminLogsAuditRoute
+  AuthenticatedAdminLogsGatewayRoute: typeof AuthenticatedAdminLogsGatewayRoute
+  AuthenticatedAdminLogsIndexRoute: typeof AuthenticatedAdminLogsIndexRoute
 }
 
 const AuthenticatedAdminRouteRouteChildren: AuthenticatedAdminRouteRouteChildren =
   {
     AuthenticatedAdminApiUsageRoute: AuthenticatedAdminApiUsageRoute,
     AuthenticatedAdminCustomersRoute: AuthenticatedAdminCustomersRoute,
-    AuthenticatedAdminLogsRoute: AuthenticatedAdminLogsRoute,
     AuthenticatedAdminPaymentsRoute: AuthenticatedAdminPaymentsRoute,
     AuthenticatedAdminProductionRoute: AuthenticatedAdminProductionRoute,
     AuthenticatedAdminProviderBalanceRoute:
       AuthenticatedAdminProviderBalanceRoute,
     AuthenticatedAdminReportsRoute: AuthenticatedAdminReportsRoute,
     AuthenticatedAdminRevenueRoute: AuthenticatedAdminRevenueRoute,
-    AuthenticatedAdminSenderIdCatalogRoute: AuthenticatedAdminSenderIdCatalogRoute,
+    AuthenticatedAdminSenderIdCatalogRoute:
+      AuthenticatedAdminSenderIdCatalogRoute,
     AuthenticatedAdminSenderIdsRoute: AuthenticatedAdminSenderIdsRoute,
     AuthenticatedAdminTrafficRoute: AuthenticatedAdminTrafficRoute,
     AuthenticatedAdminTransactionsRoute: AuthenticatedAdminTransactionsRoute,
     AuthenticatedAdminIndexRoute: AuthenticatedAdminIndexRoute,
+    AuthenticatedAdminLogsAuditRoute: AuthenticatedAdminLogsAuditRoute,
+    AuthenticatedAdminLogsGatewayRoute: AuthenticatedAdminLogsGatewayRoute,
+    AuthenticatedAdminLogsIndexRoute: AuthenticatedAdminLogsIndexRoute,
   }
 
 const AuthenticatedAdminRouteRouteWithChildren =

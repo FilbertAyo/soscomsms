@@ -70,7 +70,7 @@ export async function fetchAdminLogs(
     params: {
       audit_page: auditPage,
       provider_page: providerPage,
-      per_page: 15,
+      per_page: 30,
     },
   })
   return {
