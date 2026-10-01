@@ -188,6 +188,9 @@ export type ProviderDlrCheck = {
   soscomStatus: string | null
   requestUrl: string
   driver: string
+  matchedDelivery: boolean
+  saved: boolean
+  reportStatus: string | null
 }
 
 export async function checkAdminProviderDlr(

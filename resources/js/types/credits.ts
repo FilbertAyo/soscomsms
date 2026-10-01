@@ -93,4 +93,11 @@ export type ProviderBalance = {
   countryCode: string | null
   credentialsConfirmedAt: string | null
   checkedAt: string | null
+  dlrPoll: {
+    at: string
+    checked: number
+    updated: number
+    errors: number
+    waiting: number
+  } | null
 }

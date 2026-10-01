@@ -26,6 +26,8 @@ class Delivery extends Model
         'attempted_at',
         'sent_at',
         'delivered_at',
+        'dlr_checked_at',
+        'dlr_attempts',
     ];
 
     /**
@@ -38,6 +40,8 @@ class Delivery extends Model
             'attempted_at' => 'datetime',
             'sent_at' => 'datetime',
             'delivered_at' => 'datetime',
+            'dlr_checked_at' => 'datetime',
+            'dlr_attempts' => 'integer',
         ];
     }
 

@@ -66,7 +66,7 @@ export function LandingPage() {
   return (
     <PublicSiteFrame>
       <main>
-        <section className='mx-auto max-w-6xl px-4 py-16 sm:py-24'>
+        <section className='mx-auto grid max-w-6xl items-center gap-10 px-4 py-16 sm:py-24 lg:grid-cols-2'>
           <div className='max-w-3xl'>
             <p className='mb-4 text-sm font-medium text-primary'>
               Bulk SMS for Tanzania
@@ -94,6 +94,24 @@ export function LandingPage() {
                 </Button>
               ) : null}
             </div>
+          </div>
+          <div className='relative isolate mx-auto w-full max-w-md lg:max-w-none'>
+            <div
+              aria-hidden
+              className='absolute inset-x-[6%] top-[10%] bottom-[20%] -z-10 rounded-full bg-primary/25 blur-3xl dark:bg-primary/30'
+            />
+            <img
+              src='/images/hero-sms.png'
+              alt='SMS from MCHANGO received on a phone'
+              width={1024}
+              height={1024}
+              fetchPriority='high'
+              className='w-full drop-shadow-2xl [mask-image:linear-gradient(to_bottom,black_68%,transparent_90%)]'
+            />
+            <div
+              aria-hidden
+              className='absolute inset-x-[18%] bottom-[9%] h-8 rounded-[100%] bg-primary/20 blur-2xl'
+            />
           </div>
         </section>
 

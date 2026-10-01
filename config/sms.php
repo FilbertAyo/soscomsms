@@ -72,6 +72,13 @@ return [
         'dispatch_budget_seconds' => (int) env('SMS_PROVIDER_DISPATCH_BUDGET', 45),
         'low_balance_threshold' => (int) env('SMS_PROVIDER_LOW_BALANCE', 10000),
         'dlr_token' => env('SMS_PROVIDER_DLR_TOKEN'),
+        // Each minute, check up to this many messages, oldest-checked first, within the time budget.
+        'dlr_batch' => (int) env('SMS_PROVIDER_DLR_BATCH', 200),
+        'dlr_budget_seconds' => (int) env('SMS_PROVIDER_DLR_BUDGET', 45),
+        // Do not re-check the same message more often than this.
+        'dlr_recheck_seconds' => (int) env('SMS_PROVIDER_DLR_RECHECK', 60),
+        // Stop polling messages that still have no final status after this many hours.
+        'dlr_max_age_hours' => (int) env('SMS_PROVIDER_DLR_MAX_AGE_HOURS', 72),
     ],
 
     'fake' => [

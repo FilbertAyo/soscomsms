@@ -20,6 +20,7 @@ use App\Services\Gateway\GatewaySendResult;
 use App\Services\Gateway\OutboundSms;
 use App\Services\Gateway\ProviderDeliveryStatus;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 use Throwable;
 
@@ -566,13 +567,20 @@ class CampaignDispatcher
                 continue;
             }
 
-            $report = $this->gateway->checkDeliveryStatus((string) $messageId);
-            $this->deliveryReports->apply(
-                $report->providerMessageId !== '' ? $report->providerMessageId : (string) $messageId,
-                $report->status,
-                $recipient->phone,
-                $report->occurredAt,
-            );
+            try {
+                $report = $this->gateway->checkDeliveryStatus((string) $messageId);
+                $this->deliveryReports->apply(
+                    (string) $messageId,
+                    $report->status,
+                    $recipient->phone,
+                    $report->occurredAt,
+                );
+            } catch (Throwable $exception) {
+                Log::warning('Immediate DLR check failed.', [
+                    'message_id' => $messageId,
+                    'error' => $exception->getMessage(),
+                ]);
+            }
         }
     }
 

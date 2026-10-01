@@ -12,9 +12,15 @@ use App\Models\Delivery;
 use App\Services\DeliveryReportService;
 use App\Services\Gateway\ProviderDeliveryStatus;
 use Illuminate\Console\Command;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class PollDeliveryReportsCommand extends Command
 {
+    public const HEARTBEAT_KEY = 'sms:dlr-poll:last-run';
+
     protected $signature = 'sms:poll-delivery-reports';
 
     protected $description = 'Pull Mobishastra DLR status for submitted messages that are not yet delivered or failed.';
@@ -27,40 +33,46 @@ class PollDeliveryReportsCommand extends Command
             return self::SUCCESS;
         }
 
-        $deliveries = Delivery::query()
-            ->whereNotNull('provider_message_id')
-            ->where('provider_message_id', '!=', '')
-            ->where('provider_message_id', 'not like', 'MSH-R%')
-            ->whereIn('status', [
-                DeliveryStatus::Pending,
-                DeliveryStatus::Sending,
-                DeliveryStatus::Submitted,
-                DeliveryStatus::Unknown,
-            ])
-            ->with('campaignRecipient')
-            ->orderBy('id')
-            ->limit(100)
-            ->get()
-            ->filter(function (Delivery $delivery): bool {
-                $status = $delivery->campaignRecipient?->status;
+        $startedAt = microtime(true);
+        $budget = max((int) config('sms.provider.dlr_budget_seconds', 45), 5);
+        $deliveries = $this->dueDeliveries();
 
-                return $status === null || ! ProviderDeliveryStatus::isTerminal($status);
-            });
-
+        $checked = 0;
         $updated = 0;
+        $errors = 0;
         foreach ($deliveries as $delivery) {
-            $messageId = (string) $delivery->provider_message_id;
-            $report = $gateway->checkDeliveryStatus($messageId);
-            $applied = $reports->apply(
-                $report->providerMessageId !== '' ? $report->providerMessageId : $messageId,
-                $report->status,
-                $delivery->campaignRecipient?->phone,
-                $report->occurredAt,
-            );
+            if (microtime(true) - $startedAt >= $budget) {
+                break;
+            }
 
-            $normalized = ProviderDeliveryStatus::normalize($report->status);
-            if ($applied !== null && $normalized !== null && ProviderDeliveryStatus::isTerminal($normalized)) {
-                $updated++;
+            $checked++;
+            $messageId = (string) $delivery->provider_message_id;
+
+            try {
+                $report = $gateway->checkDeliveryStatus($messageId);
+                $applied = $reports->apply(
+                    $messageId,
+                    $report->status,
+                    $delivery->campaignRecipient?->phone,
+                    $report->occurredAt,
+                );
+
+                $normalized = ProviderDeliveryStatus::normalize($report->status);
+                if ($applied !== null && $normalized !== null && ProviderDeliveryStatus::isTerminal($normalized)) {
+                    $updated++;
+                }
+            } catch (Throwable $exception) {
+                $errors++;
+                Log::warning('DLR poll failed for one message', [
+                    'delivery_id' => $delivery->id,
+                    'provider_message_id' => $messageId,
+                    'error' => $exception->getMessage(),
+                ]);
+            } finally {
+                Delivery::query()->whereKey($delivery->id)->update([
+                    'dlr_checked_at' => now(),
+                    'dlr_attempts' => $delivery->dlr_attempts + 1,
+                ]);
             }
         }
 
@@ -76,8 +88,71 @@ class PollDeliveryReportsCommand extends Command
             ->get()
             ->each(fn (Campaign $campaign) => $campaign->refreshCounts());
 
-        $this->info('Checked '.$deliveries->count().' messages. Updated '.$updated.'.');
+        Cache::forever(self::HEARTBEAT_KEY, [
+            'at' => now()->toIso8601String(),
+            'checked' => $checked,
+            'updated' => $updated,
+            'errors' => $errors,
+            'waiting' => $this->waitingQuery()->count(),
+        ]);
+
+        $this->info("Checked {$checked} messages. Updated {$updated}.".($errors > 0 ? " Errors {$errors}." : ''));
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Least-recently-checked first, so every waiting message gets a turn
+     * and old messages that never resolve cannot block new ones.
+     *
+     * @return \Illuminate\Support\Collection<int, Delivery>
+     */
+    private function dueDeliveries()
+    {
+        $recheckBefore = now()->subSeconds(max((int) config('sms.provider.dlr_recheck_seconds', 60), 0));
+
+        return $this->waitingQuery()
+            ->where(function (Builder $query) use ($recheckBefore): void {
+                $query->whereNull('dlr_checked_at')
+                    ->orWhere('dlr_checked_at', '<=', $recheckBefore);
+            })
+            ->with('campaignRecipient')
+            ->orderByRaw('dlr_checked_at is null desc')
+            ->orderBy('dlr_checked_at')
+            ->orderByDesc('id')
+            ->limit(max((int) config('sms.provider.dlr_batch', 200), 1))
+            ->get();
+    }
+
+    /**
+     * @return Builder<Delivery>
+     */
+    private function waitingQuery(): Builder
+    {
+        $cutoff = now()->subHours(max((int) config('sms.provider.dlr_max_age_hours', 72), 1));
+
+        return Delivery::query()
+            ->whereNotNull('provider_message_id')
+            ->where('provider_message_id', '!=', '')
+            ->where('provider_message_id', 'not like', 'MSH-R%')
+            ->whereIn('status', [
+                DeliveryStatus::Pending,
+                DeliveryStatus::Sending,
+                DeliveryStatus::Submitted,
+                DeliveryStatus::Unknown,
+            ])
+            ->whereHas('campaignRecipient', function (Builder $query): void {
+                $query->whereNotIn('status', [
+                    CampaignRecipientStatus::Delivered->value,
+                    CampaignRecipientStatus::Failed->value,
+                    CampaignRecipientStatus::Rejected->value,
+                ]);
+            })
+            ->where(function (Builder $query) use ($cutoff): void {
+                $query->where('sent_at', '>=', $cutoff)
+                    ->orWhere(function (Builder $unsent) use ($cutoff): void {
+                        $unsent->whereNull('sent_at')->where('created_at', '>=', $cutoff);
+                    });
+            });
     }
 }

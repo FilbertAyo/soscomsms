@@ -2,14 +2,18 @@
 
 namespace App\Http\Controllers\Api\Admin;
 
+use App\Console\Commands\PollDeliveryReportsCommand;
 use App\Contracts\SmsGatewayInterface;
 use App\Http\Controllers\Controller;
 use App\Models\Customer;
+use App\Models\Delivery;
 use App\Models\Provider;
+use App\Services\DeliveryReportService;
 use App\Services\Gateway\ProviderDeliveryStatus;
 use App\Services\ProviderReadinessService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 
 class ProviderBalanceController extends Controller
 {
@@ -38,11 +42,15 @@ class ProviderBalanceController extends Controller
             'countryCode' => $production->countryCode(),
             'credentialsConfirmedAt' => $production->credentials_confirmed_at?->toIso8601String(),
             'checkedAt' => $provider->fresh()?->last_balance_at?->toIso8601String(),
+            'dlrPoll' => Cache::get(PollDeliveryReportsCommand::HEARTBEAT_KEY),
         ]);
     }
 
-    public function checkDlr(Request $request, SmsGatewayInterface $gateway): JsonResponse
-    {
+    public function checkDlr(
+        Request $request,
+        SmsGatewayInterface $gateway,
+        DeliveryReportService $reports,
+    ): JsonResponse {
         $validated = $request->validate([
             'message_id' => ['required', 'string', 'max:64'],
         ]);
@@ -50,6 +58,21 @@ class ProviderBalanceController extends Controller
         $messageId = trim($validated['message_id']);
         $report = $gateway->checkDeliveryStatus($messageId);
         $normalized = ProviderDeliveryStatus::normalize($report->status);
+
+        $delivery = Delivery::query()
+            ->where('provider_message_id', $messageId)
+            ->with('campaignRecipient')
+            ->first();
+        $applied = $delivery === null
+            ? null
+            : $reports->apply($messageId, $report->status, $delivery->campaignRecipient?->phone, $report->occurredAt);
+        if ($delivery !== null) {
+            Delivery::query()->whereKey($delivery->id)->update([
+                'dlr_checked_at' => now(),
+                'dlr_attempts' => $delivery->dlr_attempts + 1,
+            ]);
+        }
+        $recipientStatus = $delivery?->campaignRecipient?->fresh()?->status;
         $provider = Provider::current();
         $path = (string) config('sms.provider.dlr_path', 'dlrstatus_api.aspx');
         $base = rtrim((string) (config('sms.provider.dlr_base_url') ?: $provider->base_url ?: config('sms.provider.base_url')), '/');
@@ -62,6 +85,9 @@ class ProviderBalanceController extends Controller
             'soscomStatus' => $normalized?->value,
             'requestUrl' => $path === '' ? '' : $base.'/'.ltrim($path, '/'),
             'driver' => $provider->driver->value,
+            'matchedDelivery' => $delivery !== null,
+            'saved' => $applied !== null,
+            'reportStatus' => $recipientStatus?->value,
         ]);
     }
 }

@@ -577,6 +577,156 @@ it('skips DLR polling while the fake gateway is active', function () {
         ->assertSuccessful();
 });
 
+function mobishastraDlrProvider(): Provider
+{
+    config([
+        'sms.gateway' => GatewayDriver::Mobishastra->value,
+        'sms.provider.base_url' => 'https://example.invalid',
+        'sms.provider.profile_id' => 'SOSCOM',
+        'sms.provider.password' => 'secret',
+        'sms.provider.dlr_path' => 'dlrstatus_api.aspx',
+    ]);
+    Provider::query()->delete();
+
+    return Provider::factory()->mobishastra()->create([
+        'base_url' => 'https://example.invalid',
+        'profile_id' => 'SOSCOM',
+        'password' => 'secret',
+    ]);
+}
+
+function waitingDelivery(Provider $provider, string $messageId, array $attributes = []): Delivery
+{
+    $recipient = CampaignRecipient::factory()->create([
+        'phone' => '+255755237692',
+        'status' => CampaignRecipientStatus::Unknown,
+    ]);
+
+    return Delivery::factory()->create([
+        'campaign_recipient_id' => $recipient->id,
+        'provider_id' => $provider->id,
+        'provider_message_id' => $messageId,
+        'status' => DeliveryStatus::Unknown,
+        'sent_at' => now(),
+        ...$attributes,
+    ]);
+}
+
+it('polls the newest SMS first even when many older ones are still waiting', function () {
+    $provider = mobishastraDlrProvider();
+    config(['sms.provider.dlr_batch' => 5]);
+
+    foreach (range(1, 12) as $index) {
+        waitingDelivery($provider, (string) (1800000000 + $index), ['sent_at' => now()->subHours(5)]);
+    }
+    $latest = waitingDelivery($provider, '1887404635');
+
+    Http::fake(function ($request) {
+        parse_str((string) parse_url($request->url(), PHP_URL_QUERY), $query);
+
+        return ($query['messageid'] ?? '') === '1887404635'
+            ? Http::response('1887404635,DELIVRD,10/1/2026 3:40:33 PM', 200)
+            : Http::response('', 200);
+    });
+
+    $this->artisan('sms:poll-delivery-reports')
+        ->expectsOutputToContain('Checked 5 messages. Updated 1.')
+        ->assertSuccessful();
+
+    $latest->refresh();
+    expect($latest->status)->toBe(DeliveryStatus::Delivered)
+        ->and($latest->campaignRecipient->fresh()->status)->toBe(CampaignRecipientStatus::Delivered)
+        ->and($latest->delivered_at?->format('Y-m-d H:i'))->toBe('2026-10-01 15:40')
+        ->and($latest->dlr_checked_at)->not->toBeNull()
+        ->and($latest->dlr_attempts)->toBe(1);
+});
+
+it('rotates through waiting SMS instead of re-checking the same ones every minute', function () {
+    $provider = mobishastraDlrProvider();
+    config(['sms.provider.dlr_batch' => 2]);
+
+    $checked = waitingDelivery($provider, '1800000001', ['dlr_checked_at' => now()->subSeconds(10)]);
+    $due = waitingDelivery($provider, '1800000002', ['dlr_checked_at' => now()->subMinutes(5)]);
+
+    Http::fake(['https://example.invalid/dlrstatus_api.aspx*' => Http::response('', 200)]);
+
+    $this->artisan('sms:poll-delivery-reports')
+        ->expectsOutputToContain('Checked 1 messages.')
+        ->assertSuccessful();
+
+    expect($checked->fresh()->dlr_attempts)->toBe(0)
+        ->and($due->fresh()->dlr_attempts)->toBe(1);
+});
+
+it('keeps polling other SMS when one DLR check throws', function () {
+    $provider = mobishastraDlrProvider();
+    $broken = waitingDelivery($provider, '1800000001');
+    $good = waitingDelivery($provider, '1800000002');
+
+    Http::fake(function ($request) {
+        parse_str((string) parse_url($request->url(), PHP_URL_QUERY), $query);
+        if (($query['messageid'] ?? '') === '1800000001') {
+            throw new RuntimeException('boom');
+        }
+
+        return Http::response('1800000002,DELIVRD,10/1/2026 3:40:33 PM', 200);
+    });
+
+    $this->artisan('sms:poll-delivery-reports')->assertSuccessful();
+
+    expect($good->fresh()->status)->toBe(DeliveryStatus::Delivered)
+        ->and($broken->fresh()->dlr_attempts)->toBe(1);
+});
+
+it('stops polling SMS older than the DLR window', function () {
+    $provider = mobishastraDlrProvider();
+    waitingDelivery($provider, '1800000001', ['sent_at' => now()->subDays(4)]);
+
+    Http::fake();
+
+    $this->artisan('sms:poll-delivery-reports')
+        ->expectsOutputToContain('Checked 0 messages.')
+        ->assertSuccessful();
+
+    Http::assertNothingSent();
+});
+
+it('saves an admin DLR check onto the matching SMS report', function () {
+    $admin = User::factory()->admin()->create();
+    $provider = mobishastraDlrProvider();
+    $delivery = waitingDelivery($provider, '1887404635');
+
+    Http::fake([
+        'https://example.invalid/dlrstatus_api.aspx*' => Http::response(
+            '1887404635,DELIVRD,10/1/2026 3:40:33 PM',
+            200
+        ),
+    ]);
+
+    $this->actingAs($admin)
+        ->postJson('/api/admin/provider-balance/dlr', ['message_id' => '1887404635'])
+        ->assertOk()
+        ->assertJsonPath('matchedDelivery', true)
+        ->assertJsonPath('saved', true)
+        ->assertJsonPath('reportStatus', CampaignRecipientStatus::Delivered->value);
+
+    expect($delivery->fresh()->status)->toBe(DeliveryStatus::Delivered)
+        ->and($delivery->campaignRecipient->fresh()->status)->toBe(CampaignRecipientStatus::Delivered);
+});
+
+it('records a heartbeat the admin page can show', function () {
+    $admin = User::factory()->admin()->create();
+    mobishastraDlrProvider();
+    Http::fake();
+
+    $this->artisan('sms:poll-delivery-reports')->assertSuccessful();
+
+    $this->actingAs($admin)
+        ->getJson('/api/admin/provider-balance')
+        ->assertOk()
+        ->assertJsonPath('dlrPoll.checked', 0);
+});
+
 it('does not let a customer see provider credentials', function () {
     [$user] = gatewayCustomer();
 

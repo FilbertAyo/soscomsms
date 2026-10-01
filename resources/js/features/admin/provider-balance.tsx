@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { applyValidationErrors } from '@/lib/auth'
-import { formatNumber } from '@/lib/format'
+import { formatDateTime, formatNumber } from '@/lib/format'
 import {
   adminProviderBalanceQueryKey,
   checkAdminProviderDlr,
@@ -12,6 +12,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { type ProviderBalance } from '@/types/credits'
 import { AdminPage } from './page'
 
 export function AdminProviderBalance() {
@@ -117,6 +118,9 @@ export function AdminProviderBalance() {
                 : 'Not confirmed'}
             </p>
           </div>
+          {snapshot?.driver === 'mobishastra' ? (
+            <DlrPollStatus poll={snapshot.dlrPoll} />
+          ) : null}
           <form
             className='rounded-xl border bg-card p-5'
             onSubmit={(event) => {
@@ -131,7 +135,8 @@ export function AdminProviderBalance() {
             <h2 className='font-medium'>Test DLR status</h2>
             <p className='mt-1 text-sm text-muted-foreground'>
               Calls dlrstatus_api from this server with the saved profile and
-              password. The reply is shown here and is not saved onto a campaign.
+              password. If the message ID belongs to a Soscom SMS, the result is
+              saved onto that delivery report.
             </p>
             <div className='mt-4 flex flex-col gap-3 sm:flex-row sm:items-end'>
               <div className='flex-1 space-y-2'>
@@ -174,12 +179,60 @@ export function AdminProviderBalance() {
                   <dt className='text-muted-foreground'>Soscom status</dt>
                   <dd>{dlrResult.soscomStatus || 'Not mapped'}</dd>
                 </div>
+                <div>
+                  <dt className='text-muted-foreground'>Delivery report</dt>
+                  <dd>
+                    {!dlrResult.matchedDelivery
+                      ? 'No Soscom SMS has this message ID.'
+                      : `Now ${dlrResult.reportStatus ?? 'unknown'}${dlrResult.saved ? ' (updated)' : ''}`}
+                  </dd>
+                </div>
               </dl>
             ) : null}
           </form>
         </div>
       )}
     </AdminPage>
+  )
+}
+
+function DlrPollStatus({ poll }: { poll: ProviderBalance['dlrPoll'] }) {
+  const minutesAgo = poll
+    ? Math.floor((Date.now() - new Date(poll.at).getTime()) / 60_000)
+    : null
+  const stale = minutesAgo === null || minutesAgo > 5
+
+  return (
+    <div className='rounded-xl border bg-card p-5'>
+      <h2 className='font-medium'>Automatic delivery checks</h2>
+      {poll === null ? (
+        <p className='mt-1 text-sm text-destructive'>
+          Never run on this server. Delivery reports stay on Sent until the
+          minute cron runs <span className='font-mono'>schedule:run</span>.
+        </p>
+      ) : (
+        <>
+          <p
+            className={`mt-1 text-sm ${stale ? 'text-destructive' : 'text-muted-foreground'}`}
+          >
+            Last run {formatDateTime(poll.at)}
+            {minutesAgo !== null && minutesAgo > 0
+              ? ` (${minutesAgo} min ago)`
+              : ''}
+            .{' '}
+            {stale
+              ? 'The minute cron looks stopped, so new SMS will stay on Sent.'
+              : 'Runs every minute.'}
+          </p>
+          <p className='mt-2 text-sm text-muted-foreground'>
+            Checked {formatNumber(poll.checked)} · Updated{' '}
+            {formatNumber(poll.updated)} · Still waiting{' '}
+            {formatNumber(poll.waiting)}
+            {poll.errors > 0 ? ` · Errors ${formatNumber(poll.errors)}` : ''}
+          </p>
+        </>
+      )}
+    </div>
   )
 }
 
