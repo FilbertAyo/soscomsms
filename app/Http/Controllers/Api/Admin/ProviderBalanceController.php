@@ -13,6 +13,7 @@ use App\Services\Gateway\ProviderDeliveryStatus;
 use App\Services\ProviderReadinessService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
 
 class ProviderBalanceController extends Controller
@@ -42,8 +43,30 @@ class ProviderBalanceController extends Controller
             'countryCode' => $production->countryCode(),
             'credentialsConfirmedAt' => $production->credentials_confirmed_at?->toIso8601String(),
             'checkedAt' => $provider->fresh()?->last_balance_at?->toIso8601String(),
-            'dlrPoll' => Cache::get(PollDeliveryReportsCommand::HEARTBEAT_KEY),
+            ...$this->schedulerHealth(),
         ]);
+    }
+
+    public function runDlrPoll(): JsonResponse
+    {
+        Artisan::call('sms:poll-delivery-reports', ['--force' => true, '--budget' => 20]);
+
+        return response()->json([
+            'output' => trim(Artisan::output()),
+            ...$this->schedulerHealth(),
+        ]);
+    }
+
+    /**
+     * @return array{dlrPoll: mixed, dlrPollStartedAt: mixed, queueHeartbeatAt: mixed}
+     */
+    private function schedulerHealth(): array
+    {
+        return [
+            'dlrPoll' => Cache::get(PollDeliveryReportsCommand::HEARTBEAT_KEY),
+            'dlrPollStartedAt' => Cache::get(PollDeliveryReportsCommand::STARTED_KEY),
+            'queueHeartbeatAt' => Cache::get(ProviderReadinessService::QUEUE_HEARTBEAT_KEY),
+        ];
     }
 
     public function checkDlr(

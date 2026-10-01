@@ -18,6 +18,9 @@ use App\Services\CampaignDispatcher;
 use App\Services\Gateway\MobishastraGateway;
 use App\Services\Gateway\OutboundSms;
 use App\Services\Gateway\UnicodeHex;
+use App\Console\Commands\PollDeliveryReportsCommand;
+use Illuminate\Console\Scheduling\Schedule;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 
 function gatewayCustomer(int $balance = 20): array
@@ -725,6 +728,52 @@ it('records a heartbeat the admin page can show', function () {
         ->getJson('/api/admin/provider-balance')
         ->assertOk()
         ->assertJsonPath('dlrPoll.checked', 0);
+});
+
+it('skips while another poll holds the lock and recovers with --force', function () {
+    $provider = mobishastraDlrProvider();
+    $delivery = waitingDelivery($provider, '1887404635');
+    Http::fake([
+        'https://example.invalid/dlrstatus_api.aspx*' => Http::response('1887404635,DELIVRD,10/1/2026 3:40:33 PM', 200),
+    ]);
+
+    Cache::lock(PollDeliveryReportsCommand::LOCK_KEY, 600)->get();
+
+    $this->artisan('sms:poll-delivery-reports')
+        ->expectsOutputToContain('Another DLR poll is still running')
+        ->assertSuccessful();
+    expect($delivery->fresh()->status)->toBe(DeliveryStatus::Unknown);
+
+    $this->artisan('sms:poll-delivery-reports', ['--force' => true])
+        ->expectsOutputToContain('Updated 1')
+        ->assertSuccessful();
+    expect($delivery->fresh()->status)->toBe(DeliveryStatus::Delivered)
+        ->and(Cache::lock(PollDeliveryReportsCommand::LOCK_KEY, 10)->get())->toBeTrue();
+});
+
+it('does not guard the DLR poll with the 24-hour scheduler mutex', function () {
+    $event = collect(app(Schedule::class)->events())
+        ->first(fn ($event) => str_contains((string) $event->command, 'sms:poll-delivery-reports'));
+
+    expect($event)->not->toBeNull()
+        ->and($event->withoutOverlapping)->toBeFalse();
+});
+
+it('lets an admin run the delivery check now', function () {
+    $admin = User::factory()->admin()->create();
+    $provider = mobishastraDlrProvider();
+    $delivery = waitingDelivery($provider, '1887404635');
+    Http::fake([
+        'https://example.invalid/dlrstatus_api.aspx*' => Http::response('1887404635,DELIVRD,10/1/2026 3:40:33 PM', 200),
+    ]);
+
+    $this->actingAs($admin)
+        ->postJson('/api/admin/provider-balance/dlr-poll')
+        ->assertOk()
+        ->assertJsonPath('dlrPoll.updated', 1)
+        ->assertJsonPath('output', 'Checked 1 messages. Updated 1.');
+
+    expect($delivery->fresh()->status)->toBe(DeliveryStatus::Delivered);
 });
 
 it('does not let a customer see provider credentials', function () {

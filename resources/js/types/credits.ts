@@ -93,11 +93,17 @@ export type ProviderBalance = {
   countryCode: string | null
   credentialsConfirmedAt: string | null
   checkedAt: string | null
+} & SchedulerHealth
+
+export type SchedulerHealth = {
   dlrPoll: {
     at: string
     checked: number
     updated: number
     errors: number
     waiting: number
+    seconds?: number
   } | null
+  dlrPollStartedAt: string | null
+  queueHeartbeatAt: string | null
 }

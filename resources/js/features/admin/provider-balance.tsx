@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { applyValidationErrors } from '@/lib/auth'
 import { formatDateTime, formatNumber } from '@/lib/format'
@@ -7,12 +7,13 @@ import {
   adminProviderBalanceQueryKey,
   checkAdminProviderDlr,
   fetchAdminProviderBalance,
+  runAdminDlrPoll,
   type ProviderDlrCheck,
 } from '@/lib/credits'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { type ProviderBalance } from '@/types/credits'
+import { type ProviderBalance, type SchedulerHealth } from '@/types/credits'
 import { AdminPage } from './page'
 
 export function AdminProviderBalance() {
@@ -119,7 +120,7 @@ export function AdminProviderBalance() {
             </p>
           </div>
           {snapshot?.driver === 'mobishastra' ? (
-            <DlrPollStatus poll={snapshot.dlrPoll} />
+            <DlrPollStatus health={snapshot} />
           ) : null}
           <form
             className='rounded-xl border bg-card p-5'
@@ -196,42 +197,96 @@ export function AdminProviderBalance() {
   )
 }
 
-function DlrPollStatus({ poll }: { poll: ProviderBalance['dlrPoll'] }) {
-  const minutesAgo = poll
-    ? Math.floor((Date.now() - new Date(poll.at).getTime()) / 60_000)
-    : null
-  const stale = minutesAgo === null || minutesAgo > 5
+function minutesSince(value: string | null | undefined): number | null {
+  if (!value) return null
+  return Math.floor((Date.now() - new Date(value).getTime()) / 60_000)
+}
+
+function ago(minutes: number | null): string {
+  if (minutes === null) return 'never'
+  if (minutes < 1) return 'just now'
+  return `${minutes} min ago`
+}
+
+function DlrPollStatus({ health }: { health: SchedulerHealth }) {
+  const queryClient = useQueryClient()
+  const [output, setOutput] = useState<string | null>(null)
+  const runNow = useMutation({
+    mutationFn: runAdminDlrPoll,
+    onSuccess: (result) => {
+      setOutput(result.output)
+      queryClient.setQueryData<ProviderBalance>(
+        adminProviderBalanceQueryKey,
+        (previous) => (previous ? { ...previous, ...result } : previous)
+      )
+    },
+    onError: (error) => {
+      toast.error(applyValidationErrors(error, () => undefined))
+    },
+  })
+
+  const poll = health.dlrPoll
+  const pollMinutes = minutesSince(poll?.at)
+  const startMinutes = minutesSince(health.dlrPollStartedAt)
+  const cronMinutes = minutesSince(health.queueHeartbeatAt)
+  const cronAlive = cronMinutes !== null && cronMinutes <= 3
+  const pollAlive = pollMinutes !== null && pollMinutes <= 3
+  const killed =
+    !pollAlive &&
+    startMinutes !== null &&
+    (pollMinutes === null || startMinutes < pollMinutes)
+
+  let problem: string | null = null
+  if (!cronAlive) {
+    problem =
+      'The server cron is not running schedule:run, so nothing automatic happens (delivery checks, scheduled sends, queued jobs). Check the cPanel cron job.'
+  } else if (killed) {
+    problem =
+      'The cron runs, but the delivery check starts and never finishes. The host is likely killing the process (CPU or time limit).'
+  } else if (!pollAlive) {
+    problem =
+      'The cron runs, but the delivery check is not. Redeploy so the new schedule is loaded, or press Run now.'
+  }
 
   return (
     <div className='rounded-xl border bg-card p-5'>
-      <h2 className='font-medium'>Automatic delivery checks</h2>
-      {poll === null ? (
-        <p className='mt-1 text-sm text-destructive'>
-          Never run on this server. Delivery reports stay on Sent until the
-          minute cron runs <span className='font-mono'>schedule:run</span>.
-        </p>
+      <div className='flex items-start justify-between gap-3'>
+        <div>
+          <h2 className='font-medium'>Automatic delivery checks</h2>
+          <p className='mt-1 text-xs text-muted-foreground'>
+            Cron last seen {ago(cronMinutes)} · Delivery check last finished{' '}
+            {ago(pollMinutes)}
+            {poll ? ` (${formatDateTime(poll.at)})` : ''}
+          </p>
+        </div>
+        <Button
+          size='sm'
+          variant='outline'
+          disabled={runNow.isPending}
+          onClick={() => runNow.mutate()}
+        >
+          {runNow.isPending ? 'Checking…' : 'Run now'}
+        </Button>
+      </div>
+      {problem ? (
+        <p className='mt-3 text-sm text-destructive'>{problem}</p>
       ) : (
-        <>
-          <p
-            className={`mt-1 text-sm ${stale ? 'text-destructive' : 'text-muted-foreground'}`}
-          >
-            Last run {formatDateTime(poll.at)}
-            {minutesAgo !== null && minutesAgo > 0
-              ? ` (${minutesAgo} min ago)`
-              : ''}
-            .{' '}
-            {stale
-              ? 'The minute cron looks stopped, so new SMS will stay on Sent.'
-              : 'Runs every minute.'}
-          </p>
-          <p className='mt-2 text-sm text-muted-foreground'>
-            Checked {formatNumber(poll.checked)} · Updated{' '}
-            {formatNumber(poll.updated)} · Still waiting{' '}
-            {formatNumber(poll.waiting)}
-            {poll.errors > 0 ? ` · Errors ${formatNumber(poll.errors)}` : ''}
-          </p>
-        </>
+        <p className='mt-3 text-sm text-muted-foreground'>
+          Running every minute.
+        </p>
       )}
+      {poll ? (
+        <p className='mt-2 text-sm text-muted-foreground'>
+          Last run: checked {formatNumber(poll.checked)} · updated{' '}
+          {formatNumber(poll.updated)} · still waiting{' '}
+          {formatNumber(poll.waiting)}
+          {poll.errors > 0 ? ` · errors ${formatNumber(poll.errors)}` : ''}
+          {poll.seconds !== undefined ? ` · took ${poll.seconds}s` : ''}
+        </p>
+      ) : null}
+      {output ? (
+        <p className='mt-2 font-mono text-xs text-muted-foreground'>{output}</p>
+      ) : null}
     </div>
   )
 }

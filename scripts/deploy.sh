@@ -173,6 +173,9 @@ run_deploy() {
   log "Signalling queue workers to restart."
   "${ARTISAN[@]}" queue:restart --no-interaction
 
+  log "Clearing scheduler locks left by killed cron runs."
+  "${ARTISAN[@]}" schedule:clear-cache --no-interaction || true
+
   ensure_writable_dirs
 
   log "Bringing the app back up."

@@ -128,6 +128,7 @@ Route::prefix('api')->group(function (): void {
             Route::patch('/pricing-tiers/{pricingTier}', [AdminPricingTierController::class, 'update']);
             Route::get('/provider-balance', [AdminProviderBalanceController::class, 'show']);
             Route::post('/provider-balance/dlr', [AdminProviderBalanceController::class, 'checkDlr']);
+            Route::post('/provider-balance/dlr-poll', [AdminProviderBalanceController::class, 'runDlrPoll']);
             Route::get('/production', [AdminProductionReadinessController::class, 'show']);
             Route::patch('/production', [AdminProductionReadinessController::class, 'update']);
             Route::post('/production/whitelist', [AdminProductionReadinessController::class, 'confirmWhitelist']);

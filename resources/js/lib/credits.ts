@@ -7,6 +7,7 @@ import {
   type CreditTransaction,
   type PricingTier,
   type ProviderBalance,
+  type SchedulerHealth,
   type SmsQuote,
   type WalletSnapshot,
 } from '@/types/credits'
@@ -199,6 +200,15 @@ export async function checkAdminProviderDlr(
   const { data } = await api.post<ProviderDlrCheck>(
     '/api/admin/provider-balance/dlr',
     { message_id: messageId }
+  )
+  return data
+}
+
+export async function runAdminDlrPoll(): Promise<
+  SchedulerHealth & { output: string }
+> {
+  const { data } = await api.post<SchedulerHealth & { output: string }>(
+    '/api/admin/provider-balance/dlr-poll'
   )
   return data
 }

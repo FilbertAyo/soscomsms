@@ -74,7 +74,8 @@ return [
         'dlr_token' => env('SMS_PROVIDER_DLR_TOKEN'),
         // Each minute, check up to this many messages, oldest-checked first, within the time budget.
         'dlr_batch' => (int) env('SMS_PROVIDER_DLR_BATCH', 200),
-        'dlr_budget_seconds' => (int) env('SMS_PROVIDER_DLR_BUDGET', 45),
+        'dlr_budget_seconds' => (int) env('SMS_PROVIDER_DLR_BUDGET', 40),
+        'dlr_timeout' => (int) env('SMS_PROVIDER_DLR_TIMEOUT', 8),
         // Do not re-check the same message more often than this.
         'dlr_recheck_seconds' => (int) env('SMS_PROVIDER_DLR_RECHECK', 60),
         // Stop polling messages that still have no final status after this many hours.

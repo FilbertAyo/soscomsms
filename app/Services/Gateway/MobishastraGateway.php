@@ -143,7 +143,9 @@ class MobishastraGateway implements SmsGatewayInterface
         ];
 
         try {
-            $response = $this->http()->get($this->dlrUrl($provider, $path), $query);
+            $response = $this->http()
+                ->timeout((int) config('sms.provider.dlr_timeout', 8))
+                ->get($this->dlrUrl($provider, $path), $query);
         } catch (ConnectionException $exception) {
             $this->log($provider, 'delivery_status', $this->redact($query), null, null, 'timeout', $exception->getMessage());
 

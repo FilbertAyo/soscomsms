@@ -21,24 +21,23 @@ Schedule::command(DrainQueueCommand::class, ['--max-time=50'])
 
 Schedule::command(DispatchScheduledCampaignsCommand::class)
     ->everyMinute()
-    ->withoutOverlapping();
+    ->withoutOverlapping(5);
+
+Schedule::command(PollDeliveryReportsCommand::class)
+    ->everyMinute();
 
 Schedule::command(RetryWebhooksCommand::class)
     ->everyMinute()
-    ->withoutOverlapping();
+    ->withoutOverlapping(5);
 
 Schedule::command(ExpirePendingPaymentsCommand::class)
     ->hourly()
-    ->withoutOverlapping();
+    ->withoutOverlapping(30);
 
 Schedule::command(CheckProviderBalanceCommand::class)
     ->everyFifteenMinutes()
-    ->withoutOverlapping();
-
-Schedule::command(PollDeliveryReportsCommand::class)
-    ->everyMinute()
-    ->withoutOverlapping();
+    ->withoutOverlapping(10);
 
 Schedule::command(BackupDatabaseCommand::class)
     ->dailyAt('02:15')
-    ->withoutOverlapping();
+    ->withoutOverlapping(60);
