@@ -3,6 +3,7 @@
 use App\Models\User;
 use App\Notifications\LoginOtpNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
@@ -68,6 +69,33 @@ function completeOtp(TestResponse $challengeResponse): TestResponse
         'challenge' => $challengeResponse->json('challenge'),
         'otp' => $code,
     ]);
+}
+
+function senderIdPdf(string $contents = "%PDF-1.4\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF\n"): UploadedFile
+{
+    return UploadedFile::fake()->createWithContent('national-id.pdf', $contents);
+}
+
+/**
+ * @param  array<string, mixed>  $overrides
+ * @return array<string, mixed>
+ */
+function senderIdRequestPayload(array $overrides = []): array
+{
+    $payload = [
+        'name' => 'linkadi',
+        'purpose' => 'transactional',
+        'organization' => 'Linkadi Ltd',
+        'description' => 'Order updates',
+        'sample_content' => 'Hi Amina, your order 1042 is ready for pickup.',
+        'identity_document_type' => 'national_id',
+    ];
+
+    if (! array_key_exists('identity_document', $overrides)) {
+        $payload['identity_document'] = senderIdPdf();
+    }
+
+    return array_merge($payload, $overrides);
 }
 
 function signInAs(User $user, string $password = 'password', bool $remember = false): TestResponse

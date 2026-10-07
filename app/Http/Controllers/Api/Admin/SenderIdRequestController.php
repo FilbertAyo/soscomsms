@@ -10,13 +10,23 @@ use App\Services\AuditLogger;
 use App\Services\SenderIdService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 
 class SenderIdRequestController extends Controller
 {
     public function index(): JsonResponse
     {
         $requests = SenderIdRequest::query()
-            ->with(['customer.user', 'senderId'])
+            ->with([
+                'customer.user',
+                'senderId',
+                'identityDocument' => fn ($query) => $query->select([
+                    'id',
+                    'sender_id_request_id',
+                    'original_name',
+                    'size',
+                ]),
+            ])
             ->latest('id')
             ->get()
             ->map->toAdminArray()
@@ -30,6 +40,11 @@ class SenderIdRequestController extends Controller
         return response()->json([
             'request' => $senderIdRequest->toAdminArray(),
         ]);
+    }
+
+    public function identityDocument(SenderIdRequest $senderIdRequest): Response
+    {
+        return $senderIdRequest->identityDocumentResponse();
     }
 
     public function review(

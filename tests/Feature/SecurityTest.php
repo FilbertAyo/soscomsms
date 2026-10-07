@@ -182,36 +182,28 @@ it('rejects reserved and duplicate sender ids', function () {
     [$user] = securityCustomer();
 
     $this->actingAs($user)
-        ->postJson('/api/sender-id-requests', [
+        ->post('/api/sender-id-requests', senderIdRequestPayload([
             'name' => 'CRDB',
-            'purpose' => 'Alerts',
-            'organization' => 'Linkadi Ltd',
-        ])
+        ]))
         ->assertUnprocessable()
         ->assertJsonPath('errors.name.0', 'This Sender ID is reserved and cannot be requested.');
 
     $this->actingAs($user)
-        ->postJson('/api/sender-id-requests', [
+        ->post('/api/sender-id-requests', senderIdRequestPayload([
             'name' => 'AB',
-            'purpose' => 'Alerts',
-            'organization' => 'Linkadi Ltd',
-        ])
+        ]))
         ->assertUnprocessable();
 
     $this->actingAs($user)
-        ->postJson('/api/sender-id-requests', [
+        ->post('/api/sender-id-requests', senderIdRequestPayload([
             'name' => 'LINKADI',
-            'purpose' => 'Alerts',
-            'organization' => 'Linkadi Ltd',
-        ])
+        ]))
         ->assertCreated();
 
     $this->actingAs($user)
-        ->postJson('/api/sender-id-requests', [
+        ->post('/api/sender-id-requests', senderIdRequestPayload([
             'name' => 'linkadi',
-            'purpose' => 'Alerts',
-            'organization' => 'Linkadi Ltd',
-        ])
+        ]))
         ->assertUnprocessable()
         ->assertJsonPath('errors.name.0', 'You already have an open request for this Sender ID.');
 });

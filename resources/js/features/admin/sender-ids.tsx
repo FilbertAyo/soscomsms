@@ -26,9 +26,11 @@ import {
 } from '@/components/ui/dialog'
 import { StatusBadge } from '@/components/soscom/status-badge'
 import { RequestTimeline } from '@/components/soscom/request-timeline'
+import { SenderIdRequestFacts } from '@/features/sender-ids/request-facts'
 import {
   ADMIN_REQUEST_STEPS,
   adminTimelineIndex,
+  senderIdUseCaseLabel,
   type SenderIdRequestRecord,
 } from '@/types/sender-ids'
 import { AdminPage } from './page'
@@ -314,7 +316,9 @@ function RequestDetail({
       <div className='flex items-start justify-between gap-3'>
         <div className='min-w-0'>
           <h2 className='truncate text-base font-semibold'>{request.name}</h2>
-          <p className='text-sm text-muted-foreground'>{request.purpose}</p>
+          <p className='text-sm text-muted-foreground'>
+            {senderIdUseCaseLabel(request.purpose)}
+          </p>
           <p className='mt-1 text-sm text-muted-foreground'>
             {request.customerBusiness ?? request.customerName} ·{' '}
             {request.organization}
@@ -322,9 +326,7 @@ function RequestDetail({
         </div>
         <StatusBadge status={request.status} />
       </div>
-      {request.description ? (
-        <p className='mt-4 text-sm'>{request.description}</p>
-      ) : null}
+      <SenderIdRequestFacts request={request} admin />
       {request.providerReference ? (
         <p className='mt-3 text-sm text-muted-foreground'>
           Provider reference: {request.providerReference}

@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Http\Response;
 
 class SenderIdRequest extends Model
 {
@@ -23,6 +24,8 @@ class SenderIdRequest extends Model
         'purpose',
         'organization',
         'description',
+        'sample_content',
+        'identity_document_type',
         'status',
         'submitted_to_provider_at',
         'provider_reference',
@@ -68,6 +71,14 @@ class SenderIdRequest extends Model
         return $this->hasOne(SenderId::class);
     }
 
+    /**
+     * @return HasOne<SenderIdRequestDocument, $this>
+     */
+    public function identityDocument(): HasOne
+    {
+        return $this->hasOne(SenderIdRequestDocument::class);
+    }
+
     public function timelineIndex(): int
     {
         return match ($this->status) {
@@ -82,11 +93,12 @@ class SenderIdRequest extends Model
     }
 
     /**
-     * @return array{id: int, name: string, purpose: string, organization: string, description: string|null, status: string, currentStep: string, timelineIndex: int, submittedToProviderAt: string|null, rejectionReason: string|null, createdAt: string|null, senderIdId: int|null}
+     * @return array{id: int, name: string, purpose: string, organization: string, description: string|null, sampleContent: string|null, identityDocumentType: string|null, identityDocumentName: string|null, hasIdentityDocument: bool, status: string, currentStep: string, timelineIndex: int, submittedToProviderAt: string|null, rejectionReason: string|null, createdAt: string|null, senderIdId: int|null}
      */
     public function toApiArray(): array
     {
         $this->loadMissing('senderId');
+        $document = $this->identityDocumentMeta();
 
         return [
             'id' => $this->id,
@@ -94,6 +106,10 @@ class SenderIdRequest extends Model
             'purpose' => $this->purpose,
             'organization' => $this->organization,
             'description' => $this->description,
+            'sampleContent' => $this->sample_content,
+            'identityDocumentType' => $this->identity_document_type,
+            'identityDocumentName' => $document?->original_name,
+            'hasIdentityDocument' => $document !== null,
             'status' => $this->status->value,
             'currentStep' => $this->status->currentStep(),
             'timelineIndex' => $this->timelineIndex(),
@@ -102,6 +118,32 @@ class SenderIdRequest extends Model
             'createdAt' => $this->created_at?->toIso8601String(),
             'senderIdId' => $this->senderId?->id,
         ];
+    }
+
+    public function identityDocumentResponse(): Response
+    {
+        $document = $this->identityDocument()->first();
+        abort_if($document === null, 404);
+
+        $bytes = $document->bytes();
+        abort_if($bytes === '', 404);
+
+        return response($bytes, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="'.$document->inlineFilename().'"',
+            'X-Content-Type-Options' => 'nosniff',
+            'Cache-Control' => 'private, no-store',
+        ]);
+    }
+
+    private function identityDocumentMeta(): ?SenderIdRequestDocument
+    {
+        if ($this->relationLoaded('identityDocument')) {
+            return $this->identityDocument;
+        }
+
+        return $this->identityDocument()
+            ->first(['id', 'sender_id_request_id', 'original_name', 'size']);
     }
 
     /**

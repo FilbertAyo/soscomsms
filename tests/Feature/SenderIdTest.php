@@ -9,6 +9,7 @@ use App\Models\SenderIdRequest;
 use App\Models\User;
 use App\Services\SenderIdService;
 use App\Support\SenderIdName;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Validation\ValidationException;
 
 function senderCustomer(): array
@@ -35,13 +36,17 @@ it('lets a customer request a sender id and hides it from another customer', fun
     [$stranger] = senderCustomer();
 
     $this->actingAs($owner)
-        ->postJson('/api/sender-id-requests', [
+        ->post('/api/sender-id-requests', senderIdRequestPayload([
             'name' => 'linkadi',
-            'purpose' => 'Customer updates',
-            'organization' => 'Linkadi Ltd',
-        ])
+        ]))
         ->assertCreated()
         ->assertJsonPath('request.name', 'linkadi')
+        ->assertJsonPath('request.purpose', 'transactional')
+        ->assertJsonPath('request.sampleContent', 'Hi Amina, your order 1042 is ready for pickup.')
+        ->assertJsonPath('request.identityDocumentType', 'national_id')
+        ->assertJsonPath('request.identityDocumentName', 'national-id.pdf')
+        ->assertJsonPath('request.hasIdentityDocument', true)
+        ->assertJsonMissingPath('request.contents')
         ->assertJsonPath('request.status', SenderIdRequestStatus::Submitted->value);
 
     $id = $owner->customer->senderIdRequests()->value('id');
@@ -60,11 +65,10 @@ it('rejects a sender id request that contains a space', function () {
     [$owner] = senderCustomer();
 
     $this->actingAs($owner)
-        ->postJson('/api/sender-id-requests', [
+        ->post('/api/sender-id-requests', senderIdRequestPayload([
             'name' => 'ADI TZ',
-            'purpose' => 'Customer updates',
             'organization' => 'Adi Ltd',
-        ])
+        ]))
         ->assertUnprocessable()
         ->assertJsonValidationErrors('name');
 });
@@ -129,11 +133,9 @@ it('rejects a request for a name that is already taken', function () {
     SenderId::factory()->generic()->create(['name' => 'HUDUMA']);
 
     $this->actingAs($user)
-        ->postJson('/api/sender-id-requests', [
+        ->post('/api/sender-id-requests', senderIdRequestPayload([
             'name' => 'HUDUMA',
-            'purpose' => 'Alerts',
-            'organization' => 'Linkadi Ltd',
-        ])
+        ]))
         ->assertUnprocessable()
         ->assertJsonValidationErrors('name');
 });
@@ -143,11 +145,10 @@ it('does not let an admin approve before submitting to the provider', function (
     [$user] = senderCustomer();
 
     $this->actingAs($user)
-        ->postJson('/api/sender-id-requests', [
+        ->post('/api/sender-id-requests', senderIdRequestPayload([
             'name' => 'SOSCOM',
-            'purpose' => 'Alerts',
             'organization' => 'SOSCOM',
-        ])
+        ]))
         ->assertCreated();
 
     $id = $user->customer->senderIdRequests()->value('id');
@@ -362,6 +363,98 @@ it('rejects a catalog name with symbols', function () {
         ])
         ->assertUnprocessable()
         ->assertJsonValidationErrors('name');
+});
+
+it('rejects a sender id request with a bad sample, purpose, or identity pdf', function () {
+    [$user] = senderCustomer();
+
+    $this->actingAs($user)
+        ->post('/api/sender-id-requests', senderIdRequestPayload([
+            'name' => 'SAMPLE1',
+            'sample_content' => str_repeat('a', 161),
+        ]))
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('sample_content');
+
+    $this->actingAs($user)
+        ->post('/api/sender-id-requests', senderIdRequestPayload([
+            'name' => 'SAMPLE2',
+            'purpose' => 'Customer updates',
+        ]))
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('purpose');
+
+    $missing = senderIdRequestPayload(['name' => 'SAMPLE3']);
+    unset($missing['identity_document']);
+
+    $this->actingAs($user)
+        ->post('/api/sender-id-requests', $missing)
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('identity_document');
+
+    $this->actingAs($user)
+        ->post('/api/sender-id-requests', senderIdRequestPayload([
+            'name' => 'SAMPLE4',
+            'identity_document' => UploadedFile::fake()->createWithContent('notes.txt', 'hello'),
+        ]))
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('identity_document');
+
+    $this->actingAs($user)
+        ->post('/api/sender-id-requests', senderIdRequestPayload([
+            'name' => 'SAMPLE5',
+            'identity_document' => senderIdPdf("%PDF-1.4\n".str_repeat('A', 2049 * 1024)),
+        ]))
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('identity_document');
+});
+
+it('lets the owner and an admin open the identity pdf and hides it from other customers', function () {
+    [$owner] = senderCustomer();
+    [$stranger] = senderCustomer();
+    $admin = User::factory()->admin()->create();
+    $pdf = "%PDF-1.4\n%\x00scan\n%%EOF\n";
+
+    $created = $this->actingAs($owner)
+        ->post('/api/sender-id-requests', senderIdRequestPayload([
+            'name' => 'DOCSID',
+            'identity_document' => senderIdPdf($pdf),
+        ]))
+        ->assertCreated();
+
+    expect($created->getContent())->not->toContain('%PDF');
+
+    $id = $owner->customer->senderIdRequests()->value('id');
+
+    $own = $this->actingAs($owner)
+        ->get("/api/sender-id-requests/{$id}/identity-document")
+        ->assertOk();
+
+    expect($own->headers->get('content-type'))->toContain('application/pdf')
+        ->and($own->headers->get('content-disposition'))->toContain('inline')
+        ->and($own->getContent())->toBe($pdf);
+
+    $this->actingAs($admin)
+        ->get("/api/admin/sender-id-requests/{$id}/identity-document")
+        ->assertOk()
+        ->assertHeader('content-disposition');
+
+    $this->actingAs($stranger)
+        ->get("/api/sender-id-requests/{$id}/identity-document")
+        ->assertNotFound();
+
+    $this->actingAs($stranger)
+        ->get("/api/admin/sender-id-requests/{$id}/identity-document")
+        ->assertForbidden();
+});
+
+it('returns not found when a request has no identity document', function () {
+    $admin = User::factory()->admin()->create();
+    $request = SenderIdRequest::factory()->create();
+
+    $this->actingAs($admin)
+        ->get("/api/admin/sender-id-requests/{$request->id}/identity-document")
+        ->assertNotFound();
 });
 
 it('forbids customers from managing the sender id catalog', function () {

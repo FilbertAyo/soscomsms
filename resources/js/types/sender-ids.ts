@@ -16,6 +16,47 @@ export const SENDER_ID_REQUEST_STATUSES = [
 
 export type SenderIdRequestStatus = (typeof SENDER_ID_REQUEST_STATUSES)[number]
 
+export const SENDER_ID_USE_CASES = [
+  { value: 'transactional', label: 'Transactional' },
+  { value: 'promotional', label: 'Promotional' },
+  { value: 'both', label: 'Transactional & promotional' },
+] as const
+
+export type SenderIdUseCase = (typeof SENDER_ID_USE_CASES)[number]['value']
+
+export const IDENTITY_DOCUMENT_TYPES = [
+  { value: 'national_id', label: 'National ID (NIDA)' },
+  { value: 'passport', label: 'Passport' },
+  { value: 'voters_id', label: "Voter's ID" },
+  { value: 'driving_licence', label: 'Driving licence' },
+  { value: 'brela_certificate', label: 'BRELA certificate' },
+  { value: 'tin_certificate', label: 'TIN certificate' },
+  { value: 'business_licence', label: 'Business licence' },
+] as const
+
+export type IdentityDocumentType =
+  (typeof IDENTITY_DOCUMENT_TYPES)[number]['value']
+
+export function senderIdUseCaseLabel(value: string | null | undefined): string {
+  if (!value) {
+    return ''
+  }
+
+  return SENDER_ID_USE_CASES.find((item) => item.value === value)?.label ?? value
+}
+
+export function identityDocumentTypeLabel(
+  value: string | null | undefined
+): string {
+  if (!value) {
+    return ''
+  }
+
+  return (
+    IDENTITY_DOCUMENT_TYPES.find((item) => item.value === value)?.label ?? value
+  )
+}
+
 export type SenderIdRecord = {
   id: number
   name: string
@@ -52,6 +93,10 @@ export type SenderIdRequestRecord = {
   purpose: string
   organization: string
   description: string | null
+  sampleContent: string | null
+  identityDocumentType: string | null
+  identityDocumentName: string | null
+  hasIdentityDocument: boolean
   status: SenderIdRequestStatus
   currentStep: string
   timelineIndex: number

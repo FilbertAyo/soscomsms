@@ -84,11 +84,7 @@ it('emails admins about a new Sender ID request', function () {
     [$user] = alertsCustomer();
 
     $this->actingAs($user)
-        ->postJson('/api/sender-id-requests', [
-            'name' => 'linkadi',
-            'purpose' => 'Customer updates',
-            'organization' => 'Linkadi Ltd',
-        ])
+        ->post('/api/sender-id-requests', senderIdRequestPayload())
         ->assertCreated();
 
     Notification::assertSentTo($admin, SenderIdRequestedNotification::class);

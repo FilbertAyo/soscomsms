@@ -2,6 +2,7 @@
 
 namespace App\Notifications\Admin;
 
+use App\Enums\SenderIdUseCase;
 use App\Mail\SoscomMail;
 use App\Models\SenderIdRequest;
 use Illuminate\Bus\Queueable;
@@ -36,7 +37,7 @@ class SenderIdRequestedNotification extends Notification implements ShouldQueue
             ->greeting('Hi,')
             ->line($requester.' requested the Sender ID '.$this->request->name.'.')
             ->line('Organization: '.$this->request->organization)
-            ->line('Purpose: '.$this->request->purpose)
+            ->line('Purpose: '.SenderIdUseCase::labelFor($this->request->purpose))
             ->action('Review Sender ID requests', url('/admin/sender-ids'));
     }
 }

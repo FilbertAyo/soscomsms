@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\IdentityDocumentType;
+use App\Enums\SenderIdUseCase;
 use App\Http\Controllers\Api\Concerns\ResolvesCustomer;
 use App\Http\Controllers\Controller;
 use App\Models\SenderIdRequest;
@@ -10,6 +12,9 @@ use App\Support\SenderIdName;
 use Closure;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Validation\Rule;
 
 class SenderIdRequestController extends Controller
 {
@@ -20,7 +25,15 @@ class SenderIdRequestController extends Controller
         $customer = $this->currentCustomer($request);
 
         $requests = $customer->senderIdRequests()
-            ->with('senderId')
+            ->with([
+                'senderId',
+                'identityDocument' => fn ($query) => $query->select([
+                    'id',
+                    'sender_id_request_id',
+                    'original_name',
+                    'size',
+                ]),
+            ])
             ->latest('id')
             ->get()
             ->map->toApiArray()
@@ -39,6 +52,14 @@ class SenderIdRequestController extends Controller
         ]);
     }
 
+    public function identityDocument(Request $request, SenderIdRequest $senderIdRequest): Response
+    {
+        $customer = $this->currentCustomer($request);
+        abort_unless($senderIdRequest->customer_id === $customer->id, 404);
+
+        return $senderIdRequest->identityDocumentResponse();
+    }
+
     public function store(Request $request, SenderIdService $senderIds): JsonResponse
     {
         $customer = $this->currentCustomer($request);
@@ -46,6 +67,12 @@ class SenderIdRequestController extends Controller
         if ($request->filled('name')) {
             $request->merge([
                 'name' => SenderIdName::normalize($request->string('name')->toString()),
+            ]);
+        }
+
+        if ($request->exists('sample_content')) {
+            $request->merge([
+                'sample_content' => trim($request->string('sample_content')->toString()),
             ]);
         }
 
@@ -60,12 +87,35 @@ class SenderIdRequestController extends Controller
                     }
                 },
             ],
-            'purpose' => ['required', 'string', 'max:120'],
+            'purpose' => ['required', Rule::enum(SenderIdUseCase::class)],
             'organization' => ['required', 'string', 'max:120'],
             'description' => ['nullable', 'string', 'max:2000'],
+            'sample_content' => ['required', 'string', 'min:1', 'max:160'],
+            'identity_document_type' => ['required', Rule::enum(IdentityDocumentType::class)],
+            'identity_document' => [
+                'required',
+                'file',
+                'max:2048',
+                function (string $attribute, mixed $value, Closure $fail): void {
+                    if (! $value instanceof UploadedFile || ! is_string($path = $value->getRealPath())) {
+                        $fail('Upload a PDF of the selected identity document.');
+
+                        return;
+                    }
+
+                    $header = file_get_contents($path, false, null, 0, 5);
+                    if (! is_string($header) || ! str_starts_with($header, '%PDF')) {
+                        $fail('Upload a PDF of the selected identity document.');
+                    }
+                },
+            ],
         ]);
 
-        $created = $senderIds->request($customer, $validated);
+        /** @var UploadedFile $document */
+        $document = $validated['identity_document'];
+        unset($validated['identity_document']);
+
+        $created = $senderIds->request($customer, $validated, $document);
 
         return response()->json([
             'request' => $created->toApiArray(),

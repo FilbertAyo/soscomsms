@@ -15,7 +15,10 @@ import { PageHeader } from '@/components/soscom/page-header'
 import { CardSkeletonGrid } from '@/components/soscom/skeletons'
 import { StatusBadge } from '@/components/soscom/status-badge'
 import { Main } from '@/components/layout/main'
-import { type SenderIdRequestRecord } from '@/types/sender-ids'
+import {
+  senderIdUseCaseLabel,
+  type SenderIdRequestRecord,
+} from '@/types/sender-ids'
 
 const gridClassName =
   'grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
@@ -118,7 +121,7 @@ function RequestCard({ item }: { item: SenderIdRequestRecord }) {
         <StatusBadge status={item.status} />
       </div>
       <p className='mt-1 line-clamp-2 text-sm text-muted-foreground'>
-        {item.purpose}
+        {senderIdUseCaseLabel(item.purpose)}
       </p>
       <p className='mt-3 text-xs text-muted-foreground'>
         Requested {item.createdAt ? formatDate(item.createdAt) : 'recently'}

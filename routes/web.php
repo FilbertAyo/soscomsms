@@ -10,16 +10,16 @@ use App\Http\Controllers\Api\Admin\PaymentController as AdminPaymentController;
 use App\Http\Controllers\Api\Admin\PricingTierController as AdminPricingTierController;
 use App\Http\Controllers\Api\Admin\ProductionReadinessController as AdminProductionReadinessController;
 use App\Http\Controllers\Api\Admin\ProviderBalanceController as AdminProviderBalanceController;
-use App\Http\Controllers\Api\Admin\SenderIdRequestController as AdminSenderIdRequestController;
 use App\Http\Controllers\Api\Admin\SenderIdController as AdminSenderIdController;
+use App\Http\Controllers\Api\Admin\SenderIdRequestController as AdminSenderIdRequestController;
 use App\Http\Controllers\Api\Admin\TrafficController as AdminTrafficController;
 use App\Http\Controllers\Api\ApiKeyController;
 use App\Http\Controllers\Api\CampaignController;
 use App\Http\Controllers\Api\ContactController;
 use App\Http\Controllers\Api\ContactGroupController;
 use App\Http\Controllers\Api\ContactImportController;
-use App\Http\Controllers\Api\MessageTemplateController;
 use App\Http\Controllers\Api\DeliveryReportController;
+use App\Http\Controllers\Api\MessageTemplateController;
 use App\Http\Controllers\Api\PasswordController;
 use App\Http\Controllers\Api\PasswordResetController;
 use App\Http\Controllers\Api\PaymentController;
@@ -79,6 +79,7 @@ Route::prefix('api')->group(function (): void {
             Route::post('/sender-ids/assert', [SenderIdController::class, 'assert']);
             Route::get('/sender-id-requests', [SenderIdRequestController::class, 'index']);
             Route::post('/sender-id-requests', [SenderIdRequestController::class, 'store']);
+            Route::get('/sender-id-requests/{senderIdRequest}/identity-document', [SenderIdRequestController::class, 'identityDocument']);
             Route::get('/sender-id-requests/{senderIdRequest}', [SenderIdRequestController::class, 'show']);
 
             Route::get('/message-templates', [MessageTemplateController::class, 'index']);
@@ -141,6 +142,7 @@ Route::prefix('api')->group(function (): void {
             Route::post('/sender-ids/{senderId}/grants', [AdminSenderIdController::class, 'grant']);
             Route::delete('/sender-ids/{senderId}/grants/{customer}', [AdminSenderIdController::class, 'revoke']);
             Route::get('/sender-id-requests', [AdminSenderIdRequestController::class, 'index']);
+            Route::get('/sender-id-requests/{senderIdRequest}/identity-document', [AdminSenderIdRequestController::class, 'identityDocument']);
             Route::get('/sender-id-requests/{senderIdRequest}', [AdminSenderIdRequestController::class, 'show']);
             Route::post('/sender-id-requests/{senderIdRequest}/review', [AdminSenderIdRequestController::class, 'review']);
             Route::post('/sender-id-requests/{senderIdRequest}/provider-submissions', [AdminSenderIdRequestController::class, 'submitToProvider']);

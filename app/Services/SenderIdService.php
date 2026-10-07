@@ -2,9 +2,11 @@
 
 namespace App\Services;
 
+use App\Enums\IdentityDocumentType;
 use App\Enums\SenderIdRequestStatus;
 use App\Enums\SenderIdSource;
 use App\Enums\SenderIdStatus;
+use App\Enums\SenderIdUseCase;
 use App\Models\Customer;
 use App\Models\SenderId;
 use App\Models\SenderIdRequest;
@@ -14,6 +16,7 @@ use App\Notifications\SenderIdApprovedNotification;
 use App\Notifications\SenderIdRejectedNotification;
 use App\Support\AdminAlerts;
 use App\Support\SenderIdName;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -51,9 +54,9 @@ class SenderIdService
     }
 
     /**
-     * @param  array{name: string, purpose: string, organization: string, description?: string|null}  $payload
+     * @param  array{name: string, purpose: string, organization: string, description?: string|null, sample_content: string, identity_document_type: string}  $payload
      */
-    public function request(Customer $customer, array $payload): SenderIdRequest
+    public function request(Customer $customer, array $payload, UploadedFile $document): SenderIdRequest
     {
         $name = SenderIdName::normalize($payload['name']);
 
@@ -71,13 +74,32 @@ class SenderIdService
 
         $this->assertNameAvailable($name, $customer);
 
-        $created = $customer->senderIdRequests()->create([
-            'name' => $name,
-            'purpose' => $payload['purpose'],
-            'organization' => $payload['organization'],
-            'description' => $payload['description'] ?? null,
-            'status' => SenderIdRequestStatus::Submitted,
-        ]);
+        $bytes = file_get_contents($document->getRealPath());
+        if (! is_string($bytes) || ! str_starts_with($bytes, '%PDF')) {
+            throw ValidationException::withMessages([
+                'identity_document' => 'Upload a PDF of the selected identity document.',
+            ]);
+        }
+
+        $created = DB::transaction(function () use ($customer, $name, $payload, $document, $bytes): SenderIdRequest {
+            $created = $customer->senderIdRequests()->create([
+                'name' => $name,
+                'purpose' => SenderIdUseCase::from($payload['purpose'])->value,
+                'organization' => $payload['organization'],
+                'description' => $payload['description'] ?? null,
+                'sample_content' => $payload['sample_content'],
+                'identity_document_type' => IdentityDocumentType::from($payload['identity_document_type'])->value,
+                'status' => SenderIdRequestStatus::Submitted,
+            ]);
+
+            $created->identityDocument()->create([
+                'original_name' => $this->documentName($document),
+                'size' => (int) $document->getSize(),
+                'contents' => $bytes,
+            ]);
+
+            return $created;
+        });
 
         AdminAlerts::notify(new SenderIdRequestedNotification($created));
 
@@ -353,5 +375,21 @@ class SenderIdService
                 'name' => 'You already have an open request for this Sender ID.',
             ]);
         }
+    }
+
+    private function documentName(UploadedFile $document): string
+    {
+        $name = basename(str_replace('\\', '/', $document->getClientOriginalName()));
+        $name = trim($name);
+
+        if ($name === '' || $name === '.' || $name === '..') {
+            return 'identity-document.pdf';
+        }
+
+        if (mb_strlen($name) > 180) {
+            $name = mb_substr($name, 0, 180);
+        }
+
+        return $name;
     }
 }

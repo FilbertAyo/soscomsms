@@ -56,12 +56,37 @@ export async function createSenderIdRequest(payload: {
   purpose: string
   organization: string
   description?: string
+  sampleContent: string
+  identityDocumentType: string
+  identityDocument: File
 }): Promise<SenderIdRequestRecord> {
+  const body = new FormData()
+  body.append('name', payload.name)
+  body.append('purpose', payload.purpose)
+  body.append('organization', payload.organization)
+  if (payload.description) {
+    body.append('description', payload.description)
+  }
+  body.append('sample_content', payload.sampleContent)
+  body.append('identity_document_type', payload.identityDocumentType)
+  body.append('identity_document', payload.identityDocument)
+
   const { data } = await api.post<{ request: SenderIdRequestRecord }>(
     '/api/sender-id-requests',
-    payload
+    body
   )
   return data.request
+}
+
+export async function fetchIdentityDocument(
+  id: number | string,
+  admin = false
+): Promise<Blob> {
+  const path = admin
+    ? `/api/admin/sender-id-requests/${id}/identity-document`
+    : `/api/sender-id-requests/${id}/identity-document`
+  const { data } = await api.get<Blob>(path, { responseType: 'blob' })
+  return data
 }
 
 export async function fetchAdminSenderIdRequests(): Promise<

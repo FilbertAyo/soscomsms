@@ -12,7 +12,11 @@ import { RequestTimeline } from '@/components/soscom/request-timeline'
 import { PanelSkeleton } from '@/components/soscom/skeletons'
 import { StatusBadge } from '@/components/soscom/status-badge'
 import { Main } from '@/components/layout/main'
-import { CUSTOMER_REQUEST_STEPS } from '@/types/sender-ids'
+import { SenderIdRequestFacts } from '@/features/sender-ids/request-facts'
+import {
+  CUSTOMER_REQUEST_STEPS,
+  senderIdUseCaseLabel,
+} from '@/types/sender-ids'
 
 export function SenderIdRequestDetail({ senderId }: { senderId: string }) {
   const requestQuery = useQuery({
@@ -46,7 +50,7 @@ export function SenderIdRequestDetail({ senderId }: { senderId: string }) {
           title={`Sender ID: ${item?.name ?? '…'}`}
           description={
             item
-              ? `${item.organization} · ${item.purpose}`
+              ? `${item.organization} · ${senderIdUseCaseLabel(item.purpose)}`
               : 'Loading this request.'
           }
           actions={
@@ -63,6 +67,7 @@ export function SenderIdRequestDetail({ senderId }: { senderId: string }) {
                 {item.rejectionReason}
               </p>
             ) : null}
+            <SenderIdRequestFacts request={item} />
             {item.submittedToProviderAt ? (
               <p className='mt-3 text-sm text-muted-foreground'>
                 Soscom is reviewing this name. We will update this page when it
