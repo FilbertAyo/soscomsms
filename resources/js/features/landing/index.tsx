@@ -101,7 +101,7 @@ export function LandingPage() {
               className='absolute inset-x-[6%] top-[10%] bottom-[20%] -z-10 rounded-full bg-primary/25 blur-3xl dark:bg-primary/30'
             />
             <img
-              src='/images/hero-sms.png'
+              src='/images/hero-sms.png?v=2'
               alt='SMS from MCHANGO received on a phone'
               width={1024}
               height={1024}
