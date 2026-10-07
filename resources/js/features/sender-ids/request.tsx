@@ -156,7 +156,10 @@ export function RequestSenderId() {
           }}
         >
           <div className='space-y-2'>
-            <Label htmlFor='sender-id'>Sender ID</Label>
+            <Label htmlFor='sender-id'>
+              Sender ID
+              <RequiredMark />
+            </Label>
             <Input
               id='sender-id'
               value={name}
@@ -172,7 +175,10 @@ export function RequestSenderId() {
           </div>
           <div className='space-y-2'>
             <div className='flex items-center gap-1.5'>
-              <Label htmlFor='purpose'>Purpose</Label>
+              <Label htmlFor='purpose'>
+                Purpose
+                <RequiredMark />
+              </Label>
               <FieldHint label='About purpose' hint={PURPOSE_HINT} />
             </div>
             <Select value={purpose || undefined} onValueChange={setPurpose}>
@@ -189,7 +195,10 @@ export function RequestSenderId() {
             </Select>
           </div>
           <div className='space-y-2'>
-            <Label htmlFor='org'>Business / Organization Name</Label>
+            <Label htmlFor='org'>
+              Business / Organization Name
+              <RequiredMark />
+            </Label>
             <Input
               id='org'
               value={organization}
@@ -223,7 +232,10 @@ export function RequestSenderId() {
           <div className='space-y-2'>
             <div className='flex items-center justify-between gap-3'>
               <div className='flex items-center gap-1.5'>
-                <Label htmlFor='sample'>Sample content</Label>
+                <Label htmlFor='sample'>
+                  Sample content
+                  <RequiredMark />
+                </Label>
                 <FieldHint label='About sample content' hint={SAMPLE_HINT} />
               </div>
               <p className='text-xs text-muted-foreground tabular-nums'>
@@ -242,7 +254,10 @@ export function RequestSenderId() {
             />
           </div>
           <div className='space-y-2'>
-            <Label htmlFor='identity-type'>Identity document</Label>
+            <Label htmlFor='identity-type'>
+              Identity document
+              <RequiredMark />
+            </Label>
             <Select
               value={identityType || undefined}
               onValueChange={(value) => {
@@ -263,7 +278,10 @@ export function RequestSenderId() {
             </Select>
             {identityType ? (
               <div className='space-y-2 pt-1'>
-                <Label htmlFor='identity-file'>PDF attachment</Label>
+                <Label htmlFor='identity-file'>
+                  PDF attachment
+                  <RequiredMark />
+                </Label>
                 <Input
                   key={fileInputKey}
                   id='identity-file'
@@ -295,6 +313,14 @@ export function RequestSenderId() {
         </form>
       </Main>
     </>
+  )
+}
+
+function RequiredMark() {
+  return (
+    <span className='-ms-1 text-destructive' aria-hidden='true'>
+      *
+    </span>
   )
 }
 

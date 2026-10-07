@@ -87,7 +87,7 @@ function senderIdRequestPayload(array $overrides = []): array
         'purpose' => 'transactional',
         'organization' => 'Linkadi Ltd',
         'description' => 'Order updates',
-        'sample_content' => 'Hi Amina, your order 1042 is ready for pickup.',
+        'sample_content' => '',
         'identity_document_type' => 'national_id',
     ];
 
