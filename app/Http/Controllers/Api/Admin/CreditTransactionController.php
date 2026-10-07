@@ -23,7 +23,7 @@ class CreditTransactionController extends Controller
                 fn ($query) => $query->where('customer_id', $request->integer('customer_id'))
             )
             ->latest('id')
-            ->paginate(PaginationMeta::perPage($request));
+            ->paginate(PaginationMeta::perPage($request, 20));
 
         return response()->json([
             'transactions' => $page->getCollection()->map->toApiArray()->values(),

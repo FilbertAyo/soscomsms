@@ -2,12 +2,14 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\CreditTransactionType;
 use App\Http\Controllers\Controller;
 use App\Models\CreditTransaction;
 use App\Models\Customer;
 use App\Models\User;
 use App\Services\PricingService;
 use App\Support\PaginationMeta;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -42,7 +44,7 @@ class WalletController extends Controller
 
         $giftUnitPrice = $pricing->firstRangeUnitPriceTzs();
         $recent = $this->purchaseTransactions($customer)
-            ->with('reversal')
+            ->with(['reversal', 'relatedTransaction'])
             ->latest('id')
             ->limit(5)
             ->get()
@@ -78,7 +80,7 @@ class WalletController extends Controller
 
         $giftUnitPrice = $pricing->firstRangeUnitPriceTzs();
         $page = $this->purchaseTransactions($customer)
-            ->with('reversal')
+            ->with(['reversal', 'relatedTransaction'])
             ->latest('id')
             ->paginate(PaginationMeta::perPage($request));
 
@@ -96,7 +98,19 @@ class WalletController extends Controller
      */
     private function purchaseTransactions(Customer $customer): HasMany
     {
-        return $customer->creditTransactions()->purchasesForCustomer();
+        $visibleTypes = [
+            CreditTransactionType::Purchase->value,
+            CreditTransactionType::Grant->value,
+        ];
+
+        return $customer->creditTransactions()
+            ->where(function (Builder $query) use ($visibleTypes): void {
+                $query->whereIn('type', $visibleTypes)
+                    ->orWhere(function (Builder $reversals) use ($visibleTypes): void {
+                        $reversals->where('type', CreditTransactionType::Reversal->value)
+                            ->whereHas('relatedTransaction', fn (Builder $original) => $original->whereIn('type', $visibleTypes));
+                    });
+            });
     }
 
     /**
@@ -108,6 +122,12 @@ class WalletController extends Controller
 
         if ($transaction->isWelcomeGrant() && (int) $transaction->amount_tzs === 0) {
             $row['amountTzs'] = abs((int) $transaction->quantity) * $giftUnitPrice;
+        }
+
+        $original = $transaction->relatedTransaction;
+        if ($transaction->type === CreditTransactionType::Reversal && $original !== null) {
+            $row['description'] = 'Reversed: '.$original->description;
+            $row['amountTzs'] = $original->amount_tzs ?: null;
         }
 
         return $row;

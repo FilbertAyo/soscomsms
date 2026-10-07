@@ -41,7 +41,7 @@ const labels: Record<string, { label: string; tone: keyof typeof tones }> = {
   ok: { label: 'OK', tone: 'success' },
   error: { label: 'Error', tone: 'danger' },
   grant: { label: 'Bonus', tone: 'success' },
-  reversal: { label: 'Returned', tone: 'warning' },
+  reversal: { label: 'Reversed', tone: 'warning' },
   purchase: { label: 'Purchase', tone: 'info' },
   usage: { label: 'Used', tone: 'muted' },
   refund: { label: 'Refund', tone: 'success' },

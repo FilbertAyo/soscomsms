@@ -84,7 +84,9 @@ export function TransactionsPage() {
                       {formatNumber(item.quantity)}
                     </TableCell>
                     <TableCell>
-                      {item.amountTzs ? formatTZS(item.amountTzs) : '—'}
+                      {item.amountTzs
+                        ? `${item.quantity < 0 ? '−' : ''}${formatTZS(item.amountTzs)}`
+                        : '—'}
                     </TableCell>
                     <TableCell>
                       <StatusBadge status={item.type} />

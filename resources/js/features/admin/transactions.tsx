@@ -10,6 +10,7 @@ import {
 import { applyValidationErrors } from '@/lib/auth'
 import { formatDateTime, formatNumber, formatTZS } from '@/lib/format'
 import { Button } from '@/components/ui/button'
+import { ConfirmDialog } from '@/components/confirm-dialog'
 import { StatusBadge } from '@/components/soscom/status-badge'
 import { TableWrap } from '@/components/soscom/table-wrap'
 import { ListPagination } from '@/components/soscom/list-pagination'
@@ -21,11 +22,15 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { type CreditTransaction } from '@/types/credits'
 import { AdminPage } from './page'
 
 export function AdminTransactions() {
   const queryClient = useQueryClient()
   const [page, setPage] = useState(1)
+  const [reverseTarget, setReverseTarget] = useState<CreditTransaction | null>(
+    null
+  )
   const transactionsQuery = useQuery({
     queryKey: [...adminTransactionsQueryKey, page],
     queryFn: () => fetchAdminTransactions(page),
@@ -33,6 +38,7 @@ export function AdminTransactions() {
   const reverseMutation = useMutation({
     mutationFn: reverseCreditTransaction,
     onSuccess: async () => {
+      setReverseTarget(null)
       toast.success('Reversal recorded. The original row was not changed.')
       void queryClient.invalidateQueries({ queryKey: adminTransactionsQueryKey })
       void queryClient.invalidateQueries({ queryKey: adminCustomersQueryKey })
@@ -94,7 +100,7 @@ export function AdminTransactions() {
                         size='sm'
                         variant='outline'
                         disabled={reverseMutation.isPending}
-                        onClick={() => reverseMutation.mutate(item.id)}
+                        onClick={() => setReverseTarget(item)}
                       >
                         Reverse
                       </Button>
@@ -112,6 +118,49 @@ export function AdminTransactions() {
           onPageChange={setPage}
         />
       ) : null}
+
+      <ConfirmDialog
+        open={reverseTarget !== null}
+        onOpenChange={(open) => {
+          if (!open && !reverseMutation.isPending) {
+            setReverseTarget(null)
+          }
+        }}
+        title='Reverse this transaction?'
+        desc={
+          reverseTarget ? (
+            <div className='space-y-2'>
+              <p>
+                This adds a new row that cancels{' '}
+                <span className='font-medium text-foreground'>
+                  {reverseTarget.quantity > 0 ? '+' : ''}
+                  {formatNumber(reverseTarget.quantity)} SMS
+                </span>{' '}
+                for{' '}
+                <span className='font-medium text-foreground'>
+                  {reverseTarget.customer?.name ?? 'this customer'}
+                </span>
+                . Their SMS balance changes straight away. The original row
+                stays in the ledger and this cannot be undone.
+              </p>
+              <p className='text-xs'>
+                {reverseTarget.description} · {reverseTarget.reference}
+              </p>
+            </div>
+          ) : (
+            ''
+          )
+        }
+        cancelBtnText='Cancel'
+        confirmText={reverseMutation.isPending ? 'Reversing…' : 'Reverse'}
+        destructive
+        isLoading={reverseMutation.isPending}
+        handleConfirm={() => {
+          if (reverseTarget) {
+            reverseMutation.mutate(reverseTarget.id)
+          }
+        }}
+      />
     </AdminPage>
   )
 }

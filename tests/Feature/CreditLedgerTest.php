@@ -277,3 +277,35 @@ it('shows admin grants in the customer wallet, transactions, and dashboard feed'
         ->assertJsonPath('recentTransactions.0.quantity', 800)
         ->assertJsonMissing(['type' => 'usage']);
 });
+
+it('shows admin reversals of purchases in the customer transactions, but not usage reversals', function () {
+    $user = User::factory()->create();
+    $customer = Customer::factory()->complete()->create([
+        'user_id' => $user->id,
+        'sms_balance' => 0,
+    ]);
+    $ledger = app(CreditLedger::class);
+
+    $purchase = $ledger->purchase($customer, 300, 30, 'PAY-300', 'Purchase of 300 SMS via Lipa namba');
+    $usage = $ledger->debitUsage($customer->fresh(), 5, 'Campaign send');
+    $ledger->reverse($usage);
+    $ledger->reverse($purchase);
+
+    $this->actingAs($user)
+        ->getJson('/api/credit-transactions')
+        ->assertOk()
+        ->assertJsonPath('smsBalance', 0)
+        ->assertJsonCount(2, 'transactions')
+        ->assertJsonPath('transactions.0.type', 'reversal')
+        ->assertJsonPath('transactions.0.quantity', -300)
+        ->assertJsonPath('transactions.0.amountTzs', 9000)
+        ->assertJsonPath('transactions.0.description', 'Reversed: Purchase of 300 SMS via Lipa namba')
+        ->assertJsonPath('transactions.1.type', 'purchase')
+        ->assertJsonPath('transactions.1.reversed', true);
+
+    $this->actingAs($user)
+        ->getJson('/api/wallet')
+        ->assertOk()
+        ->assertJsonCount(2, 'recentTransactions')
+        ->assertJsonPath('recentTransactions.0.type', 'reversal');
+});

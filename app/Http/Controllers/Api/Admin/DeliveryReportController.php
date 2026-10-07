@@ -19,7 +19,7 @@ class DeliveryReportController extends Controller
             ->with(['campaignRecipient.campaign.customer.user', 'campaignRecipient.message'])
             ->when($term !== '', fn (Builder $query) => $this->search($query, $term))
             ->latest('id')
-            ->paginate(PaginationMeta::perPage($request, 10, 200));
+            ->paginate(PaginationMeta::perPage($request, 20, 200));
 
         return response()->json([
             'reports' => $reports->getCollection()->map->toAdminArray()->values(),

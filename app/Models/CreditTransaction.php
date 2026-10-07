@@ -86,18 +86,6 @@ class CreditTransaction extends Model
     }
 
     /**
-     * @param  Builder<static>  $query
-     * @return Builder<static>
-     */
-    public function scopePurchasesForCustomer(Builder $query): Builder
-    {
-        return $query->whereIn('type', [
-            CreditTransactionType::Purchase->value,
-            CreditTransactionType::Grant->value,
-        ]);
-    }
-
-    /**
      * Paid purchases plus priced admin grants. Signup bonuses stay out of revenue.
      *
      * @param  Builder<static>  $query
