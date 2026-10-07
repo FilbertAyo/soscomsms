@@ -7,12 +7,22 @@ import {
 } from '@/lib/admin'
 import { formatDateTime, formatTzMobile } from '@/lib/format'
 import { Input } from '@/components/ui/input'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 import { ListPagination } from '@/components/soscom/list-pagination'
 import { StatusBadge } from '@/components/soscom/status-badge'
+import { TableWrap } from '@/components/soscom/table-wrap'
 import { type AdminDeliveryReport } from '@/types/admin'
 import { AdminPage } from './page'
 
 const badgeClass = 'px-1.5 py-0 text-[10px] leading-4'
+const MESSAGE_PREVIEW_LENGTH = 40
 
 export function AdminReports() {
   const [page, setPage] = useState(1)
@@ -63,53 +73,82 @@ export function AdminReports() {
           Could not load delivery reports.
         </p>
       ) : (
-        <>
-          {reports.length === 0 ? (
-            <p className='text-xs text-muted-foreground'>
-              {reportsQuery.isLoading
-                ? 'Loading…'
-                : debouncedSearch
-                  ? `No delivery reports match “${debouncedSearch}”.`
-                  : 'No delivery reports yet.'}
-            </p>
-          ) : (
-            <div className='divide-y rounded-lg border bg-card text-xs'>
-              {reports.map((item) => (
-                <ReportRow key={item.id} item={item} />
-              ))}
-            </div>
-          )}
-          {meta ? <ListPagination meta={meta} onPageChange={setPage} /> : null}
-        </>
+        <TableWrap>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Sent at</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Recipient</TableHead>
+                <TableHead>Sender ID</TableHead>
+                <TableHead>Message</TableHead>
+                <TableHead>Customer</TableHead>
+                <TableHead className='text-end'>Message ID</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {reports.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} className='text-muted-foreground'>
+                    {reportsQuery.isLoading
+                      ? 'Loading…'
+                      : debouncedSearch
+                        ? `No delivery reports match “${debouncedSearch}”.`
+                        : 'No delivery reports yet.'}
+                  </TableCell>
+                </TableRow>
+              ) : (
+                reports.map((item) => <ReportRow key={item.id} item={item} />)
+              )}
+            </TableBody>
+          </Table>
+        </TableWrap>
       )}
+      {meta ? <ListPagination meta={meta} onPageChange={setPage} /> : null}
     </AdminPage>
   )
 }
 
 function ReportRow({ item }: { item: AdminDeliveryReport }) {
   return (
-    <div className='flex flex-wrap items-baseline gap-x-3 gap-y-1 px-3 py-2'>
-      <span className='w-32 shrink-0 text-[11px] text-muted-foreground tabular-nums'>
+    <TableRow>
+      <TableCell className='text-muted-foreground tabular-nums'>
         {item.sentAt ? formatDateTime(item.sentAt) : '—'}
-      </span>
-      {item.status ? (
-        <StatusBadge status={item.status} className={badgeClass} />
-      ) : null}
-      <span className='shrink-0 font-medium tabular-nums'>
+      </TableCell>
+      <TableCell>
+        {item.status ? (
+          <StatusBadge status={item.status} className={badgeClass} />
+        ) : (
+          '—'
+        )}
+      </TableCell>
+      <TableCell className='font-medium tabular-nums'>
         {item.phone ? formatTzMobile(item.phone) : '—'}
-      </span>
-      <span className='shrink-0 text-muted-foreground'>
-        {item.senderId ?? '—'}
-      </span>
-      <span className='min-w-0 flex-1 truncate'>
+      </TableCell>
+      <TableCell>{item.senderId ?? '—'}</TableCell>
+      <TableCell
+        className='max-w-64 truncate text-muted-foreground'
+        title={item.message ?? undefined}
+      >
+        {previewMessage(item.message)}
+      </TableCell>
+      <TableCell className='max-w-56 truncate'>
         {item.customerName ?? '—'}
         {item.customerEmail ? (
           <span className='text-muted-foreground'> · {item.customerEmail}</span>
         ) : null}
-      </span>
-      <span className='shrink-0 font-mono text-[11px] text-muted-foreground'>
+      </TableCell>
+      <TableCell className='text-end font-mono text-muted-foreground'>
         {item.providerMessageId || '—'}
-      </span>
-    </div>
+      </TableCell>
+    </TableRow>
   )
+}
+
+function previewMessage(message: string | null): string {
+  if (!message) return '—'
+  const flat = message.replace(/\s+/g, ' ').trim()
+  return flat.length > MESSAGE_PREVIEW_LENGTH
+    ? `${flat.slice(0, MESSAGE_PREVIEW_LENGTH).trimEnd()}…`
+    : flat
 }
