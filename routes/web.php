@@ -80,6 +80,7 @@ Route::prefix('api')->group(function (): void {
             Route::get('/sender-id-requests', [SenderIdRequestController::class, 'index']);
             Route::post('/sender-id-requests', [SenderIdRequestController::class, 'store']);
             Route::get('/sender-id-requests/{senderIdRequest}/identity-document', [SenderIdRequestController::class, 'identityDocument']);
+            Route::post('/sender-id-requests/{senderIdRequest}/resubmissions', [SenderIdRequestController::class, 'resubmit']);
             Route::get('/sender-id-requests/{senderIdRequest}', [SenderIdRequestController::class, 'show']);
 
             Route::get('/message-templates', [MessageTemplateController::class, 'index']);
@@ -148,6 +149,7 @@ Route::prefix('api')->group(function (): void {
             Route::post('/sender-id-requests/{senderIdRequest}/provider-submissions', [AdminSenderIdRequestController::class, 'submitToProvider']);
             Route::post('/sender-id-requests/{senderIdRequest}/approval', [AdminSenderIdRequestController::class, 'approve']);
             Route::post('/sender-id-requests/{senderIdRequest}/rejection', [AdminSenderIdRequestController::class, 'reject']);
+            Route::post('/sender-id-requests/{senderIdRequest}/resubmission-requests', [AdminSenderIdRequestController::class, 'requestResubmission']);
             Route::get('/api-usage', [AdminApiUsageController::class, 'index']);
             Route::get('/payments', [AdminPaymentController::class, 'index']);
             Route::post('/payments/{payment}/confirmation', [AdminPaymentController::class, 'confirm']);

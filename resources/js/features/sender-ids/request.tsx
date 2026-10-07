@@ -4,7 +4,9 @@ import { useNavigate } from '@tanstack/react-router'
 import { toast } from 'sonner'
 import { applyValidationErrors } from '@/lib/auth'
 import {
+  assertIdentityPdf,
   createSenderIdRequest,
+  formatIdentityFileSize,
   senderIdRequestQueryKey,
   senderIdRequestsQueryKey,
 } from '@/lib/sender-ids'
@@ -34,7 +36,6 @@ import {
 } from '@/types/sender-ids'
 
 const SAMPLE_LIMIT = 160
-const PDF_LIMIT_BYTES = 2 * 1024 * 1024
 
 const PURPOSE_HINT =
   'Transactional SMS is tied to something the person already did or expects, such as an OTP, receipt, delivery update, or appointment. Promotional SMS advertises an offer, product, or event and should go only to people who agreed to receive it. Choose both when this Sender ID will be used for both kinds of SMS.'
@@ -101,23 +102,9 @@ export function RequestSenderId() {
       return
     }
 
-    const looksLikePdf =
-      file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')
-    if (!looksLikePdf) {
-      toast.error('Upload a PDF of the selected identity document.')
-      clearDocument()
-      return
-    }
-
-    if (file.size > PDF_LIMIT_BYTES) {
-      toast.error('That PDF is larger than 2 MB. Use a 1–3 page scan.')
-      clearDocument()
-      return
-    }
-
-    const header = await file.slice(0, 5).text()
-    if (!header.startsWith('%PDF')) {
-      toast.error('Upload a PDF of the selected identity document.')
+    const error = await assertIdentityPdf(file)
+    if (error) {
+      toast.error(error)
       clearDocument()
       return
     }
@@ -294,7 +281,7 @@ export function RequestSenderId() {
                 <p className='text-xs text-muted-foreground'>
                   PDF only, up to 2 MB. 
                   {document
-                    ? ` Selected: ${document.name} (${formatFileSize(document.size)}).`
+                    ? ` Selected: ${document.name} (${formatIdentityFileSize(document.size)}).`
                     : ''}
                 </p>
               </div>
@@ -363,16 +350,4 @@ function normalizeWebsite(value: string): string | undefined {
   }
 
   return withScheme
-}
-
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) {
-    return `${bytes} B`
-  }
-
-  if (bytes < 1024 * 1024) {
-    return `${Math.max(1, Math.round(bytes / 1024))} KB`
-  }
-
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }

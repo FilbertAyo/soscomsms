@@ -5,6 +5,34 @@ import {
   type SenderIdRequestRecord,
 } from '@/types/sender-ids'
 
+export const IDENTITY_PDF_MAX_BYTES = 2 * 1024 * 1024
+
+export async function assertIdentityPdf(file: File): Promise<string | null> {
+  const looksLikePdf =
+    file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')
+  if (!looksLikePdf) {
+    return 'Upload a PDF of the selected identity document.'
+  }
+  if (file.size > IDENTITY_PDF_MAX_BYTES) {
+    return 'That PDF is larger than 2 MB. Use a 1–3 page scan.'
+  }
+  const header = await file.slice(0, 5).text()
+  if (!header.startsWith('%PDF')) {
+    return 'Upload a PDF of the selected identity document.'
+  }
+  return null
+}
+
+export function formatIdentityFileSize(bytes: number): string {
+  if (bytes < 1024) {
+    return `${bytes} B`
+  }
+  if (bytes < 1024 * 1024) {
+    return `${Math.max(1, Math.round(bytes / 1024))} KB`
+  }
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
 export const usableSenderIdsQueryKey = ['sender-ids'] as const
 export const senderIdRequestsQueryKey = ['sender-id-requests'] as const
 export const adminSenderIdRequestsQueryKey = [
@@ -142,6 +170,35 @@ export async function rejectSenderIdRequest(
   const { data } = await api.post<{ request: SenderIdRequestRecord }>(
     `/api/admin/sender-id-requests/${id}/rejection`,
     { rejection_reason: rejectionReason }
+  )
+  return data.request
+}
+
+export async function requestSenderIdResubmission(
+  id: number,
+  rejectionReason: string
+): Promise<SenderIdRequestRecord> {
+  const { data } = await api.post<{ request: SenderIdRequestRecord }>(
+    `/api/admin/sender-id-requests/${id}/resubmission-requests`,
+    { rejection_reason: rejectionReason }
+  )
+  return data.request
+}
+
+export async function resubmitSenderIdDocument(
+  id: number,
+  payload: {
+    identityDocumentType: string
+    identityDocument: File
+  }
+): Promise<SenderIdRequestRecord> {
+  const body = new FormData()
+  body.append('identity_document_type', payload.identityDocumentType)
+  body.append('identity_document', payload.identityDocument)
+
+  const { data } = await api.post<{ request: SenderIdRequestRecord }>(
+    `/api/sender-id-requests/${id}/resubmissions`,
+    body
   )
   return data.request
 }

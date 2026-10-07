@@ -10,6 +10,7 @@ export const SENDER_ID_REQUEST_STATUSES = [
   'submitted',
   'under_review',
   'submitted_to_provider',
+  'needs_resubmission',
   'approved',
   'rejected',
 ] as const
@@ -117,7 +118,6 @@ export type SenderIdRequestRecord = {
 export const CUSTOMER_REQUEST_STEPS = [
   { id: 'submitted', label: 'Request submitted' },
   { id: 'under_review', label: 'Under review' },
-  { id: 'submitted_to_provider', label: 'Being approved' },
   { id: 'approved', label: 'Approved' },
   { id: 'active', label: 'Active' },
 ] as const
@@ -133,6 +133,7 @@ export function adminTimelineIndex(request: SenderIdRequestRecord): number {
   switch (request.status) {
     case 'submitted':
     case 'under_review':
+    case 'needs_resubmission':
       return 0
     case 'submitted_to_provider':
       return 1

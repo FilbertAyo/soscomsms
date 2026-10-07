@@ -133,4 +133,48 @@ class SenderIdRequestController extends Controller
             'csrf_token' => csrf_token(),
         ], 201);
     }
+
+    public function resubmit(
+        Request $request,
+        SenderIdRequest $senderIdRequest,
+        SenderIdService $senderIds,
+    ): JsonResponse {
+        $customer = $this->currentCustomer($request);
+        abort_unless($senderIdRequest->customer_id === $customer->id, 404);
+
+        $validated = $request->validate([
+            'identity_document_type' => ['required', Rule::enum(IdentityDocumentType::class)],
+            'identity_document' => [
+                'required',
+                'file',
+                'max:2048',
+                function (string $attribute, mixed $value, Closure $fail): void {
+                    if (! $value instanceof UploadedFile || ! is_string($path = $value->getRealPath())) {
+                        $fail('Upload a PDF of the selected identity document.');
+
+                        return;
+                    }
+
+                    $header = file_get_contents($path, false, null, 0, 5);
+                    if (! is_string($header) || ! str_starts_with($header, '%PDF')) {
+                        $fail('Upload a PDF of the selected identity document.');
+                    }
+                },
+            ],
+        ]);
+
+        /** @var UploadedFile $document */
+        $document = $validated['identity_document'];
+
+        $updated = $senderIds->resubmitDocument(
+            $senderIdRequest,
+            $validated['identity_document_type'],
+            $document,
+        );
+
+        return response()->json([
+            'request' => $updated->toApiArray(),
+            'csrf_token' => csrf_token(),
+        ]);
+    }
 }

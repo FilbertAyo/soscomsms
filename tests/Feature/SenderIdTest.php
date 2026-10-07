@@ -7,9 +7,12 @@ use App\Models\Customer;
 use App\Models\SenderId;
 use App\Models\SenderIdRequest;
 use App\Models\User;
+use App\Notifications\Admin\SenderIdResubmittedNotification;
+use App\Notifications\SenderIdResubmissionRequestedNotification;
 use App\Services\SenderIdService;
 use App\Support\SenderIdName;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Validation\ValidationException;
 
 function senderCustomer(): array
@@ -242,6 +245,70 @@ it('requires a rejection reason and does not create a sender id', function () {
         ->assertJsonCount(0, 'senderIds');
 
     expect(SenderId::query()->count())->toBe(0);
+});
+
+it('lets an admin ask for a new document, emails the customer, and accepts a resubmission', function () {
+    Notification::fake();
+    $admin = User::factory()->admin()->create();
+    [$user, $customer] = senderCustomer();
+    $request = SenderIdRequest::factory()->create([
+        'customer_id' => $customer->id,
+        'name' => 'EMPTYPDF',
+        'identity_document_type' => 'national_id',
+    ]);
+
+    $this->actingAs($admin)
+        ->postJson("/api/admin/sender-id-requests/{$request->id}/resubmission-requests", [
+            'rejection_reason' => 'The identity PDF could not be opened.',
+        ])
+        ->assertOk()
+        ->assertJsonPath('request.status', SenderIdRequestStatus::NeedsResubmission->value)
+        ->assertJsonPath('request.timelineIndex', 1);
+
+    Notification::assertSentTo($user, SenderIdResubmissionRequestedNotification::class);
+
+    $this->actingAs($user)
+        ->getJson("/api/sender-id-requests/{$request->id}")
+        ->assertOk()
+        ->assertJsonPath('request.currentStep', 'under_review');
+
+    $this->actingAs($user)
+        ->post("/api/sender-id-requests/{$request->id}/resubmissions", [
+            'identity_document_type' => 'passport',
+            'identity_document' => senderIdPdf(),
+        ])
+        ->assertOk()
+        ->assertJsonPath('request.status', SenderIdRequestStatus::Submitted->value)
+        ->assertJsonPath('request.identityDocumentType', 'passport')
+        ->assertJsonPath('request.hasIdentityDocument', true)
+        ->assertJsonPath('request.rejectionReason', null);
+
+    Notification::assertSentTo($admin, SenderIdResubmittedNotification::class);
+
+    [$stranger] = senderCustomer();
+    $this->actingAs($stranger)
+        ->post("/api/sender-id-requests/{$request->id}/resubmissions", [
+            'identity_document_type' => 'passport',
+            'identity_document' => senderIdPdf(),
+        ])
+        ->assertNotFound();
+});
+
+it('does not let a customer resubmit after a final rejection', function () {
+    [$user, $customer] = senderCustomer();
+    $request = SenderIdRequest::factory()->create([
+        'customer_id' => $customer->id,
+        'status' => SenderIdRequestStatus::Rejected,
+        'rejection_reason' => 'This name is not allowed.',
+    ]);
+
+    $this->actingAs($user)
+        ->post("/api/sender-id-requests/{$request->id}/resubmissions", [
+            'identity_document_type' => 'national_id',
+            'identity_document' => senderIdPdf(),
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('status');
 });
 
 it('forbids customers from recording provider outcomes', function () {

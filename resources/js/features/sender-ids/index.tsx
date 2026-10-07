@@ -132,7 +132,9 @@ function RequestCard({ item }: { item: SenderIdRequestRecord }) {
             to='/sender-ids/$senderId'
             params={{ senderId: String(item.id) }}
           >
-            View Request
+            {item.status === 'needs_resubmission'
+              ? 'Upload new document'
+              : 'View Request'}
           </Link>
         </Button>
       </div>

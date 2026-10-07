@@ -43,4 +43,12 @@ class SenderIdRequestFactory extends Factory
             'submitted_to_provider_at' => now(),
         ]);
     }
+
+    public function needsResubmission(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'status' => SenderIdRequestStatus::NeedsResubmission,
+            'rejection_reason' => 'The identity PDF could not be opened.',
+        ]);
+    }
 }

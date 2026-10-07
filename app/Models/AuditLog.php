@@ -81,7 +81,8 @@ class AuditLog extends Model
         return match ($this->action) {
             AuditAction::CustomerSuspended,
             AuditAction::PaymentRejected,
-            AuditAction::SenderIdRejected => 'warning',
+            AuditAction::SenderIdRejected,
+            AuditAction::SenderIdResubmissionRequested => 'warning',
             AuditAction::CreditsReversed => 'warning',
             AuditAction::CreditsGranted,
             AuditAction::CustomerUnsuspended,
@@ -144,6 +145,9 @@ class AuditLog extends Model
             AuditAction::SenderIdRejected => $name === null || $name === ''
                 ? "{$who} rejected a Sender ID request."
                 : "{$who} rejected Sender ID {$name}".($reason ? ": {$reason}" : '.'),
+            AuditAction::SenderIdResubmissionRequested => $name === null || $name === ''
+                ? "{$who} asked a customer to resubmit a Sender ID document."
+                : "{$who} asked for a new document for Sender ID {$name}".($reason ? ": {$reason}" : '.'),
             AuditAction::SenderIdCreated => $name === null || $name === ''
                 ? "{$who} added a Sender ID."
                 : "{$who} added Sender ID {$name}.",

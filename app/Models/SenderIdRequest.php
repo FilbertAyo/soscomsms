@@ -84,12 +84,13 @@ class SenderIdRequest extends Model
     {
         return match ($this->status) {
             SenderIdRequestStatus::Submitted => 0,
-            SenderIdRequestStatus::UnderReview => 1,
-            SenderIdRequestStatus::SubmittedToProvider => 2,
-            SenderIdRequestStatus::Approved => 4,
-            SenderIdRequestStatus::Rejected => $this->submitted_to_provider_at !== null
-                ? 2
-                : ($this->reviewed_by !== null ? 1 : 0),
+            SenderIdRequestStatus::NeedsResubmission,
+            SenderIdRequestStatus::UnderReview,
+            SenderIdRequestStatus::SubmittedToProvider => 1,
+            SenderIdRequestStatus::Approved => $this->senderId !== null ? 3 : 2,
+            SenderIdRequestStatus::Rejected => $this->reviewed_by !== null || $this->submitted_to_provider_at !== null
+                ? 1
+                : 0,
         };
     }
 

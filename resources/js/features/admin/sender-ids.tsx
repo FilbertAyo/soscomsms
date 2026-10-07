@@ -9,6 +9,7 @@ import {
   approveSenderIdRequest,
   fetchAdminSenderIdRequests,
   rejectSenderIdRequest,
+  requestSenderIdResubmission,
   reviewSenderIdRequest,
   submitSenderIdRequestToProvider,
   usableSenderIdsQueryKey,
@@ -41,10 +42,12 @@ export function AdminSenderIds() {
   const [listFilter, setListFilter] = useState('')
   const [providerOpen, setProviderOpen] = useState(false)
   const [rejectOpen, setRejectOpen] = useState(false)
+  const [resubmitOpen, setResubmitOpen] = useState(false)
   const [submittedAt, setSubmittedAt] = useState(todayInput())
   const [providerReference, setProviderReference] = useState('')
   const [notes, setNotes] = useState('')
   const [rejectionReason, setRejectionReason] = useState('')
+  const [resubmitReason, setResubmitReason] = useState('')
 
   const requestsQuery = useQuery({
     queryKey: adminSenderIdRequestsQueryKey,
@@ -106,9 +109,21 @@ export function AdminSenderIds() {
   const rejectMutation = useMutation({
     mutationFn: (id: number) => rejectSenderIdRequest(id, rejectionReason.trim()),
     onSuccess: async () => {
-      toast.success('Request rejected.')
+      toast.success('Request rejected. The customer will be emailed.')
       setRejectOpen(false)
       setRejectionReason('')
+      await refresh()
+    },
+    onError: (error) => toast.error(applyValidationErrors(error, () => undefined)),
+  })
+
+  const resubmitMutation = useMutation({
+    mutationFn: (id: number) =>
+      requestSenderIdResubmission(id, resubmitReason.trim()),
+    onSuccess: async () => {
+      toast.success('Asked the customer to upload a new document.')
+      setResubmitOpen(false)
+      setResubmitReason('')
       await refresh()
     },
     onError: (error) => toast.error(applyValidationErrors(error, () => undefined)),
@@ -188,7 +203,8 @@ export function AdminSenderIds() {
                 reviewMutation.isPending ||
                 submitMutation.isPending ||
                 approveMutation.isPending ||
-                rejectMutation.isPending
+                rejectMutation.isPending ||
+                resubmitMutation.isPending
               }
               onReview={() => reviewMutation.mutate(selected.id)}
               onOpenProvider={() => {
@@ -197,6 +213,12 @@ export function AdminSenderIds() {
               }}
               onApprove={() => approveMutation.mutate(selected.id)}
               onOpenReject={() => setRejectOpen(true)}
+              onOpenResubmit={() => {
+                setResubmitReason(
+                  'The identity PDF could not be opened. Please upload a clear 1–3 page scan.'
+                )
+                setResubmitOpen(true)
+              }}
             />
           ) : null}
         </div>
@@ -259,6 +281,10 @@ export function AdminSenderIds() {
             <DialogTitle>Reject {selected?.name}</DialogTitle>
           </DialogHeader>
           <div className='space-y-2'>
+            <p className='text-sm text-muted-foreground'>
+              This closes the request. The customer will get an email with your
+              reason.
+            </p>
             <Label htmlFor='reject-reason'>Reason</Label>
             <Textarea
               id='reject-reason'
@@ -285,6 +311,41 @@ export function AdminSenderIds() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={resubmitOpen} onOpenChange={setResubmitOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Ask to resubmit {selected?.name}</DialogTitle>
+          </DialogHeader>
+          <div className='space-y-2'>
+            <p className='text-sm text-muted-foreground'>
+              Use this when the identity PDF is empty or cannot be opened. The
+              customer will get an email and can upload a new file.
+            </p>
+            <Label htmlFor='resubmit-reason'>Reason</Label>
+            <Textarea
+              id='resubmit-reason'
+              value={resubmitReason}
+              onChange={(event) => setResubmitReason(event.target.value)}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant='outline' onClick={() => setResubmitOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              disabled={
+                resubmitMutation.isPending ||
+                resubmitReason.trim() === '' ||
+                selected === null
+              }
+              onClick={() => selected && resubmitMutation.mutate(selected.id)}
+            >
+              {resubmitMutation.isPending ? 'Saving…' : 'Ask to resubmit'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AdminPage>
   )
 }
@@ -296,6 +357,7 @@ function RequestDetail({
   onOpenProvider,
   onApprove,
   onOpenReject,
+  onOpenResubmit,
 }: {
   request: SenderIdRequestRecord
   pending: boolean
@@ -303,8 +365,10 @@ function RequestDetail({
   onOpenProvider: () => void
   onApprove: () => void
   onOpenReject: () => void
+  onOpenResubmit: () => void
 }) {
   const open = request.status !== 'approved' && request.status !== 'rejected'
+  const waitingOnCustomer = request.status === 'needs_resubmission'
   const canReview =
     request.status === 'submitted' || request.status === 'under_review'
   const canSubmitToProvider =
@@ -332,7 +396,12 @@ function RequestDetail({
           Provider reference: {request.providerReference}
         </p>
       ) : null}
-      {request.rejectionReason ? (
+      {waitingOnCustomer ? (
+        <p className='mt-3 text-sm text-amber-700 dark:text-amber-400'>
+          Waiting for a new identity PDF.
+          {request.rejectionReason ? ` ${request.rejectionReason}` : ''}
+        </p>
+      ) : request.rejectionReason ? (
         <p className='mt-3 text-sm text-destructive'>{request.rejectionReason}</p>
       ) : null}
       <div className='mt-6'>
@@ -354,23 +423,16 @@ function RequestDetail({
             </Button>
           ) : null}
           {canResolve ? (
-            <>
-              <Button disabled={pending} onClick={onApprove}>
-                Approve
-              </Button>
-              <Button
-                variant='outline'
-                disabled={pending}
-                onClick={onOpenReject}
-              >
-                Reject
-              </Button>
-            </>
-          ) : (
-            <Button variant='outline' disabled={pending} onClick={onOpenReject}>
-              Reject
+            <Button disabled={pending} onClick={onApprove}>
+              Approve
             </Button>
-          )}
+          ) : null}
+          <Button variant='outline' disabled={pending} onClick={onOpenResubmit}>
+            Ask to resubmit
+          </Button>
+          <Button variant='outline' disabled={pending} onClick={onOpenReject}>
+            Reject
+          </Button>
         </div>
       ) : null}
     </div>

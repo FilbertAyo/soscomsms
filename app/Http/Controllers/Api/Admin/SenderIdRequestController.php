@@ -127,6 +127,31 @@ class SenderIdRequestController extends Controller
         ]);
     }
 
+    public function requestResubmission(
+        Request $request,
+        SenderIdRequest $senderIdRequest,
+        SenderIdService $senderIds,
+        AuditLogger $audit,
+    ): JsonResponse {
+        $validated = $request->validate([
+            'rejection_reason' => ['required', 'string', 'max:255'],
+        ]);
+
+        $updated = $senderIds->requestResubmission(
+            $senderIdRequest,
+            $this->admin($request),
+            $validated['rejection_reason'],
+        );
+        $this->audit($request, $audit, AuditAction::SenderIdResubmissionRequested, $updated, [
+            'reason' => $validated['rejection_reason'],
+        ]);
+
+        return response()->json([
+            'request' => $updated->toAdminArray(),
+            'csrf_token' => csrf_token(),
+        ]);
+    }
+
     private function admin(Request $request): User
     {
         /** @var User $user */

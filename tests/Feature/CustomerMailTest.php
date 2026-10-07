@@ -4,12 +4,13 @@ use App\Enums\SenderIdRequestStatus;
 use App\Models\Customer;
 use App\Models\SenderIdRequest;
 use App\Models\User;
+use App\Notifications\LoginOtpNotification;
 use App\Notifications\PaymentConfirmedNotification;
 use App\Notifications\PaymentRejectedNotification;
 use App\Notifications\PaymentRequestedNotification;
 use App\Notifications\SenderIdApprovedNotification;
 use App\Notifications\SenderIdRejectedNotification;
-use App\Notifications\LoginOtpNotification;
+use App\Notifications\SenderIdResubmissionRequestedNotification;
 use App\Notifications\WelcomeCustomerNotification;
 use Database\Seeders\PricingTierSeeder;
 use Illuminate\Auth\Notifications\ResetPassword;
@@ -117,6 +118,20 @@ it('emails sender id approval and rejection', function () {
         ->assertOk();
 
     Notification::assertSentTo($user, SenderIdRejectedNotification::class);
+
+    $resubmit = SenderIdRequest::factory()->create([
+        'customer_id' => $customer->id,
+        'name' => 'EMPTYPDF',
+        'status' => SenderIdRequestStatus::UnderReview,
+    ]);
+
+    $this->actingAs($admin)
+        ->postJson("/api/admin/sender-id-requests/{$resubmit->id}/resubmission-requests", [
+            'rejection_reason' => 'The identity PDF could not be opened.',
+        ])
+        ->assertOk();
+
+    Notification::assertSentTo($user, SenderIdResubmissionRequestedNotification::class);
 });
 
 it('renders a branded mail layout with the soscomsms mark and logo', function () {

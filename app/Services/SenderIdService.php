@@ -12,8 +12,10 @@ use App\Models\SenderId;
 use App\Models\SenderIdRequest;
 use App\Models\User;
 use App\Notifications\Admin\SenderIdRequestedNotification;
+use App\Notifications\Admin\SenderIdResubmittedNotification;
 use App\Notifications\SenderIdApprovedNotification;
 use App\Notifications\SenderIdRejectedNotification;
+use App\Notifications\SenderIdResubmissionRequestedNotification;
 use App\Support\AdminAlerts;
 use App\Support\SenderIdName;
 use Illuminate\Http\UploadedFile;
@@ -74,12 +76,7 @@ class SenderIdService
 
         $this->assertNameAvailable($name, $customer);
 
-        $bytes = file_get_contents($document->getRealPath());
-        if (! is_string($bytes) || ! str_starts_with($bytes, '%PDF')) {
-            throw ValidationException::withMessages([
-                'identity_document' => 'Upload a PDF of the selected identity document.',
-            ]);
-        }
+        $bytes = $this->pdfBytes($document);
 
         $created = DB::transaction(function () use ($customer, $name, $payload, $document, $bytes): SenderIdRequest {
             $created = $customer->senderIdRequests()->create([
@@ -116,6 +113,7 @@ class SenderIdService
                 $admin,
             ),
             SenderIdRequestStatus::SubmittedToProvider,
+            SenderIdRequestStatus::NeedsResubmission,
             SenderIdRequestStatus::Approved,
             SenderIdRequestStatus::Rejected => throw ValidationException::withMessages([
                 'status' => 'This request can no longer be marked under review.',
@@ -140,6 +138,7 @@ class SenderIdService
                 ],
             ),
             SenderIdRequestStatus::SubmittedToProvider,
+            SenderIdRequestStatus::NeedsResubmission,
             SenderIdRequestStatus::Approved,
             SenderIdRequestStatus::Rejected => throw ValidationException::withMessages([
                 'status' => 'This request has already been submitted to the SMS provider, or is closed.',
@@ -181,6 +180,7 @@ class SenderIdService
             SenderIdRequestStatus::Approved => $request->load('senderId'),
             SenderIdRequestStatus::Submitted,
             SenderIdRequestStatus::UnderReview,
+            SenderIdRequestStatus::NeedsResubmission,
             SenderIdRequestStatus::Rejected => throw ValidationException::withMessages([
                 'status' => 'Submit this request to Mobishastra before recording an approval.',
             ]),
@@ -207,7 +207,8 @@ class SenderIdService
         return match ($request->status) {
             SenderIdRequestStatus::Submitted,
             SenderIdRequestStatus::UnderReview,
-            SenderIdRequestStatus::SubmittedToProvider => tap(
+            SenderIdRequestStatus::SubmittedToProvider,
+            SenderIdRequestStatus::NeedsResubmission => tap(
                 $this->saveStatus(
                     $request,
                     SenderIdRequestStatus::Rejected,
@@ -226,6 +227,78 @@ class SenderIdService
                 'status' => 'This request is already closed.',
             ]),
         };
+    }
+
+    public function requestResubmission(SenderIdRequest $request, User $admin, string $reason): SenderIdRequest
+    {
+        $reason = trim($reason);
+
+        if ($reason === '') {
+            throw ValidationException::withMessages([
+                'rejection_reason' => 'Give a reason so the customer knows what to upload.',
+            ]);
+        }
+
+        return match ($request->status) {
+            SenderIdRequestStatus::Submitted,
+            SenderIdRequestStatus::UnderReview,
+            SenderIdRequestStatus::SubmittedToProvider,
+            SenderIdRequestStatus::NeedsResubmission => tap(
+                $this->saveStatus(
+                    $request,
+                    SenderIdRequestStatus::NeedsResubmission,
+                    $admin,
+                    [
+                        'rejection_reason' => $reason,
+                        'resolved_at' => null,
+                    ],
+                ),
+                function (SenderIdRequest $updated): void {
+                    $updated->loadMissing('customer.user');
+                    $updated->customer?->notifyOwner(new SenderIdResubmissionRequestedNotification($updated));
+                },
+            ),
+            SenderIdRequestStatus::Approved, SenderIdRequestStatus::Rejected => throw ValidationException::withMessages([
+                'status' => 'This request is already closed.',
+            ]),
+        };
+    }
+
+    public function resubmitDocument(
+        SenderIdRequest $request,
+        string $identityType,
+        UploadedFile $document,
+    ): SenderIdRequest {
+        if ($request->status !== SenderIdRequestStatus::NeedsResubmission) {
+            throw ValidationException::withMessages([
+                'status' => 'This request is not waiting for a new document.',
+            ]);
+        }
+
+        $bytes = $this->pdfBytes($document);
+
+        $updated = DB::transaction(function () use ($request, $identityType, $document, $bytes): SenderIdRequest {
+            $request->fill([
+                'identity_document_type' => IdentityDocumentType::from($identityType)->value,
+                'status' => SenderIdRequestStatus::Submitted,
+                'rejection_reason' => null,
+                'resolved_at' => null,
+            ]);
+            $request->save();
+
+            $request->identityDocument()->delete();
+            $request->identityDocument()->create([
+                'original_name' => $this->documentName($document),
+                'size' => (int) $document->getSize(),
+                'contents' => $bytes,
+            ]);
+
+            return $request->fresh() ?? $request;
+        });
+
+        AdminAlerts::notify(new SenderIdResubmittedNotification($updated));
+
+        return $updated;
     }
 
     /**
@@ -360,6 +433,7 @@ class SenderIdService
                 SenderIdRequestStatus::Submitted,
                 SenderIdRequestStatus::UnderReview,
                 SenderIdRequestStatus::SubmittedToProvider,
+                SenderIdRequestStatus::NeedsResubmission,
             ])
             ->whereRaw('LOWER(name) = ?', [$key])
             ->when($ignoreRequestId !== null, fn ($query) => $query->where('id', '!=', $ignoreRequestId))
@@ -376,6 +450,20 @@ class SenderIdService
                 'name' => 'You already have an open request for this Sender ID.',
             ]);
         }
+    }
+
+    private function pdfBytes(UploadedFile $document): string
+    {
+        $path = $document->getRealPath();
+        $bytes = is_string($path) ? file_get_contents($path) : false;
+
+        if (! is_string($bytes) || ! str_starts_with($bytes, '%PDF')) {
+            throw ValidationException::withMessages([
+                'identity_document' => 'Upload a PDF of the selected identity document.',
+            ]);
+        }
+
+        return $bytes;
     }
 
     private function documentName(UploadedFile $document): string
