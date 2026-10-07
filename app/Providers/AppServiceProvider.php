@@ -9,15 +9,19 @@ use App\Models\ApiKey;
 use App\Models\User;
 use App\Services\Gateway\FakeGateway;
 use App\Services\Gateway\MobishastraGateway;
+use App\Support\AdminAlerts;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Contracts\Auth\CanResetPassword;
 use Illuminate\Http\Request;
 use Illuminate\Notifications\Messages\MailMessage;
+use Illuminate\Queue\Events\JobFailed;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Str;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -83,6 +87,16 @@ class AppServiceProvider extends ServiceProvider
         if ($this->app->environment('production')) {
             URL::forceScheme('https');
         }
+
+        Queue::failing(function (JobFailed $event): void {
+            $job = $event->job->resolveName();
+
+            AdminAlerts::technical(
+                'job-failed:'.$job,
+                'Background job failed',
+                $job.' failed on the "'.$event->job->getQueue().'" queue: '.Str::limit($event->exception->getMessage(), 500),
+            );
+        });
 
         ResetPassword::createUrlUsing(function (CanResetPassword $notifiable, string $token): string {
             return url('/reset-password').'?'.http_build_query([

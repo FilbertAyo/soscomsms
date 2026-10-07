@@ -1,13 +1,8 @@
-export type MessageTemplateType =
-  | 'transactional'
-  | 'promotional'
-  | 'otp'
-  | 'informational'
+export type MessageTemplateType = 'transactional' | 'promotional' | 'informational'
 
 export const messageTemplateTypeLabels: Record<MessageTemplateType, string> = {
   transactional: 'Transactional',
   promotional: 'Promotional',
-  otp: 'OTP',
   informational: 'Informational',
 }
 

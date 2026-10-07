@@ -9,8 +9,10 @@ use App\Models\Customer;
 use App\Models\SenderId;
 use App\Models\SenderIdRequest;
 use App\Models\User;
+use App\Notifications\Admin\SenderIdRequestedNotification;
 use App\Notifications\SenderIdApprovedNotification;
 use App\Notifications\SenderIdRejectedNotification;
+use App\Support\AdminAlerts;
 use App\Support\SenderIdName;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -69,13 +71,17 @@ class SenderIdService
 
         $this->assertNameAvailable($name, $customer);
 
-        return $customer->senderIdRequests()->create([
+        $created = $customer->senderIdRequests()->create([
             'name' => $name,
             'purpose' => $payload['purpose'],
             'organization' => $payload['organization'],
             'description' => $payload['description'] ?? null,
             'status' => SenderIdRequestStatus::Submitted,
         ]);
+
+        AdminAlerts::notify(new SenderIdRequestedNotification($created));
+
+        return $created;
     }
 
     public function markUnderReview(SenderIdRequest $request, User $admin): SenderIdRequest

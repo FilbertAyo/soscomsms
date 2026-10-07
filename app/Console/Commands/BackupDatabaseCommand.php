@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Services\ProviderReadinessService;
+use App\Support\AdminAlerts;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
 use Symfony\Component\Process\Process;
@@ -29,6 +30,12 @@ class BackupDatabaseCommand extends Command
         };
 
         if ($written === false) {
+            AdminAlerts::technical(
+                'backup-failed',
+                'Database backup failed',
+                'The daily '.$connection.' backup could not be written to '.$dir.'. Check the server logs and disk space.',
+            );
+
             return self::FAILURE;
         }
 

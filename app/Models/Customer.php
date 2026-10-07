@@ -26,6 +26,8 @@ class Customer extends Model
         'job_title',
         'status',
         'sms_balance',
+        'profile_reminders_sent',
+        'profile_reminded_at',
     ];
 
     /**
@@ -36,6 +38,8 @@ class Customer extends Model
         return [
             'status' => CustomerStatus::class,
             'sms_balance' => 'integer',
+            'profile_reminders_sent' => 'integer',
+            'profile_reminded_at' => 'datetime',
         ];
     }
 

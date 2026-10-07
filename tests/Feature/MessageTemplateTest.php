@@ -157,6 +157,15 @@ it('requires a known template type', function () {
         ])
         ->assertUnprocessable()
         ->assertJsonValidationErrors('type');
+
+    $this->actingAs($user)
+        ->postJson('/api/message-templates', [
+            'name' => 'Login code',
+            'type' => 'otp',
+            'body' => 'Your code is 1234.',
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('type');
 });
 
 it('changes the type when a template is updated', function () {
@@ -166,9 +175,9 @@ it('changes the type when a template is updated', function () {
     $this->actingAs($user)
         ->patchJson("/api/message-templates/{$template->id}", [
             'name' => $template->name,
-            'type' => 'otp',
-            'body' => 'Your code is 1234.',
+            'type' => 'promotional',
+            'body' => 'Weekend offer: 20% off.',
         ])
         ->assertOk()
-        ->assertJsonPath('template.type', 'otp');
+        ->assertJsonPath('template.type', 'promotional');
 });

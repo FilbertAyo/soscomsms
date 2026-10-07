@@ -5,9 +5,11 @@ namespace App\Http\Controllers\Api;
 use App\Enums\CustomerStatus;
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Notifications\Admin\NewUserRegisteredNotification;
 use App\Notifications\WelcomeCustomerNotification;
 use App\Services\AuthOtpService;
 use App\Services\CreditLedger;
+use App\Support\AdminAlerts;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -45,6 +47,7 @@ class SessionAuthController extends Controller
         });
 
         $user->notify(new WelcomeCustomerNotification((int) config('sms.welcome_credits', 20)));
+        AdminAlerts::notify(new NewUserRegisteredNotification($user));
 
         return response()->json($otp->issue($user), 201);
     }

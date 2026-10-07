@@ -4,8 +4,8 @@ namespace App\Console\Commands;
 
 use App\Contracts\SmsGatewayInterface;
 use App\Models\Provider;
-use App\Models\User;
 use App\Notifications\ProviderLowBalanceNotification;
+use App\Support\AdminAlerts;
 use Illuminate\Console\Command;
 
 class CheckProviderBalanceCommand extends Command
@@ -20,7 +20,13 @@ class CheckProviderBalanceCommand extends Command
         $provider = Provider::current()->fresh() ?? Provider::current();
 
         if (! $snapshot->parsed) {
-            $this->error($snapshot->error ?? 'Unrecognised provider balance response.');
+            $error = $snapshot->error ?? 'Unrecognised provider balance response.';
+            AdminAlerts::technical(
+                'provider-balance-unreadable',
+                'Provider balance could not be read',
+                'The SMS provider balance check failed: '.$error,
+            );
+            $this->error($error);
 
             return self::FAILURE;
         }
@@ -47,11 +53,7 @@ class CheckProviderBalanceCommand extends Command
             return self::SUCCESS;
         }
 
-        User::query()
-            ->where('role', 'admin')
-            ->each(function (User $admin) use ($provider, $snapshot): void {
-                $admin->notify(new ProviderLowBalanceNotification($provider, $snapshot->smsBalance));
-            });
+        AdminAlerts::notify(new ProviderLowBalanceNotification($provider, $snapshot->smsBalance));
 
         $provider->forceFill(['low_balance_alerted_at' => now()])->save();
         $this->warn("Provider balance is {$snapshot->smsBalance} SMS. Admins were notified.");

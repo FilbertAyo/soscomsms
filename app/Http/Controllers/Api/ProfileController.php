@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Api;
 use App\Enums\CustomerStatus;
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Notifications\Admin\ProfileCompletedNotification;
+use App\Support\AdminAlerts;
 use App\Support\TanzaniaPhone;
 use Closure;
 use Illuminate\Http\JsonResponse;
@@ -75,8 +77,13 @@ class ProfileController extends Controller
                 $customer->{$field} = filled($value) ? $value : null;
             }
 
+            $wasPending = $customer->status === CustomerStatus::PendingProfile;
             $customer->refreshStatusFromProfile();
             $customer->save();
+
+            if ($wasPending && $customer->status === CustomerStatus::Active) {
+                AdminAlerts::notify(new ProfileCompletedNotification($customer));
+            }
         }
 
         return response()->json([

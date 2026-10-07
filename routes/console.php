@@ -7,6 +7,7 @@ use App\Console\Commands\DrainQueueCommand;
 use App\Console\Commands\ExpirePendingPaymentsCommand;
 use App\Console\Commands\PollDeliveryReportsCommand;
 use App\Console\Commands\RetryWebhooksCommand;
+use App\Console\Commands\SendProfileRemindersCommand;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
@@ -41,3 +42,7 @@ Schedule::command(CheckProviderBalanceCommand::class)
 Schedule::command(BackupDatabaseCommand::class)
     ->dailyAt('02:15')
     ->withoutOverlapping(60);
+
+Schedule::command(SendProfileRemindersCommand::class)
+    ->dailyAt('10:00')
+    ->withoutOverlapping(30);

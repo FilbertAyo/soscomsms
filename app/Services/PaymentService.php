@@ -7,9 +7,12 @@ use App\Enums\PaymentStatus;
 use App\Models\Customer;
 use App\Models\Payment;
 use App\Models\User;
+use App\Notifications\Admin\PaymentAwaitingConfirmationNotification;
 use App\Notifications\PaymentConfirmedNotification;
 use App\Notifications\PaymentRejectedNotification;
 use App\Notifications\PaymentRequestedNotification;
+use App\Support\AdminAlerts;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -53,6 +56,7 @@ class PaymentService
         ]);
 
         $customer->notifyOwner(new PaymentRequestedNotification($payment));
+        AdminAlerts::notify(new PaymentAwaitingConfirmationNotification($payment));
 
         return $payment;
     }
@@ -134,15 +138,32 @@ class PaymentService
         return $updated;
     }
 
-    public function expireDue(): int
+    /**
+     * @return Collection<int, Payment>
+     */
+    public function expireDue(): Collection
     {
-        return Payment::query()
+        $due = Payment::query()
             ->where('status', PaymentStatus::Pending)
             ->whereNotNull('expires_at')
             ->where('expires_at', '<=', now())
+            ->get();
+
+        if ($due->isEmpty()) {
+            return $due;
+        }
+
+        Payment::query()
+            ->whereKey($due->modelKeys())
+            ->where('status', PaymentStatus::Pending)
             ->update([
                 'status' => PaymentStatus::Expired->value,
                 'rejection_reason' => 'Payment was not confirmed before it expired.',
             ]);
+
+        return Payment::query()
+            ->whereKey($due->modelKeys())
+            ->where('status', PaymentStatus::Expired)
+            ->get();
     }
 }

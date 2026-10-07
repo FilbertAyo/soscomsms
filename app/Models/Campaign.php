@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\CampaignRecipientStatus;
 use App\Enums\CampaignStatus;
+use App\Support\AdminAlerts;
 use App\Support\PaginationMeta;
 use Database\Factories\CampaignFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -288,6 +289,8 @@ class Campaign extends Model
             return $this;
         }
 
+        $previous = $this->status;
+
         if ($pending > 0) {
             $this->status = CampaignStatus::Sending;
         } elseif ($accepted > 0 && $failed > 0) {
@@ -299,6 +302,17 @@ class Campaign extends Model
         }
 
         $this->save();
+
+        if ($previous !== CampaignStatus::Failed && $this->status === CampaignStatus::Failed) {
+            $this->loadMissing('customer.user');
+            $owner = $this->customer?->business_name ?: ($this->customer?->user?->name ?? 'a customer');
+
+            AdminAlerts::technical(
+                'campaign-failed:'.$this->id,
+                'Campaign failed completely',
+                'Campaign #'.$this->id.' ('.$this->name.') for '.$owner.' failed: none of its '.$failed.' messages were accepted. Check the gateway and delivery logs.',
+            );
+        }
 
         return $this;
     }
