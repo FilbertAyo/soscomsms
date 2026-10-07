@@ -17,6 +17,9 @@ import { StatusBadge } from '@/components/soscom/status-badge'
 import { Main } from '@/components/layout/main'
 import { type SenderIdRequestRecord } from '@/types/sender-ids'
 
+const gridClassName =
+  'grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
+
 export function SenderIdsPage() {
   const senderIdsQuery = useQuery({
     queryKey: usableSenderIdsQueryKey,
@@ -53,7 +56,7 @@ export function SenderIdsPage() {
             Could not load Sender IDs. Refresh and try again.
           </p>
         ) : isPending ? (
-          <CardSkeletonGrid count={3} className='md:grid-cols-2 xl:grid-cols-3' />
+          <CardSkeletonGrid count={4} className={gridClassName} />
         ) : empty ? (
           <EmptyState
             icon={BadgeCheck}
@@ -63,14 +66,19 @@ export function SenderIdsPage() {
             actionTo='/sender-ids/request'
           />
         ) : (
-          <div className='grid gap-4 md:grid-cols-2 xl:grid-cols-3'>
+          <div className={gridClassName}>
             {senderIds.map((item) => (
-              <div key={`sid-${item.id}`} className='rounded-xl border bg-card p-5'>
-                <div className='flex items-start justify-between gap-3'>
-                  <h2 className='text-xl font-semibold'>{item.name}</h2>
+              <div
+                key={`sid-${item.id}`}
+                className='flex flex-col rounded-xl border bg-card p-4'
+              >
+                <div className='flex items-start justify-between gap-2'>
+                  <h2 className='min-w-0 truncate text-base font-semibold'>
+                    {item.name}
+                  </h2>
                   <StatusBadge status={item.status} />
                 </div>
-                <p className='mt-2 text-sm text-muted-foreground'>
+                <p className='mt-1 line-clamp-2 text-sm text-muted-foreground'>
                   {item.purpose ?? 'Ready to send'}
                 </p>
                 {item.source === 'generic' ? (
@@ -78,13 +86,13 @@ export function SenderIdsPage() {
                     Shared SOSCOM Sender ID
                   </p>
                 ) : null}
-                <p className='mt-4 text-xs text-muted-foreground'>
+                <p className='mt-3 text-xs text-muted-foreground'>
                   {item.createdAt
                     ? `Added ${formatDate(item.createdAt)}`
                     : item.organization}
                 </p>
-                <div className='mt-5'>
-                  <Button asChild>
+                <div className='mt-auto pt-3'>
+                  <Button size='sm' className='w-full' asChild>
                     <Link to='/send-sms'>Use Sender ID</Link>
                   </Button>
                 </div>
@@ -102,17 +110,21 @@ export function SenderIdsPage() {
 
 function RequestCard({ item }: { item: SenderIdRequestRecord }) {
   return (
-    <div className='rounded-xl border bg-card p-5'>
-      <div className='flex items-start justify-between gap-3'>
-        <h2 className='text-xl font-semibold'>{item.name}</h2>
+    <div className='flex flex-col rounded-xl border bg-card p-4'>
+      <div className='flex items-start justify-between gap-2'>
+        <h2 className='min-w-0 truncate text-base font-semibold'>
+          {item.name}
+        </h2>
         <StatusBadge status={item.status} />
       </div>
-      <p className='mt-2 text-sm text-muted-foreground'>{item.purpose}</p>
-      <p className='mt-4 text-xs text-muted-foreground'>
+      <p className='mt-1 line-clamp-2 text-sm text-muted-foreground'>
+        {item.purpose}
+      </p>
+      <p className='mt-3 text-xs text-muted-foreground'>
         Requested {item.createdAt ? formatDate(item.createdAt) : 'recently'}
       </p>
-      <div className='mt-5'>
-        <Button variant='outline' asChild>
+      <div className='mt-auto pt-3'>
+        <Button variant='outline' size='sm' className='w-full' asChild>
           <Link
             to='/sender-ids/$senderId'
             params={{ senderId: String(item.id) }}

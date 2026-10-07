@@ -12,9 +12,17 @@ import {
   updateMessageTemplate,
 } from '@/lib/message-templates'
 import { analyzeSms } from '@/lib/sms'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import {
   Dialog,
@@ -29,17 +37,27 @@ import { EmptyState } from '@/components/soscom/empty-state'
 import { PageHeader } from '@/components/soscom/page-header'
 import { ListSkeleton } from '@/components/soscom/skeletons'
 import { Main } from '@/components/layout/main'
-import { type MessageTemplate } from '@/types/message-templates'
+import {
+  type MessageTemplate,
+  type MessageTemplateType,
+  messageTemplateTypeLabels,
+} from '@/types/message-templates'
 
 type TemplateForm = {
   name: string
+  type: MessageTemplateType
   body: string
 }
 
 const emptyForm: TemplateForm = {
   name: '',
+  type: 'transactional',
   body: '',
 }
+
+const templateTypes = Object.keys(
+  messageTemplateTypeLabels
+) as MessageTemplateType[]
 
 export function MessageTemplatesPage() {
   const queryClient = useQueryClient()
@@ -58,7 +76,11 @@ export function MessageTemplatesPage() {
 
   const saveMutation = useMutation({
     mutationFn: () => {
-      const payload = { name: form.name.trim(), body: form.body }
+      const payload = {
+        name: form.name.trim(),
+        type: form.type,
+        body: form.body,
+      }
       if (editing) {
         return updateMessageTemplate(editing.id, payload)
       }
@@ -104,7 +126,11 @@ export function MessageTemplatesPage() {
   function openEdit(template: MessageTemplate) {
     setCreating(false)
     setEditing(template)
-    setForm({ name: template.name, body: template.body })
+    setForm({
+      name: template.name,
+      type: template.type,
+      body: template.body,
+    })
   }
 
   function closeDialog(open: boolean) {
@@ -161,7 +187,12 @@ export function MessageTemplatesPage() {
               >
                 <div className='flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between'>
                   <div className='min-w-0'>
-                    <h2 className='text-sm font-medium'>{template.name}</h2>
+                    <div className='flex flex-wrap items-center gap-2'>
+                      <h2 className='text-sm font-medium'>{template.name}</h2>
+                      <Badge variant='secondary' className='text-xs'>
+                        {messageTemplateTypeLabels[template.type]}
+                      </Badge>
+                    </div>
                     <p className='mt-1 line-clamp-2 text-sm text-muted-foreground'>
                       {template.body}
                     </p>
@@ -212,6 +243,29 @@ export function MessageTemplatesPage() {
                   setForm((current) => ({ ...current, name: event.target.value }))
                 }
               />
+            </div>
+            <div className='space-y-2'>
+              <Label htmlFor='template-type'>Type</Label>
+              <Select
+                value={form.type}
+                onValueChange={(value) =>
+                  setForm((current) => ({
+                    ...current,
+                    type: value as MessageTemplateType,
+                  }))
+                }
+              >
+                <SelectTrigger id='template-type' className='w-full'>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {templateTypes.map((type) => (
+                    <SelectItem key={type} value={type}>
+                      {messageTemplateTypeLabels[type]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className='space-y-2'>
               <Label htmlFor='template-body'>Message</Label>

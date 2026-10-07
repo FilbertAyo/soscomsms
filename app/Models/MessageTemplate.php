@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\MessageEncoding;
+use App\Enums\MessageTemplateType;
 use Database\Factories\MessageTemplateFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -19,6 +20,7 @@ class MessageTemplate extends Model
     protected $fillable = [
         'customer_id',
         'name',
+        'type',
         'body',
         'encoding',
         'character_count',
@@ -31,6 +33,7 @@ class MessageTemplate extends Model
     protected function casts(): array
     {
         return [
+            'type' => MessageTemplateType::class,
             'encoding' => MessageEncoding::class,
             'character_count' => 'integer',
             'segment_count' => 'integer',
@@ -46,13 +49,14 @@ class MessageTemplate extends Model
     }
 
     /**
-     * @return array{id: int, name: string, body: string, encoding: string, characterCount: int, segmentCount: int}
+     * @return array{id: int, name: string, type: string, body: string, encoding: string, characterCount: int, segmentCount: int}
      */
     public function toApiArray(): array
     {
         return [
             'id' => $this->id,
             'name' => $this->name,
+            'type' => $this->type->value,
             'body' => $this->body,
             'encoding' => $this->encoding->value,
             'characterCount' => $this->character_count,

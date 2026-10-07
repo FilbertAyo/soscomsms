@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Enums\MessageEncoding;
+use App\Enums\MessageTemplateType;
 use App\Http\Controllers\Api\Concerns\ResolvesCustomer;
 use App\Http\Controllers\Controller;
 use App\Models\MessageTemplate;
@@ -70,7 +71,7 @@ class MessageTemplateController extends Controller
     }
 
     /**
-     * @return array{name: string, body: string}
+     * @return array{name: string, type: string, body: string}
      */
     private function validated(Request $request, int $customerId, ?int $ignoreId = null): array
     {
@@ -79,9 +80,10 @@ class MessageTemplateController extends Controller
             $unique->ignore($ignoreId);
         }
 
-        /** @var array{name: string, body: string} $validated */
+        /** @var array{name: string, type: string, body: string} $validated */
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:80', $unique],
+            'type' => ['required', Rule::enum(MessageTemplateType::class)],
             'body' => ['required', 'string', 'max:2000'],
         ]);
 
@@ -89,8 +91,8 @@ class MessageTemplateController extends Controller
     }
 
     /**
-     * @param  array{name: string, body: string}  $validated
-     * @return array{name: string, body: string, encoding: MessageEncoding, character_count: int, segment_count: int}
+     * @param  array{name: string, type: string, body: string}  $validated
+     * @return array{name: string, type: MessageTemplateType, body: string, encoding: MessageEncoding, character_count: int, segment_count: int}
      */
     private function attributes(array $validated): array
     {
@@ -98,6 +100,7 @@ class MessageTemplateController extends Controller
 
         return [
             'name' => $validated['name'],
+            'type' => MessageTemplateType::from($validated['type']),
             'body' => $validated['body'],
             'encoding' => MessageEncoding::from($analysis['encoding']),
             'character_count' => $analysis['characterCount'],

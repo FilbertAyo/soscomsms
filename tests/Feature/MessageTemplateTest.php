@@ -18,10 +18,12 @@ it('stores character and sms counts when a template is created', function () {
     $this->actingAs($user)
         ->postJson('/api/message-templates', [
             'name' => 'Fee reminder',
+            'type' => 'transactional',
             'body' => 'Hello',
         ])
         ->assertCreated()
         ->assertJsonPath('template.name', 'Fee reminder')
+        ->assertJsonPath('template.type', 'transactional')
         ->assertJsonPath('template.body', 'Hello')
         ->assertJsonPath('template.encoding', 'gsm')
         ->assertJsonPath('template.characterCount', 5)
@@ -30,15 +32,18 @@ it('stores character and sms counts when a template is created', function () {
     $this->actingAs($user)
         ->postJson('/api/message-templates', [
             'name' => 'Long notice',
+            'type' => 'informational',
             'body' => str_repeat('A', 161),
         ])
         ->assertCreated()
+        ->assertJsonPath('template.type', 'informational')
         ->assertJsonPath('template.characterCount', 161)
         ->assertJsonPath('template.segmentCount', 2);
 
     $this->actingAs($user)
         ->postJson('/api/message-templates', [
             'name' => 'Emoji note',
+            'type' => 'promotional',
             'body' => 'Habari 🎉',
         ])
         ->assertCreated()
@@ -55,6 +60,7 @@ it('lists only the signed-in customer templates', function () {
     $this->actingAs($owner)
         ->postJson('/api/message-templates', [
             'name' => 'Parents',
+            'type' => 'informational',
             'body' => 'Meeting at 4pm.',
         ])
         ->assertCreated();
@@ -85,6 +91,7 @@ it('stops another customer from updating or deleting a template', function () {
     $this->actingAs($owner)
         ->postJson('/api/message-templates', [
             'name' => 'Parents',
+            'type' => 'informational',
             'body' => 'Meeting at 4pm.',
         ])
         ->assertCreated();
@@ -94,6 +101,7 @@ it('stops another customer from updating or deleting a template', function () {
     $this->actingAs($stranger)
         ->patchJson("/api/message-templates/{$template->id}", [
             'name' => 'Hacked',
+            'type' => 'promotional',
             'body' => 'Changed.',
         ])
         ->assertNotFound();
@@ -115,6 +123,7 @@ it('rejects a duplicate template name for the same customer', function () {
     $this->actingAs($user)
         ->postJson('/api/message-templates', [
             'name' => 'Parents',
+            'type' => 'transactional',
             'body' => 'First copy.',
         ])
         ->assertCreated();
@@ -122,8 +131,44 @@ it('rejects a duplicate template name for the same customer', function () {
     $this->actingAs($user)
         ->postJson('/api/message-templates', [
             'name' => 'Parents',
+            'type' => 'transactional',
             'body' => 'Second copy.',
         ])
         ->assertUnprocessable()
         ->assertJsonValidationErrors('name');
+});
+
+it('requires a known template type', function () {
+    [$user] = templateCustomer();
+
+    $this->actingAs($user)
+        ->postJson('/api/message-templates', [
+            'name' => 'No type',
+            'body' => 'Hello',
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('type');
+
+    $this->actingAs($user)
+        ->postJson('/api/message-templates', [
+            'name' => 'Bad type',
+            'type' => 'spam',
+            'body' => 'Hello',
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('type');
+});
+
+it('changes the type when a template is updated', function () {
+    [$user, $customer] = templateCustomer();
+    $template = MessageTemplate::factory()->create(['customer_id' => $customer->id]);
+
+    $this->actingAs($user)
+        ->patchJson("/api/message-templates/{$template->id}", [
+            'name' => $template->name,
+            'type' => 'otp',
+            'body' => 'Your code is 1234.',
+        ])
+        ->assertOk()
+        ->assertJsonPath('template.type', 'otp');
 });

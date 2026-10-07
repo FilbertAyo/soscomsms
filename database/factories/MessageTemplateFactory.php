@@ -3,6 +3,7 @@
 namespace Database\Factories;
 
 use App\Enums\MessageEncoding;
+use App\Enums\MessageTemplateType;
 use App\Models\Customer;
 use App\Models\MessageTemplate;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -24,6 +25,7 @@ class MessageTemplateFactory extends Factory
         return [
             'customer_id' => Customer::factory()->complete(),
             'name' => fake()->unique()->words(2, true),
+            'type' => MessageTemplateType::Transactional,
             'body' => $body,
             'encoding' => MessageEncoding::Gsm,
             'character_count' => strlen($body),
