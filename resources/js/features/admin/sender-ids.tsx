@@ -215,7 +215,7 @@ export function AdminSenderIds() {
               onOpenReject={() => setRejectOpen(true)}
               onOpenResubmit={() => {
                 setResubmitReason(
-                  'The identity PDF could not be opened. Please upload a clear 1–3 page scan.'
+                  'The identity PDF could not be opened. Please upload a clear document.'
                 )
                 setResubmitOpen(true)
               }}

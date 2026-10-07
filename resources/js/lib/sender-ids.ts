@@ -14,7 +14,7 @@ export async function assertIdentityPdf(file: File): Promise<string | null> {
     return 'Upload a PDF of the selected identity document.'
   }
   if (file.size > IDENTITY_PDF_MAX_BYTES) {
-    return 'That PDF is larger than 2 MB. Use a 1–3 page scan.'
+    return 'That PDF is larger than 2 MB. Please upload a clear document under 2 MB.'
   }
   const header = await file.slice(0, 5).text()
   if (!header.startsWith('%PDF')) {
