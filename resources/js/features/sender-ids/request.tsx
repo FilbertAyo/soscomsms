@@ -237,7 +237,7 @@ export function RequestSenderId() {
               onChange={(event) =>
                 setSample(event.target.value.slice(0, SAMPLE_LIMIT))
               }
-              placeholder='Hi Amina, your order 1042 is ready for pickup.'
+              placeholder=''
               required
             />
           </div>
