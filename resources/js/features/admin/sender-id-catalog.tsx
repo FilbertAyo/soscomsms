@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Search } from 'lucide-react'
 import { toast } from 'sonner'
 import { applyValidationErrors } from '@/lib/auth'
 import { fetchAdminCustomers } from '@/lib/credits'
@@ -30,6 +31,8 @@ import { type AdminSenderIdCatalogRecord } from '@/types/sender-ids'
 import { type AdminCustomer } from '@/types/credits'
 import { AdminPage } from './page'
 
+const MIN_CUSTOMER_SEARCH = 2
+
 export function AdminSenderIdCatalog() {
   const queryClient = useQueryClient()
   const [selectedId, setSelectedId] = useState<number | null>(null)
@@ -37,12 +40,13 @@ export function AdminSenderIdCatalog() {
   const [name, setName] = useState('')
   const [generic, setGeneric] = useState(true)
   const [availableToAll, setAvailableToAll] = useState(false)
+  const [listFilter, setListFilter] = useState('')
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [deleteOpen, setDeleteOpen] = useState(false)
 
   useEffect(() => {
-    const timer = window.setTimeout(() => setDebouncedSearch(search), 250)
+    const timer = window.setTimeout(() => setDebouncedSearch(search.trim()), 300)
     return () => window.clearTimeout(timer)
   }, [search])
 
@@ -53,13 +57,21 @@ export function AdminSenderIdCatalog() {
   const senderIds = catalogQuery.data ?? []
   const selected =
     senderIds.find((item) => item.id === selectedId) ?? senderIds[0] ?? null
+  const filterTerm = listFilter.trim().toLowerCase()
+  const visibleSenderIds = filterTerm
+    ? senderIds.filter((item) => item.name.toLowerCase().includes(filterTerm))
+    : senderIds
 
+  const customerSearchReady = debouncedSearch.length >= MIN_CUSTOMER_SEARCH
   const customersQuery = useQuery({
     queryKey: ['admin', 'customers', 'sender-id-grants', debouncedSearch],
     queryFn: () => fetchAdminCustomers(debouncedSearch, 1),
-    enabled: selected !== null && !selected.availableToAll,
+    enabled:
+      customerSearchReady && selected !== null && !selected.availableToAll,
   })
-  const searchResults = customersQuery.data?.customers ?? []
+  const searchResults = customerSearchReady
+    ? (customersQuery.data?.customers ?? [])
+    : []
 
   function refresh() {
     void queryClient.invalidateQueries({ queryKey: adminSenderIdCatalogQueryKey })
@@ -169,28 +181,66 @@ export function AdminSenderIdCatalog() {
           We couldn't load Sender IDs. Refresh the page and try again.
         </p>
       ) : (
-        <div className='grid gap-6 lg:grid-cols-[20rem_minmax(0,1fr)]'>
-          <div className='space-y-3'>
+        <div className='grid items-start gap-4 lg:grid-cols-[18rem_minmax(0,1fr)]'>
+          <div className='rounded-lg border bg-card'>
+            <div className='flex items-center justify-between gap-2 border-b px-3 py-2'>
+              <span className='text-xs font-medium'>
+                {senderIds.length === 1
+                  ? '1 Sender ID'
+                  : `${senderIds.length} Sender IDs`}
+              </span>
+            </div>
+            <div className='border-b p-2'>
+              <div className='relative'>
+                <Search className='pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground' />
+                <Input
+                  type='search'
+                  value={listFilter}
+                  onChange={(event) => setListFilter(event.target.value)}
+                  placeholder='Filter Sender IDs'
+                  className='h-8 ps-8 text-xs'
+                  aria-label='Filter Sender IDs'
+                />
+              </div>
+            </div>
             {senderIds.length === 0 ? (
-              <p className='text-sm text-muted-foreground'>
+              <p className='p-3 text-xs text-muted-foreground'>
                 No Sender IDs yet. Add the names you received from the provider.
               </p>
+            ) : visibleSenderIds.length === 0 ? (
+              <p className='p-3 text-xs text-muted-foreground'>
+                No Sender IDs match “{listFilter.trim()}”.
+              </p>
             ) : (
-              senderIds.map((item) => (
-                <button
-                  key={item.id}
-                  type='button'
-                  onClick={() => setSelectedId(item.id)}
-                  className={`w-full rounded-xl border bg-card p-4 text-start ${
-                    selected?.id === item.id ? 'ring-2 ring-primary' : ''
-                  }`}
-                >
-                  <p className='font-semibold'>{item.name}</p>
-                  <p className='mt-1 text-xs text-muted-foreground'>
-                    {typeLabel(item)} · {visibilityLabel(item)}
-                  </p>
-                </button>
-              ))
+              <div className='max-h-[28rem] divide-y overflow-y-auto'>
+                {visibleSenderIds.map((item) => (
+                  <button
+                    key={item.id}
+                    type='button'
+                    onClick={() => setSelectedId(item.id)}
+                    className={`flex w-full items-center justify-between gap-2 px-3 py-2 text-start transition-colors hover:bg-muted/50 ${
+                      selected?.id === item.id
+                        ? 'bg-primary/10 hover:bg-primary/10'
+                        : ''
+                    }`}
+                  >
+                    <span className='min-w-0'>
+                      <span className='block truncate text-sm font-medium'>
+                        {item.name}
+                      </span>
+                      <span className='block truncate text-[11px] text-muted-foreground'>
+                        {typeLabel(item)} · {visibilityLabel(item)}
+                      </span>
+                    </span>
+                    {item.status !== 'active' ? (
+                      <StatusBadge
+                        status={item.status}
+                        className='px-1.5 py-0 text-[10px] leading-4'
+                      />
+                    ) : null}
+                  </button>
+                ))}
+              </div>
             )}
           </div>
           {selected ? (
@@ -204,7 +254,8 @@ export function AdminSenderIdCatalog() {
               search={search}
               onSearch={setSearch}
               candidates={grantCandidates}
-              customersLoading={customersQuery.isPending}
+              searchReady={customerSearchReady}
+              customersLoading={customerSearchReady && customersQuery.isFetching}
               onToggleAll={(value) =>
                 updateMutation.mutate({ available_to_all: value })
               }
@@ -304,6 +355,7 @@ function CatalogDetail({
   search,
   onSearch,
   candidates,
+  searchReady,
   customersLoading,
   onToggleAll,
   onToggleGeneric,
@@ -317,6 +369,7 @@ function CatalogDetail({
   search: string
   onSearch: (value: string) => void
   candidates: AdminCustomer[]
+  searchReady: boolean
   customersLoading: boolean
   onToggleAll: (value: boolean) => void
   onToggleGeneric: (value: boolean) => void
@@ -328,11 +381,11 @@ function CatalogDetail({
   const requestOwned = senderId.source === 'request'
 
   return (
-    <div className='space-y-5 rounded-xl border bg-card p-5'>
+    <div className='space-y-4 rounded-lg border bg-card p-4'>
       <div className='flex items-start justify-between gap-3'>
-        <div>
-          <h2 className='text-xl font-semibold'>{senderId.name}</h2>
-          <p className='mt-1 text-sm text-muted-foreground'>
+        <div className='min-w-0'>
+          <h2 className='truncate text-base font-semibold'>{senderId.name}</h2>
+          <p className='text-xs text-muted-foreground'>
             {typeLabel(senderId)} · {visibilityLabel(senderId)}
           </p>
         </div>
@@ -369,57 +422,66 @@ function CatalogDetail({
       />
 
       {senderId.availableToAll ? (
-        <p className='text-sm text-muted-foreground'>
+        <p className='text-xs text-muted-foreground'>
           Every customer can use {senderId.name}. Turn off “Show to all
           customers” to limit it to people you grant.
         </p>
       ) : (
-        <div className='space-y-3'>
-          <div>
+        <div className='space-y-3 border-t pt-4'>
+          <div className='space-y-1.5'>
             <Label htmlFor='grant-search'>Grant to a customer</Label>
-            <Input
-              id='grant-search'
-              className='mt-2'
-              placeholder='Search name, email, or business'
-              value={search}
-              onChange={(event) => onSearch(event.target.value)}
-            />
+            <div className='relative'>
+              <Search className='pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground' />
+              <Input
+                id='grant-search'
+                type='search'
+                className='h-8 ps-8 text-xs'
+                placeholder='Search name, email, phone, or business'
+                value={search}
+                onChange={(event) => onSearch(event.target.value)}
+              />
+            </div>
+            {!searchReady ? (
+              <p className='text-[11px] text-muted-foreground'>
+                Type at least {MIN_CUSTOMER_SEARCH} characters to find a
+                customer.
+              </p>
+            ) : customersLoading ? (
+              <p className='text-[11px] text-muted-foreground'>Searching…</p>
+            ) : candidates.length === 0 ? (
+              <p className='text-[11px] text-muted-foreground'>
+                No customers found without access.
+              </p>
+            ) : null}
           </div>
-          {customersLoading ? (
-            <p className='text-sm text-muted-foreground'>Searching…</p>
-          ) : null}
           {grantCandidatesList(candidates, onGrant, pending)}
           <div>
-            <p className='mb-2 text-sm font-medium'>Who can use it</p>
+            <p className='mb-1.5 text-xs font-medium'>
+              Who can use it ({senderId.grants.length})
+            </p>
             {senderId.grants.length === 0 ? (
-              <p className='text-sm text-muted-foreground'>
+              <p className='text-xs text-muted-foreground'>
                 No customers yet. Search and grant access.
               </p>
             ) : (
-              <ul className='space-y-2'>
+              <ul className='max-h-64 divide-y overflow-y-auto rounded-lg border'>
                 {senderId.grants.map((grant) => (
-                  <li
+                  <CustomerRow
                     key={grant.id}
-                    className='flex items-center justify-between gap-3 rounded-lg border px-3 py-2'
+                    title={grant.businessName ?? grant.name ?? 'Customer'}
+                    email={grant.email}
                   >
-                    <div>
-                      <p className='text-sm font-medium'>
-                        {grant.businessName ?? grant.name ?? 'Customer'}
-                      </p>
-                      <p className='text-xs text-muted-foreground'>
-                        {grant.email}
-                      </p>
-                    </div>
                     <Button
                       type='button'
                       size='sm'
-                      variant='outline'
+                      variant='ghost'
+                      className='h-7 px-2 text-xs'
                       disabled={pending}
                       onClick={() => onRevoke(grant.id)}
                     >
                       Remove
                     </Button>
-                  </li>
+                  </CustomerRow>
                 ))}
               </ul>
             )}
@@ -430,6 +492,7 @@ function CatalogDetail({
       <Button
         type='button'
         variant='outline'
+        size='sm'
         disabled={senderId.campaignCount > 0}
         onClick={onDelete}
       >
@@ -454,29 +517,45 @@ function grantCandidatesList(
   }
 
   return (
-    <ul className='space-y-2'>
-      {candidates.slice(0, 6).map((customer) => (
-        <li
+    <ul className='max-h-56 divide-y overflow-y-auto rounded-lg border'>
+      {candidates.map((customer) => (
+        <CustomerRow
           key={customer.id}
-          className='flex items-center justify-between gap-3 rounded-lg border px-3 py-2'
+          title={customer.businessName ?? customer.name ?? 'Customer'}
+          email={customer.email}
         >
-          <div>
-            <p className='text-sm font-medium'>
-              {customer.businessName ?? customer.name ?? 'Customer'}
-            </p>
-            <p className='text-xs text-muted-foreground'>{customer.email}</p>
-          </div>
           <Button
             type='button'
             size='sm'
+            className='h-7 px-2 text-xs'
             disabled={pending}
             onClick={() => onGrant(customer.id)}
           >
             Grant
           </Button>
-        </li>
+        </CustomerRow>
       ))}
     </ul>
+  )
+}
+
+function CustomerRow({
+  title,
+  email,
+  children,
+}: {
+  title: string
+  email: string | null | undefined
+  children: React.ReactNode
+}) {
+  return (
+    <li className='flex items-center justify-between gap-3 px-3 py-1.5'>
+      <div className='min-w-0'>
+        <p className='truncate text-xs font-medium'>{title}</p>
+        <p className='truncate text-[11px] text-muted-foreground'>{email}</p>
+      </div>
+      {children}
+    </li>
   )
 }
 

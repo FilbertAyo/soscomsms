@@ -38,13 +38,16 @@ export async function fetchAdminTraffic(page = 1): Promise<AdminTraffic> {
   }
 }
 
-export async function fetchAdminDeliveryReports(page = 1): Promise<{
+export async function fetchAdminDeliveryReports(
+  page = 1,
+  q = ''
+): Promise<{
   reports: AdminDeliveryReport[]
   meta: PageMeta
 }> {
   const { data } = await api.get<{ reports: AdminDeliveryReport[]; meta?: PageMeta }>(
     '/api/admin/delivery-reports',
-    { params: { page } }
+    { params: { page, q: q || undefined } }
   )
   return {
     reports: data.reports,

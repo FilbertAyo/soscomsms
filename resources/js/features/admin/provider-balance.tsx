@@ -45,42 +45,44 @@ export function AdminProviderBalance() {
           Could not load the provider balance.
         </p>
       ) : (
-        <div className='max-w-3xl space-y-4'>
-          <div className='rounded-xl border bg-card p-6'>
-            <p className='text-sm text-muted-foreground'>
-              {snapshot?.name ?? 'Provider'} ({snapshot?.driver ?? '…'})
-            </p>
-            <p className='mt-2 text-4xl font-semibold'>
-              {snapshot?.parsed === false
-                ? '—'
-                : `${formatNumber(snapshot?.smsBalance ?? 0)} SMS`}
-            </p>
-            {snapshot?.parsed === false ? (
-              <p className='mt-4 text-sm text-destructive'>
-                {snapshot.parseError ||
-                  'Mobishastra did not return a numeric SMS balance.'}{' '}
-                Confirm the 8-digit profile ID and password, then compare the
-                raw reply below with the Mobishastra portal.
+        <div className='space-y-4'>
+          <div className='grid gap-4 md:grid-cols-2 xl:grid-cols-3'>
+            <div className='rounded-xl border bg-card p-5'>
+              <p className='text-sm text-muted-foreground'>
+                {snapshot?.name ?? 'Provider'} ({snapshot?.driver ?? '…'})
               </p>
-            ) : snapshot?.lowBalance ? (
-              <p className='mt-4 text-sm text-destructive'>
-                Balance is below the warning threshold of{' '}
-                {formatNumber(snapshot.lowBalanceThreshold)} SMS. Top up the
-                upstream account before customer traffic is affected.
+              <p
+                className={`mt-2 text-2xl font-semibold ${snapshot?.parsed === false || snapshot?.lowBalance ? 'text-destructive' : ''}`}
+              >
+                {snapshot?.parsed === false
+                  ? '—'
+                  : `${formatNumber(snapshot?.smsBalance ?? 0)} SMS`}
               </p>
-            ) : (
-              <p className='mt-4 text-sm text-muted-foreground'>
-                Warning threshold:{' '}
-                {formatNumber(snapshot?.lowBalanceThreshold ?? 0)} SMS.
-              </p>
-            )}
-            {snapshot?.driver === 'mobishastra' && snapshot.rawResponse ? (
-              <p className='mt-3 break-all font-mono text-xs text-muted-foreground'>
-                Mobishastra returned: {snapshot.rawResponse}
-              </p>
-            ) : null}
-          </div>
-          <div className='grid gap-4 sm:grid-cols-2'>
+              {snapshot?.parsed === false ? (
+                <p className='mt-3 text-xs leading-5 text-destructive'>
+                  {snapshot.parseError ||
+                    'Mobishastra did not return a numeric SMS balance.'}{' '}
+                  Confirm the 8-digit profile ID and password, then compare the
+                  raw reply below with the Mobishastra portal.
+                </p>
+              ) : snapshot?.lowBalance ? (
+                <p className='mt-3 text-xs leading-5 text-destructive'>
+                  Balance is below the warning threshold of{' '}
+                  {formatNumber(snapshot.lowBalanceThreshold)} SMS. Top up the
+                  upstream account before customer traffic is affected.
+                </p>
+              ) : (
+                <p className='mt-3 text-xs leading-5 text-muted-foreground'>
+                  Warning threshold:{' '}
+                  {formatNumber(snapshot?.lowBalanceThreshold ?? 0)} SMS.
+                </p>
+              )}
+              {snapshot?.driver === 'mobishastra' && snapshot.rawResponse ? (
+                <p className='mt-3 break-all font-mono text-xs text-muted-foreground'>
+                  Mobishastra returned: {snapshot.rawResponse}
+                </p>
+              ) : null}
+            </div>
             <BalanceCard
               label='Customer credits'
               value={`${formatNumber(snapshot?.customerCredits ?? 0)} SMS`}
@@ -106,10 +108,14 @@ export function AdminProviderBalance() {
             <p className='mt-1'>
               Whitelisted:{' '}
               {snapshot?.staticIpWhitelistedAt
-                ? new Date(snapshot.staticIpWhitelistedAt).toLocaleString('en-TZ')
+                ? new Date(snapshot.staticIpWhitelistedAt).toLocaleString(
+                    'en-TZ'
+                  )
                 : 'Not confirmed'}
             </p>
-            <p className='mt-1'>CountryCode: {snapshot?.countryCode || 'ALL'}</p>
+            <p className='mt-1'>
+              CountryCode: {snapshot?.countryCode || 'ALL'}
+            </p>
             <p className='mt-1'>
               Tanzania account:{' '}
               {snapshot?.credentialsConfirmedAt
@@ -305,7 +311,9 @@ function BalanceCard({
   return (
     <div className='rounded-xl border bg-card p-5'>
       <p className='text-sm text-muted-foreground'>{label}</p>
-      <p className={`mt-2 text-2xl font-semibold ${warn ? 'text-destructive' : ''}`}>
+      <p
+        className={`mt-2 text-2xl font-semibold ${warn ? 'text-destructive' : ''}`}
+      >
         {value}
       </p>
       <p className='mt-3 text-xs leading-5 text-muted-foreground'>{hint}</p>

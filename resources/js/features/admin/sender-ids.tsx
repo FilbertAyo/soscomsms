@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Search } from 'lucide-react'
 import { toast } from 'sonner'
 import { applyValidationErrors } from '@/lib/auth'
 import { formatDate } from '@/lib/format'
@@ -35,6 +36,7 @@ import { AdminPage } from './page'
 export function AdminSenderIds() {
   const queryClient = useQueryClient()
   const [selectedId, setSelectedId] = useState<number | null>(null)
+  const [listFilter, setListFilter] = useState('')
   const [providerOpen, setProviderOpen] = useState(false)
   const [rejectOpen, setRejectOpen] = useState(false)
   const [submittedAt, setSubmittedAt] = useState(todayInput())
@@ -49,6 +51,14 @@ export function AdminSenderIds() {
   const requests = requestsQuery.data ?? []
   const selected =
     requests.find((item) => item.id === selectedId) ?? requests[0] ?? null
+  const filterTerm = listFilter.trim().toLowerCase()
+  const visibleRequests = filterTerm
+    ? requests.filter((item) =>
+        [item.name, item.customerBusiness, item.customerName].some((value) =>
+          value?.toLowerCase().includes(filterTerm)
+        )
+      )
+    : requests
 
   async function refresh() {
     void queryClient.invalidateQueries({ queryKey: adminSenderIdRequestsQueryKey })
@@ -110,31 +120,63 @@ export function AdminSenderIds() {
       {requestsQuery.isError ? (
         <p className='text-sm text-destructive'>Could not load requests.</p>
       ) : (
-        <div className='grid gap-6 lg:grid-cols-[20rem_minmax(0,1fr)]'>
-          <div className='space-y-3'>
+        <div className='grid items-start gap-4 lg:grid-cols-[18rem_minmax(0,1fr)]'>
+          <div className='rounded-lg border bg-card'>
+            <div className='border-b px-3 py-2 text-xs font-medium'>
+              {requests.length === 1
+                ? '1 request'
+                : `${requests.length} requests`}
+            </div>
+            <div className='border-b p-2'>
+              <div className='relative'>
+                <Search className='pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground' />
+                <Input
+                  type='search'
+                  value={listFilter}
+                  onChange={(event) => setListFilter(event.target.value)}
+                  placeholder='Filter by name or customer'
+                  className='h-8 ps-8 text-xs'
+                  aria-label='Filter requests'
+                />
+              </div>
+            </div>
             {requests.length === 0 ? (
-              <p className='text-sm text-muted-foreground'>
+              <p className='p-3 text-xs text-muted-foreground'>
                 No Sender ID requests yet.
               </p>
+            ) : visibleRequests.length === 0 ? (
+              <p className='p-3 text-xs text-muted-foreground'>
+                No requests match “{listFilter.trim()}”.
+              </p>
             ) : (
-              requests.map((item) => (
-                <button
-                  key={item.id}
-                  type='button'
-                  onClick={() => setSelectedId(item.id)}
-                  className={`w-full rounded-xl border bg-card p-4 text-start ${
-                    selected?.id === item.id ? 'ring-2 ring-primary' : ''
-                  }`}
-                >
-                  <p className='font-semibold'>{item.name}</p>
-                  <p className='text-sm text-muted-foreground'>
-                    Requested by: {item.customerBusiness ?? item.customerName}
-                  </p>
-                  <p className='mt-1 text-xs text-muted-foreground'>
-                    Date: {item.createdAt ? formatDate(item.createdAt) : '—'}
-                  </p>
-                </button>
-              ))
+              <div className='max-h-[28rem] divide-y overflow-y-auto'>
+                {visibleRequests.map((item) => (
+                  <button
+                    key={item.id}
+                    type='button'
+                    onClick={() => setSelectedId(item.id)}
+                    className={`flex w-full items-center justify-between gap-2 px-3 py-2 text-start transition-colors hover:bg-muted/50 ${
+                      selected?.id === item.id
+                        ? 'bg-primary/10 hover:bg-primary/10'
+                        : ''
+                    }`}
+                  >
+                    <span className='min-w-0'>
+                      <span className='block truncate text-sm font-medium'>
+                        {item.name}
+                      </span>
+                      <span className='block truncate text-[11px] text-muted-foreground'>
+                        {item.customerBusiness ?? item.customerName} ·{' '}
+                        {item.createdAt ? formatDate(item.createdAt) : '—'}
+                      </span>
+                    </span>
+                    <StatusBadge
+                      status={item.status}
+                      className='shrink-0 px-1.5 py-0 text-[10px] leading-4'
+                    />
+                  </button>
+                ))}
+              </div>
             )}
           </div>
           {selected ? (
@@ -268,10 +310,10 @@ function RequestDetail({
   const canResolve = request.status === 'submitted_to_provider'
 
   return (
-    <div className='rounded-xl border bg-card p-5'>
+    <div className='rounded-lg border bg-card p-4'>
       <div className='flex items-start justify-between gap-3'>
-        <div>
-          <h2 className='text-xl font-semibold'>{request.name}</h2>
+        <div className='min-w-0'>
+          <h2 className='truncate text-base font-semibold'>{request.name}</h2>
           <p className='text-sm text-muted-foreground'>{request.purpose}</p>
           <p className='mt-1 text-sm text-muted-foreground'>
             {request.customerBusiness ?? request.customerName} ·{' '}

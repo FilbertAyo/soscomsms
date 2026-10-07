@@ -177,6 +177,51 @@ it('lists live traffic and delivery reports for the demo customer', function () 
         ->assertJsonPath('reports.0.status', CampaignRecipientStatus::Delivered->value);
 });
 
+it('searches delivery reports by phone, message ID, Sender ID, and customer', function () {
+    [$admin, , $customer] = adminDashboardCustomer();
+    $other = Customer::factory()->complete()->create(['business_name' => 'Mchango Group']);
+
+    $makeReport = function (Customer $owner, string $sender, string $phone, string $messageId): void {
+        $campaign = Campaign::factory()->create([
+            'customer_id' => $owner->id,
+            'sender_name' => $sender,
+            'status' => CampaignStatus::Completed,
+        ]);
+        $recipient = CampaignRecipient::factory()->create([
+            'campaign_id' => $campaign->id,
+            'phone' => $phone,
+            'status' => CampaignRecipientStatus::Delivered,
+        ]);
+        Delivery::factory()->create([
+            'campaign_recipient_id' => $recipient->id,
+            'provider_id' => Provider::current()->id,
+            'provider_message_id' => $messageId,
+            'status' => DeliveryStatus::Delivered,
+            'sent_at' => now(),
+        ]);
+    };
+
+    $makeReport($customer, 'INFO', '+255712445221', '1871080898');
+    $makeReport($other, 'MCHANGO', '+255754000111', '1871080999');
+
+    $search = fn (string $q) => $this->actingAs($admin)
+        ->getJson('/api/admin/delivery-reports?q='.urlencode($q))
+        ->assertOk();
+
+    $search('0712445221')
+        ->assertJsonCount(1, 'reports')
+        ->assertJsonPath('reports.0.providerMessageId', '1871080898');
+    $search('1871080999')
+        ->assertJsonCount(1, 'reports')
+        ->assertJsonPath('reports.0.senderId', 'MCHANGO');
+    $search('mchango')->assertJsonCount(1, 'reports');
+    $search('customer@soscom.co.tz')
+        ->assertJsonCount(1, 'reports')
+        ->assertJsonPath('reports.0.phone', '+255712445221');
+    $search('1871080')->assertJsonCount(2, 'reports');
+    $search('nothing-matches')->assertJsonCount(0, 'reports');
+});
+
 it('records grants in the audit log and shows provider logs without gateway payloads', function () {
     [$admin, , $customer] = adminDashboardCustomer();
 
