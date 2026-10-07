@@ -50,6 +50,7 @@ export function RequestSenderId() {
   const [name, setName] = useState('')
   const [purpose, setPurpose] = useState('')
   const [organization, setOrganization] = useState(businessName)
+  const [website, setWebsite] = useState('')
   const [description, setDescription] = useState('')
   const [sample, setSample] = useState('')
   const [identityType, setIdentityType] = useState('')
@@ -66,6 +67,7 @@ export function RequestSenderId() {
         name: name.trim(),
         purpose,
         organization: organization.trim(),
+        websiteUrl: normalizeWebsite(website),
         description: description.trim() || undefined,
         sampleContent: sample.trim(),
         identityDocumentType: identityType,
@@ -146,6 +148,10 @@ export function RequestSenderId() {
               toast.error('Please complete the required fields.')
               return
             }
+            if (website.trim() && !normalizeWebsite(website)) {
+              toast.error('Enter a valid website, such as https://example.co.tz.')
+              return
+            }
             submitMutation.mutate()
           }}
         >
@@ -190,6 +196,21 @@ export function RequestSenderId() {
               onChange={(event) => setOrganization(event.target.value)}
               required
             />
+          </div>
+          <div className='space-y-2'>
+            <Label htmlFor='website'>Website</Label>
+            <Input
+              id='website'
+              type='text'
+              inputMode='url'
+              autoComplete='url'
+              value={website}
+              onChange={(event) => setWebsite(event.target.value)}
+              placeholder='https://example.co.tz'
+            />
+            <p className='text-xs text-muted-foreground'>
+              Optional. Your company or organization website.
+            </p>
           </div>
           <div className='space-y-2'>
             <Label htmlFor='description'>Description</Label>
@@ -253,8 +274,7 @@ export function RequestSenderId() {
                   }
                 />
                 <p className='text-xs text-muted-foreground'>
-                  PDF only, up to 2 MB. A normal 1–3 page scan fits in this
-                  limit.
+                  PDF only, up to 2 MB. 
                   {document
                     ? ` Selected: ${document.name} (${formatFileSize(document.size)}).`
                     : ''}
@@ -295,6 +315,28 @@ function FieldHint({ label, hint }: { label: string; hint: string }) {
       </TooltipContent>
     </Tooltip>
   )
+}
+
+function normalizeWebsite(value: string): string | undefined {
+  const trimmed = value.trim()
+  if (!trimmed) {
+    return undefined
+  }
+
+  const withScheme = /^https?:\/\//i.test(trimmed)
+    ? trimmed
+    : `https://${trimmed}`
+
+  try {
+    const url = new URL(withScheme)
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+      return undefined
+    }
+  } catch {
+    return undefined
+  }
+
+  return withScheme
 }
 
 function formatFileSize(bytes: number): string {

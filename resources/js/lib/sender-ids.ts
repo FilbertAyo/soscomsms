@@ -55,6 +55,7 @@ export async function createSenderIdRequest(payload: {
   name: string
   purpose: string
   organization: string
+  websiteUrl?: string
   description?: string
   sampleContent: string
   identityDocumentType: string
@@ -64,6 +65,9 @@ export async function createSenderIdRequest(payload: {
   body.append('name', payload.name)
   body.append('purpose', payload.purpose)
   body.append('organization', payload.organization)
+  if (payload.websiteUrl) {
+    body.append('website_url', payload.websiteUrl)
+  }
   if (payload.description) {
     body.append('description', payload.description)
   }

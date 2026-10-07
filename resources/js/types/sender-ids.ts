@@ -92,6 +92,7 @@ export type SenderIdRequestRecord = {
   name: string
   purpose: string
   organization: string
+  websiteUrl: string | null
   description: string | null
   sampleContent: string | null
   identityDocumentType: string | null

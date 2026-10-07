@@ -37,6 +37,10 @@ class SenderIdRequestedNotification extends Notification implements ShouldQueue
             ->greeting('Hi,')
             ->line($requester.' requested the Sender ID '.$this->request->name.'.')
             ->line('Organization: '.$this->request->organization)
+            ->when(
+                filled($this->request->website_url),
+                fn ($mail) => $mail->line('Website: '.$this->request->website_url),
+            )
             ->line('Purpose: '.SenderIdUseCase::labelFor($this->request->purpose))
             ->action('Review Sender ID requests', url('/admin/sender-ids'));
     }

@@ -76,6 +76,16 @@ class SenderIdRequestController extends Controller
             ]);
         }
 
+        if ($request->exists('website_url')) {
+            $website = trim($request->string('website_url')->toString());
+            if ($website !== '' && ! preg_match('/^https?:\/\//i', $website)) {
+                $website = 'https://'.$website;
+            }
+            $request->merge([
+                'website_url' => $website === '' ? null : $website,
+            ]);
+        }
+
         $validated = $request->validate([
             'name' => [
                 'required',
@@ -89,6 +99,7 @@ class SenderIdRequestController extends Controller
             ],
             'purpose' => ['required', Rule::enum(SenderIdUseCase::class)],
             'organization' => ['required', 'string', 'max:120'],
+            'website_url' => ['nullable', 'string', 'max:255', 'url:http,https'],
             'description' => ['nullable', 'string', 'max:2000'],
             'sample_content' => ['required', 'string', 'min:1', 'max:160'],
             'identity_document_type' => ['required', Rule::enum(IdentityDocumentType::class)],

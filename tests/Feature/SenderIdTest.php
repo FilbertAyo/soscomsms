@@ -46,6 +46,7 @@ it('lets a customer request a sender id and hides it from another customer', fun
         ->assertJsonPath('request.identityDocumentType', 'national_id')
         ->assertJsonPath('request.identityDocumentName', 'national-id.pdf')
         ->assertJsonPath('request.hasIdentityDocument', true)
+        ->assertJsonPath('request.websiteUrl', null)
         ->assertJsonMissingPath('request.contents')
         ->assertJsonPath('request.status', SenderIdRequestStatus::Submitted->value);
 
@@ -59,6 +60,26 @@ it('lets a customer request a sender id and hides it from another customer', fun
     $this->actingAs($stranger)
         ->getJson("/api/sender-id-requests/{$id}")
         ->assertNotFound();
+});
+
+it('stores an optional website and rejects one that is not a web address', function () {
+    [$user] = senderCustomer();
+
+    $this->actingAs($user)
+        ->post('/api/sender-id-requests', senderIdRequestPayload([
+            'name' => 'WEBONE',
+            'website_url' => 'linkadi.co.tz',
+        ]))
+        ->assertCreated()
+        ->assertJsonPath('request.websiteUrl', 'https://linkadi.co.tz');
+
+    $this->actingAs($user)
+        ->post('/api/sender-id-requests', senderIdRequestPayload([
+            'name' => 'WEBTWO',
+            'website_url' => 'not a website',
+        ]))
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('website_url');
 });
 
 it('rejects a sender id request that contains a space', function () {

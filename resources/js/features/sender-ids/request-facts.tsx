@@ -15,6 +15,7 @@ export function SenderIdRequestFacts({
   return (
     <dl className='mt-4 space-y-3 text-sm'>
       <Fact label='Purpose' value={senderIdUseCaseLabel(request.purpose)} />
+      {request.websiteUrl ? <WebsiteFact url={request.websiteUrl} /> : null}
       {request.description ? (
         <Fact label='Description' value={request.description} />
       ) : null}
@@ -53,6 +54,30 @@ function Fact({ label, value }: { label: string; value: string }) {
     <div>
       <dt className='text-xs font-medium text-muted-foreground'>{label}</dt>
       <dd className='mt-1 whitespace-pre-wrap'>{value}</dd>
+    </div>
+  )
+}
+
+function WebsiteFact({ url }: { url: string }) {
+  const safe = /^https?:\/\//i.test(url) ? url : null
+
+  return (
+    <div>
+      <dt className='text-xs font-medium text-muted-foreground'>Website</dt>
+      <dd className='mt-1 break-all'>
+        {safe ? (
+          <a
+            href={safe}
+            target='_blank'
+            rel='noreferrer'
+            className='underline underline-offset-2'
+          >
+            {safe}
+          </a>
+        ) : (
+          url
+        )}
+      </dd>
     </div>
   )
 }

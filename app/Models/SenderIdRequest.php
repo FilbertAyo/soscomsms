@@ -23,6 +23,7 @@ class SenderIdRequest extends Model
         'name',
         'purpose',
         'organization',
+        'website_url',
         'description',
         'sample_content',
         'identity_document_type',
@@ -93,7 +94,7 @@ class SenderIdRequest extends Model
     }
 
     /**
-     * @return array{id: int, name: string, purpose: string, organization: string, description: string|null, sampleContent: string|null, identityDocumentType: string|null, identityDocumentName: string|null, hasIdentityDocument: bool, status: string, currentStep: string, timelineIndex: int, submittedToProviderAt: string|null, rejectionReason: string|null, createdAt: string|null, senderIdId: int|null}
+     * @return array{id: int, name: string, purpose: string, organization: string, websiteUrl: string|null, description: string|null, sampleContent: string|null, identityDocumentType: string|null, identityDocumentName: string|null, hasIdentityDocument: bool, status: string, currentStep: string, timelineIndex: int, submittedToProviderAt: string|null, rejectionReason: string|null, createdAt: string|null, senderIdId: int|null}
      */
     public function toApiArray(): array
     {
@@ -105,6 +106,7 @@ class SenderIdRequest extends Model
             'name' => $this->name,
             'purpose' => $this->purpose,
             'organization' => $this->organization,
+            'websiteUrl' => $this->website_url,
             'description' => $this->description,
             'sampleContent' => $this->sample_content,
             'identityDocumentType' => $this->identity_document_type,

@@ -54,7 +54,7 @@ class SenderIdService
     }
 
     /**
-     * @param  array{name: string, purpose: string, organization: string, description?: string|null, sample_content: string, identity_document_type: string}  $payload
+     * @param  array{name: string, purpose: string, organization: string, website_url?: string|null, description?: string|null, sample_content: string, identity_document_type: string}  $payload
      */
     public function request(Customer $customer, array $payload, UploadedFile $document): SenderIdRequest
     {
@@ -86,6 +86,7 @@ class SenderIdService
                 'name' => $name,
                 'purpose' => SenderIdUseCase::from($payload['purpose'])->value,
                 'organization' => $payload['organization'],
+                'website_url' => filled($payload['website_url'] ?? null) ? $payload['website_url'] : null,
                 'description' => $payload['description'] ?? null,
                 'sample_content' => $payload['sample_content'],
                 'identity_document_type' => IdentityDocumentType::from($payload['identity_document_type'])->value,
