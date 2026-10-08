@@ -135,8 +135,7 @@ export function BuySmsPage() {
             <div className='mb-6'>
               <h1 className='text-2xl font-semibold tracking-tight'>Buy SMS</h1>
               <p className='mt-1 text-sm text-muted-foreground'>
-                Pay with M-Pesa, Airtel Money, Mixx by Yas, or Halotel. Approve
-                the prompt on your phone.
+                Pay with M-Pesa, Airtel Money, Mixx by Yas, or Halotel. 
               </p>
             </div>
 

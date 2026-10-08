@@ -27,7 +27,7 @@ export function AdminPayments() {
   return (
     <AdminPage
       title='Payments'
-      description='Mobile money purchases. SMS are added when the customer approves the prompt on their phone.'
+      description='Mobile money purchases. .'
     >
       {paymentsQuery.isError ? (
         <p className='text-sm text-destructive'>Could not load payments.</p>
