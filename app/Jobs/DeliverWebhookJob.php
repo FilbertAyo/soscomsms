@@ -29,7 +29,7 @@ class DeliverWebhookJob implements ShouldQueue
         }
 
         $webhook = $delivery->webhook;
-        if ($webhook === null || ! $webhook->enabled) {
+        if ($webhook === null || ! $webhook->enabled || ! config('sms.webhooks.enabled')) {
             $delivery->forceFill([
                 'status' => WebhookDeliveryStatus::Failed,
                 'error' => 'Webhook is missing or disabled.',

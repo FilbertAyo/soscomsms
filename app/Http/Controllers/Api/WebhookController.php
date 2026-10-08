@@ -6,12 +6,26 @@ use App\Http\Controllers\Api\Concerns\ResolvesCustomer;
 use App\Http\Controllers\Controller;
 use App\Models\Webhook;
 use App\Services\WebhookDispatcher;
+use Closure;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
 
-class WebhookController extends Controller
+class WebhookController extends Controller implements HasMiddleware
 {
     use ResolvesCustomer;
+
+    public static function middleware(): array
+    {
+        return [
+            new Middleware(function (Request $request, Closure $next) {
+                abort_unless((bool) config('sms.webhooks.enabled'), 404);
+
+                return $next($request);
+            }),
+        ];
+    }
 
     public function index(Request $request): JsonResponse
     {

@@ -16,7 +16,7 @@ import {
   ScrollText,
   Radio,
 } from 'lucide-react'
-import { developerApiVisible } from '@/lib/features'
+import { developerApiVisible, webhooksVisible } from '@/lib/features'
 import {
   isAdmin,
   needsProfileCompletion,
@@ -90,7 +90,9 @@ const customerNavGroups: SidebarData['navGroups'] = [
               items: [
                 { title: 'API keys', url: '/developer' },
                 { title: 'Documentation', url: '/developer/docs' },
-                { title: 'Webhooks', url: '/developer/webhooks' },
+                ...(webhooksVisible
+                  ? [{ title: 'Webhooks', url: '/developer/webhooks' }]
+                  : []),
               ],
             },
           ]

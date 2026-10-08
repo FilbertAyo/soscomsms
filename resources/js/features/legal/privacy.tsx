@@ -1,4 +1,4 @@
-import { developerApiVisible } from '@/lib/features'
+import { developerApiVisible, webhooksVisible } from '@/lib/features'
 import { LegalLayout, LegalSection } from './layout'
 
 export function PrivacyPage() {
@@ -34,9 +34,11 @@ export function PrivacyPage() {
         </p>
         {developerApiVisible ? (
           <p>
-            Developer data: API key names and prefixes, request paths, status
-            codes, and webhook delivery attempts. We do not show full live keys
-            again after you create them.
+            Developer data: API key names and prefixes, request paths
+            {webhooksVisible
+              ? ', status codes, and webhook delivery attempts.'
+              : ', and status codes.'}{' '}
+            We do not show full live keys again after you create them.
           </p>
         ) : null}
         <p>

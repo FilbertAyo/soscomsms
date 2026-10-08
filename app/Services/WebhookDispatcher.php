@@ -132,6 +132,10 @@ class WebhookDispatcher
 
     public function retryDue(): int
     {
+        if (! config('sms.webhooks.enabled')) {
+            return 0;
+        }
+
         $ids = WebhookDelivery::query()
             ->where('status', WebhookDeliveryStatus::Pending)
             ->whereNotNull('next_retry_at')
@@ -155,7 +159,7 @@ class WebhookDispatcher
         ?int $campaignId,
         ?int $recipientId,
     ): void {
-        if ($customer === null) {
+        if ($customer === null || ! config('sms.webhooks.enabled')) {
             return;
         }
 

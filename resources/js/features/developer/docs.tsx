@@ -5,9 +5,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { AppHeader } from '@/components/soscom/app-header'
 import { PageHeader } from '@/components/soscom/page-header'
 import { Main } from '@/components/layout/main'
+import { webhooksVisible } from '@/lib/features'
 import { cn } from '@/lib/utils'
 
-const sections = [
+const allSections = [
   { id: 'introduction', title: 'Introduction' },
   { id: 'authentication', title: 'Authentication' },
   { id: 'send-sms', title: 'Send SMS' },
@@ -20,7 +21,11 @@ const sections = [
   { id: 'error-codes', title: 'Error codes' },
 ] as const
 
-type SectionId = (typeof sections)[number]['id']
+type SectionId = (typeof allSections)[number]['id']
+
+const sections = allSections.filter(
+  (section) => webhooksVisible || section.id !== 'webhooks'
+)
 
 function apiBase(): string {
   if (typeof window === 'undefined') {
@@ -193,7 +198,7 @@ export function ApiDocsPage() {
       <Main>
         <PageHeader
           title='API Documentation'
-          description='Send Tanzanian SMS from your own application. Developers talk only to Soscom SMS — never to the upstream gateway.'
+          description='Send Tanzanian SMS from your own application. Developers talk only to Soscom SMS never to the upstream gateway.'
         />
         <div className='grid items-start gap-8 lg:grid-cols-[13.5rem_minmax(0,1fr)]'>
           <nav className='lg:sticky lg:top-6 lg:self-start'>
@@ -232,7 +237,7 @@ export function ApiDocsPage() {
             <SenderIdsSection base={base} />
             <StatusSection base={base} />
             <ReportsSection base={base} />
-            <WebhooksSection />
+            {webhooksVisible && <WebhooksSection />}
             <ErrorsSection />
           </div>
         </div>

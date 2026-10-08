@@ -26,6 +26,21 @@ function webhookCustomer(int $balance = 20): array
 beforeEach(function () {
     Http::preventStrayRequests();
     $this->seed(PricingTierSeeder::class);
+    config(['sms.webhooks.enabled' => true]);
+});
+
+it('hides the webhook API when webhooks are turned off', function () {
+    [$user] = webhookCustomer();
+    config(['sms.webhooks.enabled' => false]);
+
+    $this->actingAs($user)->getJson('/api/webhooks')->assertNotFound();
+    $this->actingAs($user)
+        ->postJson('/api/webhooks', [
+            'name' => 'School CRM',
+            'url' => 'https://hooks.example.test/soscom',
+            'events' => [WebhookEvent::DeliveryUpdated->value],
+        ])
+        ->assertNotFound();
 });
 
 it('creates a webhook, shows the secret once, and posts a signed delivery.updated event', function () {

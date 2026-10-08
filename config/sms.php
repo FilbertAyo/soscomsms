@@ -97,6 +97,7 @@ return [
     ],
 
     'webhooks' => [
+        'enabled' => (bool) env('SMS_WEBHOOKS_ENABLED', false),
         'timeout' => (int) env('SMS_WEBHOOK_TIMEOUT', 10),
         'max_per_customer' => (int) env('SMS_WEBHOOK_MAX', 5),
         'max_attempts' => (int) env('SMS_WEBHOOK_ATTEMPTS', 5),
