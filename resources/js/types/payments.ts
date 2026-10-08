@@ -1,13 +1,16 @@
-export type PaymentStatus = 'pending' | 'paid' | 'rejected' | 'expired'
+export type PaymentStatus = 'pending' | 'paid' | 'rejected' | 'failed' | 'expired'
 
 export type PaymentRecord = {
   id: number
   quantity: number
   unitPriceTzs: number
   amountTzs: number
-  method: 'lipa_namba'
-  lipaNamba: string
+  method: 'lipa_namba' | 'snippe'
   payerReference: string
+  provider: string | null
+  feeTzs: number | null
+  netTzs: number | null
+  snippeReference: string | null
   status: PaymentStatus
   creditTransactionId: number | null
   rejectionReason: string | null

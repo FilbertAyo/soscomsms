@@ -76,9 +76,10 @@ export function TermsPage() {
           can try the product. After that you buy credits through the wallet.
         </p>
         <p>
-          Payment is by Lipa namba to SOSCOM TECHNOLOGIES COMPANY LIMITED.
-          Credits are added only after Soscom confirms the payment. A request
-          in the dashboard is not proof of payment.
+          Payment is by mobile money through Snippe. You approve the amount
+          shown at checkout on your phone with M-Pesa, Airtel Money, Mixx by
+          Yas, or Halotel. SMS credits are added only after that approval is
+          confirmed. A prompt you do not approve adds nothing.
         </p>
         <p>
           Price depends on the volume tier shown at checkout. Each 160-character

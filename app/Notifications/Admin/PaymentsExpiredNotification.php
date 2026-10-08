@@ -35,7 +35,7 @@ class PaymentsExpiredNotification extends Notification implements ShouldQueue
         $message = SoscomMail::message()
             ->subject($count === 1 ? '1 payment expired unconfirmed' : $count.' payments expired unconfirmed')
             ->greeting('Hi,')
-            ->line('These payment requests expired before anyone confirmed them:');
+            ->line('These phone prompts expired before the customer approved them:');
 
         foreach ($this->payments as $payment) {
             $payment->loadMissing('customer.user');
@@ -46,7 +46,7 @@ class PaymentsExpiredNotification extends Notification implements ShouldQueue
         }
 
         return $message
-            ->line('If any of these customers did pay, ask them to request the purchase again so you can confirm it.')
+            ->line('No SMS were added. The customer can start a new purchase from Buy SMS.')
             ->action('Open payments', url('/admin/payments'));
     }
 }

@@ -1,65 +1,61 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { applyValidationErrors } from '@/lib/auth'
 import {
   createPayment,
   createQuote,
+  fetchPayment,
   fetchPayments,
   fetchWallet,
   paymentsQueryKey,
   quantityInTier,
   quoteQueryKey,
   walletQueryKey,
+  withSmsBalance,
 } from '@/lib/credits'
-import { formatDateTime, formatNumber, formatTZS } from '@/lib/format'
+import { formatNumber, formatTZS } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/auth-store'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { AppHeader } from '@/components/soscom/app-header'
-import { PageHeader } from '@/components/soscom/page-header'
-import { CardSkeletonGrid } from '@/components/soscom/skeletons'
 import { StatusBadge } from '@/components/soscom/status-badge'
-import { TableWrap } from '@/components/soscom/table-wrap'
 import { Main } from '@/components/layout/main'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
 import { type PricingTier } from '@/types/credits'
-
-type BuyStep = 'quantity' | 'pay'
-
-const LIPA_NAMBA_NAME = 'SOSCOM TECHNOLOGIES COMPANY LIMITED'
+import { type PaymentRecord } from '@/types/payments'
 
 export function BuySmsPage() {
   const queryClient = useQueryClient()
   const profilePhone = useAuthStore((state) => state.user?.customer?.phone ?? '')
-  const [step, setStep] = useState<BuyStep>('quantity')
   const [quantityInput, setQuantityInput] = useState('')
   const [payerReference, setPayerReference] = useState(profilePhone)
+  const [watchingId, setWatchingId] = useState<number | null>(null)
+  const announced = useRef<number | null>(null)
   const walletQuery = useQuery({
     queryKey: walletQueryKey,
     queryFn: fetchWallet,
   })
   const paymentsQuery = useQuery({
     queryKey: paymentsQueryKey,
-    queryFn: () => fetchPayments(1, 100),
+    queryFn: () => fetchPayments(1, 20),
   })
   const tiers = walletQuery.data?.tiers ?? []
   const minPurchaseQuantity = walletQuery.data?.minPurchaseQuantity ?? 100
-  const lipaNamba =
-    walletQuery.data?.lipaNamba ?? paymentsQuery.data?.lipaNamba ?? '123456'
-  const lipaNambaName =
-    walletQuery.data?.lipaNambaName ??
-    paymentsQuery.data?.lipaNambaName ??
-    LIPA_NAMBA_NAME
+  const pendingPayment = (paymentsQuery.data?.payments ?? []).find(
+    (item) => item.status === 'pending'
+  )
+  const activeId = watchingId ?? pendingPayment?.id ?? null
+  const paymentQuery = useQuery({
+    queryKey: ['payments', 'status', activeId],
+    queryFn: () => fetchPayment(activeId ?? 0),
+    enabled: activeId !== null,
+    refetchInterval: (query) =>
+      query.state.data?.payment.status === 'pending' ? 3000 : false,
+  })
+  const activePayment = paymentQuery.data?.payment ?? pendingPayment ?? null
+  const waiting = activePayment?.status === 'pending'
   const quantity = parsedSmsQuantity(quantityInput)
   const localQuote = useMemo(
     () => quoteFromTiers(quantity, tiers, minPurchaseQuantity),
@@ -68,15 +64,31 @@ export function BuySmsPage() {
   const quoteQuery = useQuery({
     queryKey: quoteQueryKey(quantity),
     queryFn: () => createQuote(quantity),
-    enabled: quantity >= minPurchaseQuantity,
+    enabled: quantity >= minPurchaseQuantity && !waiting,
     retry: false,
   })
   const quote =
     quoteQuery.data?.quantity === quantity ? quoteQuery.data : localQuote
   const belowMinimum = quantity > 0 && quantity < minPurchaseQuantity
-  const pending = (paymentsQuery.data?.payments ?? []).filter(
-    (item) => item.status === 'pending'
-  )
+
+  useEffect(() => {
+    const payment = paymentQuery.data?.payment
+    const balance = paymentQuery.data?.smsBalance
+    if (!payment || payment.status !== 'paid' || balance == null) {
+      return
+    }
+    if (announced.current === payment.id) {
+      return
+    }
+    announced.current = payment.id
+    const current = useAuthStore.getState().user
+    if (current) {
+      useAuthStore.getState().setUser(withSmsBalance(current, balance))
+    }
+    toast.success(`${formatNumber(payment.quantity)} SMS added to your account.`)
+    void queryClient.invalidateQueries({ queryKey: walletQueryKey })
+    void queryClient.invalidateQueries({ queryKey: paymentsQueryKey })
+  }, [paymentQuery.data, queryClient])
 
   const buyMutation = useMutation({
     mutationFn: () =>
@@ -84,14 +96,9 @@ export function BuySmsPage() {
         quantity,
         payer_reference: payerReference.trim(),
       }),
-    onSuccess: async () => {
-      toast.success(
-        'We have recorded your payment. SMS will be added after Soscom confirms it.'
-      )
-      setStep('quantity')
-      setQuantityInput('')
-      setPayerReference(profilePhone)
-      void queryClient.invalidateQueries({ queryKey: walletQueryKey })
+    onSuccess: async (result) => {
+      setWatchingId(result.payment.id)
+      toast.success('Check your phone and approve the payment prompt.')
       void queryClient.invalidateQueries({ queryKey: paymentsQueryKey })
     },
     onError: (error) => {
@@ -101,211 +108,188 @@ export function BuySmsPage() {
 
   function selectTier(tier: PricingTier) {
     setQuantityInput(String(tier.minQuantity))
-    setStep('quantity')
   }
 
-  function goToPay() {
+  function pay() {
     if (quantity < minPurchaseQuantity) {
       toast.error(`Enter at least ${formatNumber(minPurchaseQuantity)} SMS.`)
       return
     }
-    setStep('pay')
+    buyMutation.mutate()
+  }
+
+  function startAnother() {
+    setWatchingId(null)
+    setQuantityInput('')
+    announced.current = null
+    void queryClient.invalidateQueries({ queryKey: paymentsQueryKey })
   }
 
   return (
     <>
       <AppHeader />
       <Main>
-        <PageHeader
-          title='Buy SMS'
-          description=''
-        />
-        {walletQuery.isError ? (
-          <p className='text-sm text-destructive'>
-            Could not load SMS prices. Refresh and try again.
-          </p>
-        ) : (
-          <div className='w-full space-y-6'>
-            {walletQuery.isLoading ? (
-              <CardSkeletonGrid count={3} className='w-full xl:grid-cols-3' />
-            ) : tiers.length > 0 ? (
-              <div className='grid w-full gap-4 sm:grid-cols-2 xl:grid-cols-3'>
-                {tiers.map((tier) => (
-                  <button
-                    key={tier.id}
-                    type='button'
-                    onClick={() => selectTier(tier)}
-                    className={cn(
-                      'rounded-xl border bg-card p-5 text-start',
-                      quantityInTier(quantity, tier) && 'ring-2 ring-primary'
-                    )}
-                  >
-                    <p className='text-2xl font-semibold'>{tier.label}</p>
-                    <p className='mt-1 text-muted-foreground'>
-                      {formatTZS(tier.unitPriceTzs)} per SMS
-                    </p>
-                  </button>
-                ))}
-              </div>
-            ) : null}
+        <div className='mx-auto w-full max-w-3xl'>
+          <div className='rounded-2xl border bg-card p-6 shadow-sm sm:p-8'>
+            <div className='mb-6'>
+              <h1 className='text-2xl font-semibold tracking-tight'>Buy SMS</h1>
+              <p className='mt-1 text-sm text-muted-foreground'>
+                Pay with M-Pesa, Airtel Money, Mixx by Yas, or Halotel. Approve
+                the prompt on your phone.
+              </p>
+            </div>
 
-            <div className='w-full rounded-xl border bg-card p-5 sm:p-6'>
-              <ol className='mb-6 grid grid-cols-2 gap-2 text-sm'>
-                <li
-                  className={cn(
-                    'rounded-lg border px-3 py-2',
-                    step === 'quantity'
-                      ? 'border-primary bg-primary/5 font-medium'
-                      : 'text-muted-foreground'
-                  )}
-                >
-                  1. How many SMS
-                </li>
-                <li
-                  className={cn(
-                    'rounded-lg border px-3 py-2',
-                    step === 'pay'
-                      ? 'border-primary bg-primary/5 font-medium'
-                      : 'text-muted-foreground'
-                  )}
-                >
-                  2. Pay
-                </li>
-              </ol>
-
-              {step === 'quantity' ? (
-                <div className='space-y-5'>
-                  <div className='space-y-2'>
-                    <Label htmlFor='sms-quantity'>How many SMS do you want?</Label>
-                    <Input
-                      id='sms-quantity'
-                      type='number'
-                      min={minPurchaseQuantity}
-                      step={1}
-                      inputMode='numeric'
-                      value={quantityInput}
-                      onChange={(event) => setQuantityInput(event.target.value)}
-                    />
-                    {belowMinimum ? (
-                      <p className='text-sm text-destructive'>
-                        Enter at least {formatNumber(minPurchaseQuantity)} SMS.
-                      </p>
-                    ) : (
-                      <p className='text-xs text-muted-foreground'>
-                        Minimum {formatNumber(minPurchaseQuantity)} SMS. 
-                      </p>
-                    )}
+            {walletQuery.isError ? (
+              <p className='text-sm text-destructive'>
+                Could not load SMS prices. Refresh and try again.
+              </p>
+            ) : waiting && activePayment ? (
+              <WaitingCard payment={activePayment} />
+            ) : activePayment && activePayment.status !== 'pending' && watchingId === activePayment.id ? (
+              <ResultCard payment={activePayment} onAgain={startAnother} />
+            ) : (
+              <div className='space-y-6'>
+                {tiers.length > 0 ? (
+                  <div className='grid gap-2 sm:grid-cols-3'>
+                    {tiers.map((tier) => (
+                      <button
+                        key={tier.id}
+                        type='button'
+                        onClick={() => selectTier(tier)}
+                        className={cn(
+                          'rounded-xl border px-3 py-3 text-start transition-colors hover:bg-muted/40',
+                          quantityInTier(quantity, tier) && 'border-primary bg-primary/5'
+                        )}
+                      >
+                        <p className='text-sm font-medium'>{tier.label}</p>
+                        <p className='mt-0.5 text-xs text-muted-foreground'>
+                          {formatTZS(tier.unitPriceTzs)} each
+                        </p>
+                      </button>
+                    ))}
                   </div>
-                  <QuoteSummary
-                    quote={quote}
-                    emptyHint={
-                      quantity === 0
-                        ? ''
-                        : belowMinimum
-                          ? null
-                          : 'Calculating the amount…'
-                    }
+                ) : null}
+
+                <div className='space-y-2'>
+                  <Label htmlFor='sms-quantity'>How many SMS?</Label>
+                  <Input
+                    id='sms-quantity'
+                    type='number'
+                    min={minPurchaseQuantity}
+                    step={1}
+                    inputMode='numeric'
+                    value={quantityInput}
+                    onChange={(event) => setQuantityInput(event.target.value)}
                   />
-                  <Button
-                    className='w-full sm:w-auto'
-                    disabled={quantity < minPurchaseQuantity || !quote}
-                    onClick={goToPay}
-                  >
-                    Next
-                  </Button>
-                </div>
-              ) : (
-                <div className='space-y-5'>
-                  {quoteQuery.isError && !quote ? (
+                  {belowMinimum ? (
                     <p className='text-sm text-destructive'>
-                      Could not load the amount to pay. Go back and try again.
+                      Enter at least {formatNumber(minPurchaseQuantity)} SMS.
                     </p>
                   ) : (
-                    <div className='grid gap-5 lg:grid-cols-2'>
-                      <QuoteSummary quote={quote} emptyHint='Preparing your amount…' />
-                      <div className='rounded-lg border bg-muted/30 p-4'>
-                        <p className='text-sm text-muted-foreground'>Lipa namba</p>
-                        <p className='mt-1 font-mono text-2xl font-semibold tracking-wide'>
-                          {lipaNamba}
-                        </p>
-                        <p className='mt-3 text-sm text-muted-foreground'>Name</p>
-                        <p className='mt-1 font-medium'>{lipaNambaName}</p>
-                        <p className='mt-3 text-sm text-muted-foreground'>
-                          Pay this amount to that Lipa namba. SMS is added after
-                          Soscom confirms the payment.
-                        </p>
-                      </div>
-                    </div>
+                    <p className='text-xs text-muted-foreground'>
+                      Minimum {formatNumber(minPurchaseQuantity)} SMS.
+                    </p>
                   )}
-                  <div className='max-w-md space-y-2'>
-                    <Label htmlFor='payer-reference'>
-                      Mobile number you will pay with
-                    </Label>
-                    <Input
-                      id='payer-reference'
-                      value={payerReference}
-                      onChange={(event) => setPayerReference(event.target.value)}
-                    />
-                  </div>
-                  <div className='flex gap-2'>
-                    <Button
-                      type='button'
-                      variant='outline'
-                      onClick={() => setStep('quantity')}
-                    >
-                      Back
-                    </Button>
-                    <Button
-                      disabled={
-                        buyMutation.isPending ||
-                        !quote ||
-                        payerReference.trim().length < 3
-                      }
-                      onClick={() => buyMutation.mutate()}
-                    >
-                      {buyMutation.isPending ? 'Please wait…' : 'Submit for confirmation'}
-                    </Button>
-                  </div>
                 </div>
-              )}
-            </div>
+
+                <div className='rounded-xl bg-muted/40 px-4 py-4'>
+                  <p className='text-sm text-muted-foreground'>Amount to pay</p>
+                  <p className='mt-1 text-3xl font-semibold tracking-tight'>
+                    {quote ? formatTZS(quote.totalTzs) : '—'}
+                  </p>
+                  {quote ? (
+                    <p className='mt-1 text-sm text-muted-foreground'>
+                      {formatNumber(quote.quantity)} SMS at {formatTZS(quote.unitPriceTzs)} each
+                    </p>
+                  ) : null}
+                </div>
+
+                <div className='space-y-2'>
+                  <Label htmlFor='payer-reference'>Mobile number to approve the payment</Label>
+                  <Input
+                    id='payer-reference'
+                    type='tel'
+                    inputMode='tel'
+                    autoComplete='tel'
+                    placeholder='07XXXXXXXX'
+                    value={payerReference}
+                    onChange={(event) => setPayerReference(event.target.value)}
+                  />
+                  <p className='text-xs text-muted-foreground'>
+                    This number receives the PIN prompt. It can be different from
+                    the number on your account.
+                  </p>
+                </div>
+
+                <Button
+                  className='w-full'
+                  disabled={
+                    buyMutation.isPending ||
+                    quantity < minPurchaseQuantity ||
+                    !quote ||
+                    payerReference.trim().length < 9
+                  }
+                  onClick={pay}
+                >
+                  {buyMutation.isPending ? 'Sending prompt…' : 'Pay with mobile money'}
+                </Button>
+              </div>
+            )}
           </div>
-        )}
-        {pending.length > 0 ? (
-          <div className='mt-10 w-full'>
-            <h2 className='mb-3 text-lg font-semibold'>Waiting for confirmation</h2>
-            <TableWrap>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Requested</TableHead>
-                    <TableHead>SMS</TableHead>
-                    <TableHead>Amount</TableHead>
-                    <TableHead>Payer</TableHead>
-                    <TableHead>Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {pending.map((item) => (
-                    <TableRow key={item.id}>
-                      <TableCell>
-                        {item.createdAt ? formatDateTime(item.createdAt) : '—'}
-                      </TableCell>
-                      <TableCell>{formatNumber(item.quantity)}</TableCell>
-                      <TableCell>{formatTZS(item.amountTzs)}</TableCell>
-                      <TableCell>{item.payerReference}</TableCell>
-                      <TableCell>
-                        <StatusBadge status={item.status} />
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableWrap>
-          </div>
-        ) : null}
+        </div>
       </Main>
     </>
+  )
+}
+
+function WaitingCard({ payment }: { payment: PaymentRecord }) {
+  return (
+    <div className='space-y-4'>
+      <div className='rounded-xl bg-muted/40 px-4 py-4'>
+        <p className='text-sm text-muted-foreground'>Waiting for approval</p>
+        <p className='mt-1 text-3xl font-semibold tracking-tight'>
+          {formatTZS(payment.amountTzs)}
+        </p>
+        <p className='mt-1 text-sm text-muted-foreground'>
+          {formatNumber(payment.quantity)} SMS · prompt sent to {payment.payerReference}
+        </p>
+      </div>
+      <p className='text-sm text-muted-foreground'>
+        Open the prompt on that phone and enter your mobile-money PIN. This page
+        updates when the payment is confirmed.
+      </p>
+      <StatusBadge status={payment.status} />
+    </div>
+  )
+}
+
+function ResultCard({
+  payment,
+  onAgain,
+}: {
+  payment: PaymentRecord
+  onAgain: () => void
+}) {
+  const paid = payment.status === 'paid'
+
+  return (
+    <div className='space-y-4'>
+      <div className='rounded-xl bg-muted/40 px-4 py-4'>
+        <p className='text-sm text-muted-foreground'>
+          {paid ? 'Payment confirmed' : 'Payment not completed'}
+        </p>
+        <p className='mt-1 text-3xl font-semibold tracking-tight'>
+          {paid ? `${formatNumber(payment.quantity)} SMS` : formatTZS(payment.amountTzs)}
+        </p>
+        {payment.rejectionReason ? (
+          <p className='mt-2 text-sm text-muted-foreground'>{payment.rejectionReason}</p>
+        ) : null}
+      </div>
+      <StatusBadge status={payment.status} />
+      <Button className='w-full' variant={paid ? 'default' : 'outline'} onClick={onAgain}>
+        {paid ? 'Buy more SMS' : 'Try again'}
+      </Button>
+    </div>
   )
 }
 
@@ -314,34 +298,6 @@ type QuotePreview = {
   unitPriceTzs: number
   totalTzs: number
   tier: PricingTier
-}
-
-function QuoteSummary({
-  quote,
-  emptyHint,
-}: {
-  quote: QuotePreview | null
-  emptyHint: string | null
-}) {
-  if (!quote) {
-    return emptyHint ? (
-      <p className='text-sm text-muted-foreground'>{emptyHint}</p>
-    ) : null
-  }
-
-  return (
-    <div className='rounded-lg border bg-muted/30 p-4'>
-      <p className='text-sm text-muted-foreground'>Amount to pay</p>
-      <p className='mt-1 text-3xl font-semibold tracking-tight'>
-        {formatTZS(quote.totalTzs)}
-      </p>
-      <p className='mt-2 text-sm text-muted-foreground'>
-        {formatNumber(quote.quantity)} SMS
-        {quantityInTier(quote.quantity, quote.tier) ? ` · ${quote.tier.label}` : ''}{' '}
-        at {formatTZS(quote.unitPriceTzs)} each
-      </p>
-    </div>
-  )
 }
 
 function parsedSmsQuantity(value: string): number {

@@ -11,7 +11,7 @@ class ExpirePendingPaymentsCommand extends Command
 {
     protected $signature = 'payments:expire';
 
-    protected $description = 'Expire pending SMS purchase requests that were not confirmed';
+    protected $description = 'Expire pending SMS purchases whose phone prompt was not approved';
 
     public function handle(PaymentService $payments): int
     {

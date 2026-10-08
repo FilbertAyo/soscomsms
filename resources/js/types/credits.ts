@@ -54,8 +54,6 @@ export type SmsPackageQuote = {
 export type WalletSnapshot = {
   smsBalance: number
   welcomeCredits: number
-  lipaNamba: string
-  lipaNambaName: string
   minPurchaseQuantity: number
   tiers: PricingTier[]
   packages: SmsPackageQuote[]

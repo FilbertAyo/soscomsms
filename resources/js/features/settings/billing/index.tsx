@@ -28,12 +28,11 @@ export function SettingsBilling() {
   })
   const payments = paymentsQuery.data?.payments ?? []
   const meta = paymentsQuery.data?.meta
-  const lipaNamba = paymentsQuery.data?.lipaNamba ?? '123456'
 
   return (
     <ContentSection
       title='Billing'
-      desc='Purchase history and how to pay for SMS credits.'
+      desc='Purchase history for SMS credits.'
     >
       <div className='space-y-6'>
         <p className='text-sm'>
@@ -41,17 +40,8 @@ export function SettingsBilling() {
           <span className='font-semibold'>{formatNumber(balance)} SMS</span>
         </p>
         <p className='text-sm text-muted-foreground'>
-          Pay with Lipa namba{' '}
-          <span className='font-mono font-medium text-foreground'>
-            {lipaNamba}
-          </span>
-          {paymentsQuery.data?.lipaNambaName ? (
-            <>
-              {' '}
-              ({paymentsQuery.data.lipaNambaName})
-            </>
-          ) : null}
-          . SMS appear after Soscom confirms the payment.
+          Buy SMS with mobile money. Credits appear after you approve the
+          prompt on your phone.
         </p>
         <div className='flex flex-wrap gap-2'>
           <Button asChild>

@@ -27,8 +27,9 @@ export function PrivacyPage() {
           numbers you upload, group names, send times, and delivery status.
         </p>
         <p>
-          Billing data: SMS balance, credit history, Lipa namba payer
-          reference, purchase amounts in TZS, and admin confirmation notes.
+          Billing data: SMS balance, credit history, the mobile number used
+          to pay, the payment reference, and the amount in TZS. We do not
+          store your mobile-money PIN.
         </p>
         {developerApiVisible ? (
           <p>
@@ -69,8 +70,10 @@ export function PrivacyPage() {
             : 'password or billing records.'}
         </p>
         <p>
-          Payment: Lipa namba payments are made on the mobile-money network.
-          We only store the payer reference you type and the amount we expect.
+          Payment: Snippe (snippe.sh) receives your name, email, paying
+          phone number, and the amount so it can send a PIN prompt to
+          M-Pesa, Airtel Money, Mixx by Yas, or Halotel. We store the
+          result of that payment. We never receive or store the PIN.
         </p>
         <p>
           Hosting and email: servers and mail used to run sms.soscom.co.tz and

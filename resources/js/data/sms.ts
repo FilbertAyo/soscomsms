@@ -681,7 +681,7 @@ export const faqs = [
     items: [
       {
         q: 'How do I buy more SMS?',
-        a: 'Go to Buy SMS, enter how many SMS you need (from 100), pay the quoted amount to Lipa namba 123456, then submit the mobile number you paid with. Credits appear after Soscom confirms the payment.',
+        a: 'Go to Buy SMS, enter how many SMS you need (from 100), and the mobile number that will approve the payment. A prompt is sent to that phone. Credits appear after you approve it.',
       },
       {
         q: 'Do unused SMS expire?',
@@ -716,7 +716,7 @@ export const faqs = [
     items: [
       {
         q: 'Which payment methods can I use?',
-        a: 'Pay the quoted amount to Lipa namba 123456 (mobile money), then submit the name or number you paid with. Soscom confirms the payment before credits are added.',
+        a: 'M-Pesa, Airtel Money, Mixx by Yas, and Halotel. Enter the mobile number at Buy SMS and approve the prompt on that phone. Credits are added when the payment is confirmed.',
       },
     ],
   },

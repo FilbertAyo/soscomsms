@@ -41,6 +41,7 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
         $middleware->validateCsrfTokens(except: [
             'api/provider/delivery-reports',
+            'api/webhooks/snippe',
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

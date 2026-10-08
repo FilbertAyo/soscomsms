@@ -103,13 +103,10 @@ return [
         'backoff' => [60, 300, 900, 3600],
     ],
 
-    'billing' => [
-        'lipa_namba' => env('SMS_LIPA_NAMBA', '123456'),
-        'lipa_namba_name' => env(
-            'SMS_LIPA_NAMBA_NAME',
-            'SOSCOM TECHNOLOGIES COMPANY LIMITED',
-        ),
-        'payment_expires_hours' => (int) env('SMS_PAYMENT_EXPIRES_HOURS', 72),
+    'snippe' => [
+        'api_key' => env('SNIPPE_API_KEY'),
+        'webhook_secret' => env('SNIPPE_WEBHOOK_SECRET'),
+        'base_url' => rtrim((string) env('SNIPPE_BASE_URL', 'https://api.snippe.sh'), '/'),
     ],
 
     'production' => [

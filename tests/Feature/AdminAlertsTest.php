@@ -9,7 +9,6 @@ use App\Models\Customer;
 use App\Models\Payment;
 use App\Models\User;
 use App\Notifications\Admin\NewUserRegisteredNotification;
-use App\Notifications\Admin\PaymentAwaitingConfirmationNotification;
 use App\Notifications\Admin\PaymentsExpiredNotification;
 use App\Notifications\Admin\ProfileCompletedNotification;
 use App\Notifications\Admin\SenderIdRequestedNotification;
@@ -91,8 +90,10 @@ it('emails admins about a new Sender ID request', function () {
     Notification::assertNotSentTo($user, SenderIdRequestedNotification::class);
 });
 
-it('emails admins when a payment needs confirming', function () {
+it('does not ask an admin to confirm a mobile money payment', function () {
     Notification::fake();
+    configureSnippe();
+    fakeSnippePayment();
     $admin = User::factory()->admin()->create();
     [$user] = alertsCustomer();
 
@@ -103,11 +104,7 @@ it('emails admins when a payment needs confirming', function () {
         ])
         ->assertCreated();
 
-    Notification::assertSentTo(
-        $admin,
-        PaymentAwaitingConfirmationNotification::class,
-        fn (PaymentAwaitingConfirmationNotification $n) => $n->payment->payer_reference === '0754221890',
-    );
+    Notification::assertNothingSentTo($admin);
 });
 
 it('sends one summary email when pending payments expire', function () {

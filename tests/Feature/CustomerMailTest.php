@@ -6,7 +6,6 @@ use App\Models\SenderIdRequest;
 use App\Models\User;
 use App\Notifications\LoginOtpNotification;
 use App\Notifications\PaymentConfirmedNotification;
-use App\Notifications\PaymentRejectedNotification;
 use App\Notifications\PaymentRequestedNotification;
 use App\Notifications\SenderIdApprovedNotification;
 use App\Notifications\SenderIdRejectedNotification;
@@ -39,16 +38,17 @@ it('emails a welcome message after a customer registers', function () {
     Notification::assertSentTo($user, LoginOtpNotification::class);
 });
 
-it('emails payment requested, confirmed, and rejected notices', function () {
+it('emails a payment prompt and a confirmation when the payment succeeds', function () {
     Notification::fake();
     $this->seed(PricingTierSeeder::class);
+    configureSnippe();
+    fakeSnippePayment();
 
-    $user = User::factory()->create();
-    $customer = Customer::factory()->complete()->create([
+    $user = User::factory()->create(['name' => 'Amina Juma']);
+    Customer::factory()->complete()->create([
         'user_id' => $user->id,
         'sms_balance' => 9,
     ]);
-    $admin = User::factory()->admin()->create();
 
     $create = $this->actingAs($user)
         ->postJson('/api/payments', [
@@ -59,26 +59,13 @@ it('emails payment requested, confirmed, and rejected notices', function () {
 
     Notification::assertSentTo($user, PaymentRequestedNotification::class);
 
-    $this->actingAs($admin)
-        ->postJson('/api/admin/payments/'.$create->json('payment.id').'/confirmation')
-        ->assertOk();
+    postSnippeWebhook(snippeCompletedEvent(
+        'ref-pay-1',
+        2500,
+        (int) $create->json('payment.id'),
+    ))->assertOk();
 
     Notification::assertSentTo($user, PaymentConfirmedNotification::class);
-
-    $second = $this->actingAs($user)
-        ->postJson('/api/payments', [
-            'quantity' => 100,
-            'payer_reference' => '0754221890',
-        ])
-        ->assertCreated();
-
-    $this->actingAs($admin)
-        ->postJson('/api/admin/payments/'.$second->json('payment.id').'/rejection', [
-            'rejection_reason' => 'No Lipa namba payment received.',
-        ])
-        ->assertOk();
-
-    Notification::assertSentTo($user, PaymentRejectedNotification::class);
 });
 
 it('emails sender id approval and rejection', function () {

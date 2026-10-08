@@ -50,6 +50,7 @@ const labels: Record<string, { label: string; tone: keyof typeof tones }> = {
   paid: { label: 'Paid', tone: 'success' },
   expired: { label: 'Expired', tone: 'muted' },
   lipa_namba: { label: 'Lipa namba', tone: 'info' },
+  snippe: { label: 'Mobile money', tone: 'info' },
 }
 
 type StatusBadgeProps = {

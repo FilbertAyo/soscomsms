@@ -221,22 +221,27 @@ export async function fetchPayments(
   perPage?: number
 ): Promise<{
   payments: PaymentRecord[]
-  lipaNamba: string
-  lipaNambaName: string
   meta: PageMeta
 }> {
   const { data } = await api.get<{
     payments: PaymentRecord[]
-    lipaNamba: string
-    lipaNambaName: string
     meta?: PageMeta
   }>('/api/payments', { params: { page, per_page: perPage } })
   return {
     payments: data.payments,
-    lipaNamba: data.lipaNamba,
-    lipaNambaName: data.lipaNambaName,
     meta: data.meta ?? emptyPageMeta,
   }
+}
+
+export async function fetchPayment(id: number): Promise<{
+  payment: PaymentRecord
+  smsBalance: number | null
+}> {
+  const { data } = await api.get<{
+    payment: PaymentRecord
+    smsBalance: number | null
+  }>(`/api/payments/${id}`)
+  return data
 }
 
 export async function createPayment(payload: {
@@ -255,48 +260,18 @@ export async function fetchAdminPayments(
   status?: string
 ): Promise<{
   payments: PaymentRecord[]
-  lipaNamba: string
-  lipaNambaName: string
   meta: PageMeta
 }> {
   const { data } = await api.get<{
     payments: PaymentRecord[]
-    lipaNamba: string
-    lipaNambaName: string
     meta?: PageMeta
   }>('/api/admin/payments', {
     params: { page, status: status || undefined },
   })
   return {
     payments: data.payments,
-    lipaNamba: data.lipaNamba,
-    lipaNambaName: data.lipaNambaName,
     meta: data.meta ?? emptyPageMeta,
   }
-}
-
-export async function confirmAdminPayment(
-  id: number,
-  note?: string
-): Promise<{ payment: PaymentRecord; smsBalance: number | undefined }> {
-  const { data } = await api.post<{
-    payment: PaymentRecord
-    smsBalance?: number
-  }>(`/api/admin/payments/${id}/confirmation`, {
-    note: note || undefined,
-  })
-  return data
-}
-
-export async function rejectAdminPayment(
-  id: number,
-  rejectionReason: string
-): Promise<PaymentRecord> {
-  const { data } = await api.post<{ payment: PaymentRecord }>(
-    `/api/admin/payments/${id}/rejection`,
-    { rejection_reason: rejectionReason }
-  )
-  return data.payment
 }
 
 export function withSmsBalance(user: AuthUser, smsBalance: number): AuthUser {

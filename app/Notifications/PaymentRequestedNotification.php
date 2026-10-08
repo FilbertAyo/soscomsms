@@ -33,8 +33,8 @@ class PaymentRequestedNotification extends Notification implements ShouldQueue
         return SoscomMail::message()
             ->subject('Complete your SMS purchase')
             ->greeting(SoscomMail::greetingFor($user))
-            ->line('Pay '.SoscomMail::tzs($this->payment->amount_tzs).' to Lipa namba '.$this->payment->lipa_namba.' ('.config('sms.billing.lipa_namba_name', 'SOSCOM TECHNOLOGIES COMPANY LIMITED').') for '.$this->payment->quantity.' SMS.')
-            ->line('We will add the SMS after we confirm the payment. Your balance does not change until then.')
+            ->line('We sent a mobile money prompt for '.SoscomMail::tzs($this->payment->amount_tzs).' to '.$this->payment->payer_reference.' for '.$this->payment->quantity.' SMS.')
+            ->line('Approve it on your phone. Your balance does not change until the payment is confirmed.')
             ->action('View billing', url('/settings/billing'));
     }
 }

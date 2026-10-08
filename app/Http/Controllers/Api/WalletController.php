@@ -54,11 +54,6 @@ class WalletController extends Controller
         return response()->json([
             'smsBalance' => $customer->sms_balance,
             'welcomeCredits' => (int) config('sms.welcome_credits', 20),
-            'lipaNamba' => (string) config('sms.billing.lipa_namba', '123456'),
-            'lipaNambaName' => (string) config(
-                'sms.billing.lipa_namba_name',
-                'SOSCOM TECHNOLOGIES COMPANY LIMITED',
-            ),
             'minPurchaseQuantity' => (int) config('sms.min_purchase_quantity', 100),
             'tiers' => $tiers,
             'packages' => $packages,

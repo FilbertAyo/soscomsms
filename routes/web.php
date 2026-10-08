@@ -30,6 +30,7 @@ use App\Http\Controllers\Api\QuoteController;
 use App\Http\Controllers\Api\SenderIdController;
 use App\Http\Controllers\Api\SenderIdRequestController;
 use App\Http\Controllers\Api\SessionAuthController;
+use App\Http\Controllers\Api\SnippeWebhookController;
 use App\Http\Controllers\Api\WalletController;
 use App\Http\Controllers\Api\WebhookController;
 use Illuminate\Support\Facades\Route;
@@ -39,6 +40,8 @@ Route::redirect('/register', '/sign-up');
 
 Route::prefix('api')->group(function (): void {
     Route::match(['get', 'post'], '/provider/delivery-reports', [ProviderDeliveryReportController::class, 'store'])
+        ->middleware('throttle:120,1');
+    Route::post('/webhooks/snippe', [SnippeWebhookController::class, 'store'])
         ->middleware('throttle:120,1');
     Route::post('/register', [SessionAuthController::class, 'register'])
         ->middleware('throttle:register');
@@ -112,6 +115,7 @@ Route::prefix('api')->group(function (): void {
 
             Route::get('/payments', [PaymentController::class, 'index']);
             Route::post('/payments', [PaymentController::class, 'store']);
+            Route::get('/payments/{payment}', [PaymentController::class, 'show']);
         });
 
         Route::middleware('admin')->prefix('admin')->group(function (): void {
@@ -152,8 +156,6 @@ Route::prefix('api')->group(function (): void {
             Route::post('/sender-id-requests/{senderIdRequest}/resubmission-requests', [AdminSenderIdRequestController::class, 'requestResubmission']);
             Route::get('/api-usage', [AdminApiUsageController::class, 'index']);
             Route::get('/payments', [AdminPaymentController::class, 'index']);
-            Route::post('/payments/{payment}/confirmation', [AdminPaymentController::class, 'confirm']);
-            Route::post('/payments/{payment}/rejection', [AdminPaymentController::class, 'reject']);
         });
     });
 });
