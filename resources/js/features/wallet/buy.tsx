@@ -30,7 +30,8 @@ export function BuySmsPage() {
   const queryClient = useQueryClient()
   const profilePhone = useAuthStore((state) => state.user?.customer?.phone ?? '')
   const [quantityInput, setQuantityInput] = useState('')
-  const [payerReference, setPayerReference] = useState(profilePhone)
+  const [payerDigits, setPayerDigits] = useState(() => tzLocalDigits(profilePhone))
+  const payerValid = /^[67]\d{8}$/.test(payerDigits)
   const [watchingId, setWatchingId] = useState<number | null>(null)
   const announced = useRef<number | null>(null)
   const walletQuery = useQuery({
@@ -94,7 +95,7 @@ export function BuySmsPage() {
     mutationFn: () =>
       createPayment({
         quantity,
-        payer_reference: payerReference.trim(),
+        payer_reference: `+255${payerDigits}`,
       }),
     onSuccess: async (result) => {
       setWatchingId(result.payment.id)
@@ -206,19 +207,33 @@ export function BuySmsPage() {
 
                 <div className='space-y-2'>
                   <Label htmlFor='payer-reference'>Mobile number to approve the payment</Label>
-                  <Input
-                    id='payer-reference'
-                    type='tel'
-                    inputMode='tel'
-                    autoComplete='tel'
-                    placeholder='07XXXXXXXX'
-                    value={payerReference}
-                    onChange={(event) => setPayerReference(event.target.value)}
-                  />
-                  <p className='text-xs text-muted-foreground'>
-                    This number receives the PIN prompt. It can be different from
-                    the number on your account.
-                  </p>
+                  <div className='relative'>
+                    <span className='pointer-events-none absolute inset-y-0 start-0 flex items-center border-e px-3 text-sm text-muted-foreground select-none'>
+                      +255
+                    </span>
+                    <Input
+                      id='payer-reference'
+                      type='tel'
+                      inputMode='numeric'
+                      autoComplete='tel-national'
+                      placeholder='7XXXXXXXX'
+                      className='ps-16'
+                      value={payerDigits}
+                      onChange={(event) =>
+                        setPayerDigits(tzLocalDigits(event.target.value))
+                      }
+                    />
+                  </div>
+                  {payerDigits.length === 9 && !payerValid ? (
+                    <p className='text-sm text-destructive'>
+                      Enter a Tanzanian mobile number starting with 6 or 7.
+                    </p>
+                  ) : (
+                    <p className='text-xs text-muted-foreground'>
+                      This number receives the PIN prompt. It can be different
+                      from the number on your account.
+                    </p>
+                  )}
                 </div>
 
                 <Button
@@ -227,7 +242,7 @@ export function BuySmsPage() {
                     buyMutation.isPending ||
                     quantity < minPurchaseQuantity ||
                     !quote ||
-                    payerReference.trim().length < 9
+                    !payerValid
                   }
                   onClick={pay}
                 >
@@ -298,6 +313,16 @@ type QuotePreview = {
   unitPriceTzs: number
   totalTzs: number
   tier: PricingTier
+}
+
+function tzLocalDigits(value: string): string {
+  let digits = value.replace(/\D+/g, '')
+
+  if (digits.startsWith('255') && digits.length > 9) {
+    digits = digits.slice(3)
+  }
+
+  return digits.replace(/^0+/, '').slice(0, 9)
 }
 
 function parsedSmsQuantity(value: string): number {
