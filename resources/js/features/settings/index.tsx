@@ -2,13 +2,10 @@ import { Outlet } from '@tanstack/react-router'
 import {
   Bell,
   Building2,
-  CreditCard,
-  KeyRound,
   Lock,
   Palette,
   UserCog,
 } from 'lucide-react'
-import { developerApiVisible } from '@/lib/features'
 import { Separator } from '@/components/ui/separator'
 import { AppHeader } from '@/components/soscom/app-header'
 import { Main } from '@/components/layout/main'
@@ -39,20 +36,6 @@ const sidebarNavItems = [
     title: 'Notifications',
     href: '/settings/notifications',
     icon: <Bell size={18} />,
-  },
-  ...(developerApiVisible
-    ? [
-        {
-          title: 'API',
-          href: '/settings/api',
-          icon: <KeyRound size={18} />,
-        },
-      ]
-    : []),
-  {
-    title: 'Billing',
-    href: '/settings/billing',
-    icon: <CreditCard size={18} />,
   },
 ]
 

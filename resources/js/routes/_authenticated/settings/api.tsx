@@ -1,10 +1,8 @@
-import { createFileRoute } from '@tanstack/react-router'
-import { SettingsApi } from '@/features/settings/api'
-import { assertDeveloperApiVisible } from '@/lib/features'
+import { createFileRoute, redirect } from '@tanstack/react-router'
 
 export const Route = createFileRoute('/_authenticated/settings/api')({
   beforeLoad: () => {
-    assertDeveloperApiVisible()
+    throw redirect({ to: '/developer' })
   },
-  component: SettingsApi,
+  component: () => null,
 })

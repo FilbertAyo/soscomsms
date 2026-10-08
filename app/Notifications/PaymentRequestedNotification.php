@@ -35,6 +35,6 @@ class PaymentRequestedNotification extends Notification implements ShouldQueue
             ->greeting(SoscomMail::greetingFor($user))
             ->line('We sent a mobile money prompt for '.SoscomMail::tzs($this->payment->amount_tzs).' to '.$this->payment->payer_reference.' for '.$this->payment->quantity.' SMS.')
             ->line('Approve it on your phone. Your balance does not change until the payment is confirmed.')
-            ->action('View billing', url('/settings/billing'));
+            ->action('View wallet', url('/wallet'));
     }
 }

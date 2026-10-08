@@ -224,7 +224,7 @@ export function ApiDocsPage() {
             </ul>
           </nav>
           <div className='min-w-0 space-y-10'>
-            <IntroSection base={base} />
+            <IntroSection />
             <AuthSection />
             <SendSection base={base} />
             <BulkSection base={base} />
@@ -241,7 +241,9 @@ export function ApiDocsPage() {
   )
 }
 
-function IntroSection({ base }: { base: string }) {
+const productionApiBase = 'https://sms.soscom.co.tz/api/v1'
+
+function IntroSection() {
   return (
     <DocSection id='introduction' title='Introduction'>
       <p>
@@ -250,23 +252,14 @@ function IntroSection({ base }: { base: string }) {
         <Link to='/developer' className='font-medium text-primary hover:underline'>
           API keys
         </Link>
-        , then call these endpoints. Your customers and servers do not need an
-        IP whitelist. Soscom sends from its own server after the upstream
+        , then call the endpoints below. Your customers and servers do not need
+        an IP whitelist. Soscom sends from its own server after the upstream
         provider allows that address.
       </p>
-      <Callout>
-        Production base URL is <code>https://sms.soscom.co.tz/api/v1</code>.
-        This environment uses <code>{base}/api/v1</code>.
-      </Callout>
-      <ul className='space-y-2 text-sm'>
-        <Endpoint method='POST' path='/api/v1/sms/send' />
-        <Endpoint method='POST' path='/api/v1/sms/bulk' />
-        <Endpoint method='GET' path='/api/v1/balance' />
-        <Endpoint method='GET' path='/api/v1/sender-ids' />
-        <Endpoint method='GET' path='/api/v1/sms/{id}' />
-        <Endpoint method='GET' path='/api/v1/messages/{id}' />
-        <Endpoint method='GET' path='/api/v1/reports' />
-      </ul>
+      <p className='text-xs font-semibold tracking-wider text-muted-foreground uppercase'>
+        Base URL
+      </p>
+      <Endpoint path={productionApiBase} />
       <p>
         Credits are deducted when SOSCOM accepts the send into its queue — the
         same as the dashboard. A gateway reject is refunded. A timeout is left
@@ -517,28 +510,42 @@ function DocSection({
   )
 }
 
-function Endpoint({ method, path }: { method: 'GET' | 'POST'; path: string }) {
+function Endpoint({
+  method,
+  path,
+}: {
+  method?: 'GET' | 'POST'
+  path: string
+}) {
+  const [copied, setCopied] = useState(false)
+
   return (
     <div className='flex flex-wrap items-center gap-2 font-mono text-sm text-foreground'>
-      <span
-        className={cn(
-          'rounded px-1.5 py-0.5 text-[11px] font-semibold tracking-wide',
-          method === 'GET'
-            ? 'bg-muted text-foreground'
-            : 'bg-primary/15 text-primary'
-        )}
-      >
-        {method}
-      </span>
+      {method ? (
+        <span
+          className={cn(
+            'rounded px-1.5 py-0.5 text-[11px] font-semibold tracking-wide',
+            method === 'GET'
+              ? 'bg-muted text-foreground'
+              : 'bg-primary/15 text-primary'
+          )}
+        >
+          {method}
+        </span>
+      ) : null}
       <span>{path}</span>
-    </div>
-  )
-}
-
-function Callout({ children }: { children: ReactNode }) {
-  return (
-    <div className='rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-foreground'>
-      {children}
+      <button
+        type='button'
+        className='rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground'
+        onClick={async () => {
+          await navigator.clipboard.writeText(path)
+          setCopied(true)
+          window.setTimeout(() => setCopied(false), 1500)
+        }}
+        aria-label='Copy'
+      >
+        {copied ? <Check className='size-3.5' /> : <Copy className='size-3.5' />}
+      </button>
     </div>
   )
 }

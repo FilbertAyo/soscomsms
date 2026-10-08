@@ -1,5 +1,4 @@
 import {
-  CircleHelp,
   CreditCard,
   FileText,
   KeyRound,
@@ -96,11 +95,6 @@ const customerNavGroups: SidebarData['navGroups'] = [
             },
           ]
         : []),
-      {
-        title: 'Help',
-        url: '/help-center',
-        icon: CircleHelp,
-      },
     ],
   },
 ]

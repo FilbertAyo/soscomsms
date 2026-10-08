@@ -1,6 +1,8 @@
-import { createFileRoute } from '@tanstack/react-router'
-import { SettingsBilling } from '@/features/settings/billing'
+import { createFileRoute, redirect } from '@tanstack/react-router'
 
 export const Route = createFileRoute('/_authenticated/settings/billing')({
-  component: SettingsBilling,
+  beforeLoad: () => {
+    throw redirect({ to: '/wallet' })
+  },
+  component: () => null,
 })
