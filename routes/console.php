@@ -8,6 +8,7 @@ use App\Console\Commands\ExpirePendingPaymentsCommand;
 use App\Console\Commands\PollDeliveryReportsCommand;
 use App\Console\Commands\RetryWebhooksCommand;
 use App\Console\Commands\SendProfileRemindersCommand;
+use App\Models\ProviderLog;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
@@ -46,3 +47,7 @@ Schedule::command(BackupDatabaseCommand::class)
 Schedule::command(SendProfileRemindersCommand::class)
     ->dailyAt('10:00')
     ->withoutOverlapping(30);
+
+Schedule::command('model:prune', ['--model' => [ProviderLog::class]])
+    ->dailyAt('03:00')
+    ->withoutOverlapping(60);

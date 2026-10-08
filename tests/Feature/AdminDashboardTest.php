@@ -255,3 +255,34 @@ it('records grants in the audit log and shows provider logs without gateway payl
         ->and($response->json('auditLogs.0.message'))->toContain('1000 SMS')
         ->and($response->json('auditLogs.0.message'))->toContain('customer@soscom.co.tz');
 });
+
+it('shows only the last 30 days of gateway logs and prunes logs older than 90 days', function () {
+    [$admin] = adminDashboardCustomer();
+
+    $makeLog = function (int $daysAgo): ProviderLog {
+        $log = ProviderLog::query()->create([
+            'provider_id' => Provider::current()->id,
+            'action' => 'send',
+            'status' => 'ok',
+        ]);
+        $log->forceFill(['created_at' => now()->subDays($daysAgo)])->save();
+
+        return $log;
+    };
+
+    $recent = $makeLog(2);
+    $older = $makeLog(45);
+    $ancient = $makeLog(120);
+
+    $this->actingAs($admin)
+        ->getJson('/api/admin/logs')
+        ->assertOk()
+        ->assertJsonPath('providerMeta.total', 1)
+        ->assertJsonPath('providerLogs.0.id', $recent->id);
+
+    $this->artisan('model:prune', ['--model' => [ProviderLog::class]])->assertSuccessful();
+
+    expect(ProviderLog::query()->pluck('id')->all())
+        ->toEqualCanonicalizing([$recent->id, $older->id])
+        ->and(ProviderLog::query()->whereKey($ancient->id)->exists())->toBeFalse();
+});

@@ -22,6 +22,7 @@ class LogController extends Controller
 
         $provider = ProviderLog::query()
             ->with(['provider', 'campaign'])
+            ->where('created_at', '>=', now()->subDays(30))
             ->latest('id')
             ->paginate($perPage, ['*'], 'provider_page', max($request->integer('provider_page', 1), 1));
 

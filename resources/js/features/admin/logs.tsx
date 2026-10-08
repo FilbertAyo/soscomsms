@@ -60,7 +60,7 @@ export function AdminGatewayLogs() {
   return (
     <AdminPage
       title='Gateway Logs'
-      description='Mobishastra send replies. Use these to see why an SMS did not reach a phone.'
+      description='Mobishastra send replies from the last 30 days. Use these to see why an SMS did not reach a phone.'
     >
       <p className='mb-3 text-xs text-muted-foreground'>
         blocked = Soscom never called Mobishastra. timeout = no reply. 000 /
@@ -73,7 +73,7 @@ export function AdminGatewayLogs() {
         <>
           {logs.length === 0 ? (
             <p className='text-xs text-muted-foreground'>
-              {logsQuery.isLoading ? 'Loading…' : 'No gateway send logs yet.'}
+              {logsQuery.isLoading ? 'Loading…' : 'No gateway send logs in the last 30 days.'}
             </p>
           ) : (
             <div className='divide-y rounded-lg border bg-card text-xs'>
