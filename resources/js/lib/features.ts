@@ -5,7 +5,7 @@ import { redirect } from '@tanstack/react-router'
  * Set this to true to show those surfaces again. The pages and backend stay in place either way.
  * Admin "API Usage" does not use this flag.
  */
-export const developerApiVisible = false
+export const developerApiVisible = true
 
 export function assertDeveloperApiVisible(): void {
   if (!developerApiVisible) {

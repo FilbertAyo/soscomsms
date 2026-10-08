@@ -7,9 +7,10 @@ export function PrivacyPage() {
       <LegalSection title='1. Who we are'>
         <p>
           SOSCOM Technologies Company Limited runs Soscom SMS at
+          sms.soscom.co.tz. This page explains what we collect when you use
           {developerApiVisible
-            ? 'sms.soscom.co.tz. This page explains what we collect when you use the dashboard or the SMS API, and how we use it.'
-            : 'sms.soscom.co.tz. This page explains what we collect when you use the dashboard, and how we use it.'}
+            ? ' the dashboard or the SMS API, and how we use it.'
+            : ' the dashboard, and how we use it.'}
         </p>
         <p>
           Contact for privacy questions: sms@soscom.co.tz.
@@ -66,8 +67,8 @@ export function PrivacyPage() {
           Wholesale SMS provider: we pass the Sender ID, destination number,
           and message text needed to deliver SMS. We do not give them your
           {developerApiVisible
-            ? 'password, API keys, or billing records.'
-            : 'password or billing records.'}
+            ? ' password, API keys, or billing records.'
+            : ' password or billing records.'}
         </p>
         <p>
           Payment: Snippe (snippe.sh) receives your name, email, paying
@@ -85,8 +86,8 @@ export function PrivacyPage() {
         </p>
         <p>
           Your staff: anyone you give login access
-          {developerApiVisible ? 'or an API key ' : ''}
-          can see the data in that account.
+          {developerApiVisible ? ' or an API key' : ''} can see the data in
+          that account.
         </p>
       </LegalSection>
 
@@ -132,9 +133,10 @@ export function PrivacyPage() {
         <p>
           Passwords are hashed. Provider credentials and API secrets are
           stored so customers cannot read them. Sessions use CSRF protection.
+          No method is perfect; you still need a strong password
           {developerApiVisible
-            ? 'No method is perfect; you still need a strong password and to keep API keys off public computers.'
-            : 'No method is perfect; you still need a strong password.'}
+            ? ' and to keep API keys off public computers.'
+            : '.'}
         </p>
       </LegalSection>
 

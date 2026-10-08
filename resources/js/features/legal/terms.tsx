@@ -10,9 +10,10 @@ export function TermsPage() {
         <p>
           These terms are between you and SOSCOM Technologies Company Limited
           (“Soscom”, “we”, “us”). They apply when you use Soscom SMS at
-          sms.soscom.co.tz, including the dashboard
-          {developerApiVisible ? ', the public SMS API,' : ''} and related
-          billing and support.
+          sms.soscom.co.tz, including the dashboard{developerApiVisible
+            ? ', the public SMS API,'
+            : ','}{' '}
+          and related billing and support.
         </p>
         <p>
           By creating an account or using the service, you agree to these
