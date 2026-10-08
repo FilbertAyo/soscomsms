@@ -44,7 +44,7 @@ it('prices the first SMS range at 25 TZS and rejects less than 100', function ()
 
     $this->actingAs($user)
         ->postJson('/api/payments', [
-            'quantity' => 50,
+            'quantity' => 49,
             'payer_reference' => '0754221890',
         ])
         ->assertUnprocessable();

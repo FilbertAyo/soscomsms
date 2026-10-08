@@ -43,7 +43,7 @@ export function BuySmsPage() {
     queryFn: () => fetchPayments(1, 20),
   })
   const tiers = walletQuery.data?.tiers ?? []
-  const minPurchaseQuantity = walletQuery.data?.minPurchaseQuantity ?? 100
+  const minPurchaseQuantity = walletQuery.data?.minPurchaseQuantity ?? 50
   const pendingPayment = (paymentsQuery.data?.payments ?? []).find(
     (item) => item.status === 'pending'
   )

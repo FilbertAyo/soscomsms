@@ -21,7 +21,7 @@ Create **two keys** if you have a staging site and production: one for each, sam
 
 Do **not** enable `disbursement:read` or `disbursement:create`. Those scopes send money out of the Snippe balance. Buying SMS credits only collects money in.
 
-There is no sandbox. The WooCommerce guide states this directly: test with a real payment of at least **TZS 500**, then turn the flow on for customers. Our smallest package is 100 SMS at TZS 25, so TZS 2,500, which is above that minimum.
+There is no sandbox. The WooCommerce guide states this directly: test with a real payment of at least **TZS 500**, then turn the flow on for customers. Our smallest package is 50 SMS at TZS 25, so TZS 1,250, which is above that minimum.
 
 ## How a wallet top-up should work
 

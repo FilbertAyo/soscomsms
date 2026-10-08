@@ -681,7 +681,7 @@ export const faqs = [
     items: [
       {
         q: 'How do I buy more SMS?',
-        a: 'Go to Buy SMS, enter how many SMS you need (from 100), and the mobile number that will approve the payment. A prompt is sent to that phone. Credits appear after you approve it.',
+        a: 'Go to Buy SMS, enter how many SMS you need (from 50), and the mobile number that will approve the payment. A prompt is sent to that phone. Credits appear after you approve it.',
       },
       {
         q: 'Do unused SMS expire?',

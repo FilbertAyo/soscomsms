@@ -13,7 +13,7 @@ class PricingTierController extends Controller
         return response()->json([
             'tiers' => $pricing->tiers()->map->toApiArray()->values(),
             'packages' => config('sms.packages'),
-            'minPurchaseQuantity' => (int) config('sms.min_purchase_quantity', 100),
+            'minPurchaseQuantity' => (int) config('sms.min_purchase_quantity', 50),
             'welcomeCredits' => (int) config('sms.welcome_credits', 20),
         ]);
     }

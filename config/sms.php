@@ -6,9 +6,9 @@ return [
 
     'provider_unit_cost_tzs' => (int) env('SMS_PROVIDER_UNIT_COST_TZS', 14),
 
-    'min_purchase_quantity' => 100,
+    'min_purchase_quantity' => 50,
 
-    'packages' => [100, 1000, 5000],
+    'packages' => [50, 1000, 5000],
 
     'generic_sender_ids' => ['HARUSI', 'SEND OFF', 'MWALIKO', 'MCHANGO'],
 

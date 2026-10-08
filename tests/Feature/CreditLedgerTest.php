@@ -122,8 +122,8 @@ it('lets an admin grant credits and the customer wallet shows them', function ()
         ->getJson('/api/wallet')
         ->assertOk()
         ->assertJsonPath('smsBalance', 1000)
-        ->assertJsonPath('minPurchaseQuantity', 100)
-        ->assertJsonPath('tiers.0.minQuantity', 100)
+        ->assertJsonPath('minPurchaseQuantity', 50)
+        ->assertJsonPath('tiers.0.minQuantity', 50)
         ->assertJsonPath('tiers.0.unitPriceTzs', 25);
 });
 

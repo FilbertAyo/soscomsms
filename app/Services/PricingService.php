@@ -36,7 +36,7 @@ class PricingService
 
     public function tierFor(int $quantity): PricingTier
     {
-        $minimum = (int) config('sms.min_purchase_quantity', 100);
+        $minimum = (int) config('sms.min_purchase_quantity', 50);
 
         if ($quantity < $minimum) {
             throw ValidationException::withMessages([
