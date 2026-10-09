@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Loader2, Smartphone } from 'lucide-react'
 import { toast } from 'sonner'
 import { applyValidationErrors } from '@/lib/auth'
 import {
@@ -98,6 +99,10 @@ export function BuySmsPage() {
         payer_reference: `+255${payerDigits}`,
       }),
     onSuccess: async (result) => {
+      queryClient.setQueryData(['payments', 'status', result.payment.id], {
+        payment: result.payment,
+        smsBalance: null,
+      })
       setWatchingId(result.payment.id)
       toast.success('Check your phone and approve the payment prompt.')
       void queryClient.invalidateQueries({ queryKey: paymentsQueryKey })
@@ -257,24 +262,62 @@ export function BuySmsPage() {
 }
 
 function WaitingCard({ payment }: { payment: PaymentRecord }) {
+  const elapsed = useElapsedSeconds(payment.createdAt)
+
   return (
-    <div className='space-y-4'>
-      <div className='rounded-xl bg-muted/40 px-4 py-4'>
-        <p className='text-sm text-muted-foreground'>Waiting for approval</p>
-        <p className='mt-1 text-3xl font-semibold tracking-tight'>
+    <div className='flex flex-col items-center py-4 text-center' aria-live='polite'>
+      <div className='relative flex size-28 items-center justify-center'>
+        <span className='absolute inset-0 animate-ping rounded-full bg-primary/10 [animation-duration:2s]' />
+        <span className='absolute inset-0 rounded-full border-4 border-muted' />
+        <span className='absolute inset-0 animate-spin rounded-full border-4 border-transparent border-t-primary [animation-duration:1.2s]' />
+        <Smartphone className='size-9 text-primary' aria-hidden='true' />
+      </div>
+
+      <p className='mt-6 text-lg font-semibold tracking-tight'>
+        Waiting for you to approve on your phone
+      </p>
+      <p className='mt-1 max-w-md text-sm text-muted-foreground'>
+        A prompt was sent to {payment.payerReference}. Open it and enter your
+        mobile-money PIN. This page updates on its own.
+      </p>
+
+      <div className='mt-6 w-full rounded-xl bg-muted/40 px-4 py-4'>
+        <p className='text-3xl font-semibold tracking-tight'>
           {formatTZS(payment.amountTzs)}
         </p>
         <p className='mt-1 text-sm text-muted-foreground'>
-          {formatNumber(payment.quantity)} SMS · prompt sent to {payment.payerReference}
+          {formatNumber(payment.quantity)} SMS
         </p>
       </div>
-      <p className='text-sm text-muted-foreground'>
-        Open the prompt on that phone and enter your mobile-money PIN. This page
-        updates when the payment is confirmed.
+
+      <p className='mt-4 inline-flex items-center gap-2 text-xs text-muted-foreground'>
+        <Loader2 className='size-3.5 animate-spin' aria-hidden='true' />
+        Checking payment status · {formatElapsed(elapsed)}
       </p>
-      <StatusBadge status={payment.status} />
     </div>
   )
+}
+
+function useElapsedSeconds(since: string | null): number {
+  const start = useMemo(() => {
+    const parsed = since ? Date.parse(since) : Number.NaN
+    return Number.isNaN(parsed) ? Date.now() : parsed
+  }, [since])
+  const [now, setNow] = useState(() => Date.now())
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1000)
+    return () => window.clearInterval(timer)
+  }, [])
+
+  return Math.max(0, Math.floor((now - start) / 1000))
+}
+
+function formatElapsed(seconds: number): string {
+  const minutes = Math.floor(seconds / 60)
+  const rest = String(seconds % 60).padStart(2, '0')
+
+  return `${minutes}:${rest}`
 }
 
 function ResultCard({
