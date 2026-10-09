@@ -1,7 +1,9 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { Link } from '@tanstack/react-router'
-import { Check, Copy } from 'lucide-react'
+import { Check, Copy, Download } from 'lucide-react'
+import { toast } from 'sonner'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Button } from '@/components/ui/button'
 import { AppHeader } from '@/components/soscom/app-header'
 import { PageHeader } from '@/components/soscom/page-header'
 import { Main } from '@/components/layout/main'
@@ -158,7 +160,24 @@ function scrollToSection(id: SectionId) {
 
 export function ApiDocsPage() {
   const [active, setActive] = useState<SectionId>('introduction')
+  const [downloading, setDownloading] = useState(false)
   const base = apiBase()
+
+  async function downloadPdf() {
+    if (downloading) {
+      return
+    }
+
+    setDownloading(true)
+    try {
+      const { downloadApiDocsPdf } = await import('@/lib/download-api-docs-pdf')
+      await downloadApiDocsPdf()
+    } catch {
+      toast.error('Could not download the documentation. Try again.')
+    } finally {
+      setDownloading(false)
+    }
+  }
 
   useEffect(() => {
     const hash = window.location.hash.replace('#', '') as SectionId
@@ -199,6 +218,12 @@ export function ApiDocsPage() {
         <PageHeader
           title='API Documentation'
           description='Send Tanzanian SMS from your own application. Developers talk only to Soscom SMS never to the upstream gateway.'
+          actions={
+            <Button variant='outline' onClick={() => void downloadPdf()} disabled={downloading}>
+              <Download />
+              {downloading ? 'Preparing PDF…' : 'Download PDF'}
+            </Button>
+          }
         />
         <div className='grid items-start gap-8 lg:grid-cols-[13.5rem_minmax(0,1fr)]'>
           <nav className='lg:sticky lg:top-6 lg:self-start'>

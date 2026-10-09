@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Loader2, Smartphone } from 'lucide-react'
+import { Check, Clock, Smartphone, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { applyValidationErrors } from '@/lib/auth'
 import {
@@ -22,7 +22,6 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { AppHeader } from '@/components/soscom/app-header'
-import { StatusBadge } from '@/components/soscom/status-badge'
 import { Main } from '@/components/layout/main'
 import { type PricingTier } from '@/types/credits'
 import { type PaymentRecord } from '@/types/payments'
@@ -262,17 +261,11 @@ export function BuySmsPage() {
 }
 
 function WaitingCard({ payment }: { payment: PaymentRecord }) {
-  const elapsed = useElapsedSeconds(payment.createdAt)
-
   return (
     <div className='flex flex-col items-center py-4 text-center' aria-live='polite'>
-      <div className='relative flex size-28 items-center justify-center'>
-        <span className='absolute inset-0 animate-ping rounded-full bg-primary/10 [animation-duration:2s]' />
-        <span className='absolute inset-0 rounded-full border-4 border-muted' />
-        <span className='absolute inset-0 animate-spin rounded-full border-4 border-transparent border-t-primary [animation-duration:1.2s]' />
+      <StatusMark tone='waiting'>
         <Smartphone className='size-9 text-primary' aria-hidden='true' />
-      </div>
-
+      </StatusMark>
       <p className='mt-6 text-lg font-semibold tracking-tight'>
         Waiting for you to approve on your phone
       </p>
@@ -280,44 +273,12 @@ function WaitingCard({ payment }: { payment: PaymentRecord }) {
         A prompt was sent to {payment.payerReference}. Open it and enter your
         mobile-money PIN. This page updates on its own.
       </p>
-
-      <div className='mt-6 w-full rounded-xl bg-muted/40 px-4 py-4'>
-        <p className='text-3xl font-semibold tracking-tight'>
-          {formatTZS(payment.amountTzs)}
-        </p>
-        <p className='mt-1 text-sm text-muted-foreground'>
-          {formatNumber(payment.quantity)} SMS
-        </p>
-      </div>
-
-      <p className='mt-4 inline-flex items-center gap-2 text-xs text-muted-foreground'>
-        <Loader2 className='size-3.5 animate-spin' aria-hidden='true' />
-        Checking payment status · {formatElapsed(elapsed)}
-      </p>
+      <AmountPanel
+        amount={formatTZS(payment.amountTzs)}
+        detail={`${formatNumber(payment.quantity)} SMS`}
+      />
     </div>
   )
-}
-
-function useElapsedSeconds(since: string | null): number {
-  const start = useMemo(() => {
-    const parsed = since ? Date.parse(since) : Number.NaN
-    return Number.isNaN(parsed) ? Date.now() : parsed
-  }, [since])
-  const [now, setNow] = useState(() => Date.now())
-
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(Date.now()), 1000)
-    return () => window.clearInterval(timer)
-  }, [])
-
-  return Math.max(0, Math.floor((now - start) / 1000))
-}
-
-function formatElapsed(seconds: number): string {
-  const minutes = Math.floor(seconds / 60)
-  const rest = String(seconds % 60).padStart(2, '0')
-
-  return `${minutes}:${rest}`
 }
 
 function ResultCard({
@@ -328,24 +289,102 @@ function ResultCard({
   onAgain: () => void
 }) {
   const paid = payment.status === 'paid'
+  const expired = payment.status === 'expired'
+  const title = paid
+    ? 'Payment confirmed'
+    : expired
+      ? 'This prompt expired'
+      : 'Payment was not completed'
+  const detail = paid
+    ? `${formatNumber(payment.quantity)} SMS have been added to your account.`
+    : expired
+      ? 'The mobile-money prompt timed out. No SMS were added. Start a new purchase when you are ready.'
+      : payment.rejectionReason ??
+        'The prompt was not approved. No SMS were added, and you have not been charged.'
 
   return (
-    <div className='space-y-4'>
-      <div className='rounded-xl bg-muted/40 px-4 py-4'>
-        <p className='text-sm text-muted-foreground'>
-          {paid ? 'Payment confirmed' : 'Payment not completed'}
-        </p>
-        <p className='mt-1 text-3xl font-semibold tracking-tight'>
-          {paid ? `${formatNumber(payment.quantity)} SMS` : formatTZS(payment.amountTzs)}
-        </p>
-        {payment.rejectionReason ? (
-          <p className='mt-2 text-sm text-muted-foreground'>{payment.rejectionReason}</p>
-        ) : null}
-      </div>
-      <StatusBadge status={payment.status} />
-      <Button className='w-full' variant={paid ? 'default' : 'outline'} onClick={onAgain}>
+    <div className='flex flex-col items-center py-4 text-center' aria-live='polite'>
+      <StatusMark tone={paid ? 'paid' : expired ? 'expired' : 'failed'}>
+        {paid ? (
+          <Check className='size-10' strokeWidth={2.5} aria-hidden='true' />
+        ) : expired ? (
+          <Clock className='size-9' aria-hidden='true' />
+        ) : (
+          <X className='size-10' strokeWidth={2.5} aria-hidden='true' />
+        )}
+      </StatusMark>
+      <p className='mt-6 text-lg font-semibold tracking-tight'>{title}</p>
+      <p className='mt-1 max-w-md text-sm text-muted-foreground'>{detail}</p>
+      <AmountPanel
+        amount={paid ? `${formatNumber(payment.quantity)} SMS` : formatTZS(payment.amountTzs)}
+        detail={
+          paid
+            ? formatTZS(payment.amountTzs)
+            : `${formatNumber(payment.quantity)} SMS · ${payment.payerReference}`
+        }
+      />
+      <Button
+        className='mt-6 w-full'
+        variant={paid ? 'default' : 'outline'}
+        onClick={onAgain}
+      >
         {paid ? 'Buy more SMS' : 'Try again'}
       </Button>
+    </div>
+  )
+}
+
+function StatusMark({
+  tone,
+  children,
+}: {
+  tone: 'waiting' | 'paid' | 'failed' | 'expired'
+  children: ReactNode
+}) {
+  const colors = {
+    waiting: {
+      ping: 'bg-primary/10',
+      ring: 'border-muted',
+      icon: 'text-primary',
+    },
+    paid: {
+      ping: 'bg-primary/15',
+      ring: 'border-primary/25',
+      icon: 'text-primary',
+    },
+    failed: {
+      ping: 'bg-destructive/10',
+      ring: 'border-destructive/25',
+      icon: 'text-destructive',
+    },
+    expired: {
+      ping: 'bg-muted',
+      ring: 'border-muted-foreground/20',
+      icon: 'text-muted-foreground',
+    },
+  }[tone]
+
+  return (
+    <div className={cn('relative flex size-28 items-center justify-center', colors.icon)}>
+      {tone === 'waiting' ? (
+        <span className={cn('absolute inset-0 animate-ping rounded-full [animation-duration:2s]', colors.ping)} />
+      ) : (
+        <span className={cn('absolute inset-2 rounded-full', colors.ping)} />
+      )}
+      <span className={cn('absolute inset-0 rounded-full border-4', colors.ring)} />
+      {tone === 'waiting' ? (
+        <span className='absolute inset-0 animate-spin rounded-full border-4 border-transparent border-t-primary [animation-duration:1.2s]' />
+      ) : null}
+      <span className='relative z-10'>{children}</span>
+    </div>
+  )
+}
+
+function AmountPanel({ amount, detail }: { amount: string; detail: string }) {
+  return (
+    <div className='mt-6 w-full rounded-xl bg-muted/40 px-4 py-4'>
+      <p className='text-3xl font-semibold tracking-tight'>{amount}</p>
+      <p className='mt-1 text-sm text-muted-foreground'>{detail}</p>
     </div>
   )
 }
