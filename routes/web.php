@@ -154,7 +154,9 @@ Route::prefix('api')->group(function (): void {
             Route::post('/sender-id-requests/{senderIdRequest}/approval', [AdminSenderIdRequestController::class, 'approve']);
             Route::post('/sender-id-requests/{senderIdRequest}/rejection', [AdminSenderIdRequestController::class, 'reject']);
             Route::post('/sender-id-requests/{senderIdRequest}/resubmission-requests', [AdminSenderIdRequestController::class, 'requestResubmission']);
-            Route::get('/api-usage', [AdminApiUsageController::class, 'index']);
+            Route::get('/api-usage/requests', [AdminApiUsageController::class, 'requests']);
+            Route::get('/api-usage/keys', [AdminApiUsageController::class, 'keys']);
+            Route::get('/api-usage/webhook-deliveries', [AdminApiUsageController::class, 'webhookDeliveries']);
             Route::get('/payments', [AdminPaymentController::class, 'index']);
         });
     });

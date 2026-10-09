@@ -176,9 +176,7 @@ export function LandingPage() {
                   Clear credit usage on every request
                 </li>
               </ul>
-              <Button className='mt-8' asChild>
-                <Link to='/sign-in'>View API documentation</Link>
-              </Button>
+            
             </div>
             <pre className='overflow-x-auto rounded-xl border bg-card p-5 text-sm'>
               {`curl https://sms.soscom.co.tz/api/v1/sms/send \\

@@ -198,10 +198,83 @@ it('lets an admin see real API usage logs', function () {
         ->assertOk();
 
     $this->actingAs($admin)
-        ->getJson('/api/admin/api-usage')
+        ->getJson('/api/admin/api-usage/keys')
         ->assertOk()
         ->assertJsonPath('keys.0.masked', ApiKey::query()->first()->masked())
+        ->assertJsonPath('meta.total', 1)
+        ->assertJsonMissing(['key' => $plain]);
+
+    $this->actingAs($admin)
+        ->getJson('/api/admin/api-usage/requests')
+        ->assertOk()
         ->assertJsonPath('logs.0.path', '/api/v1/balance')
         ->assertJsonPath('logs.0.statusCode', 200)
+        ->assertJsonPath('meta.currentPage', 1)
         ->assertJsonMissing(['key' => $plain]);
+
+    $this->actingAs($admin)
+        ->getJson('/api/admin/api-usage/webhook-deliveries')
+        ->assertOk()
+        ->assertJsonPath('meta.total', 0);
+});
+
+it('paginates and searches admin API usage', function () {
+    $admin = User::factory()->admin()->create();
+    [, $customer] = publicApiCustomer();
+    [, $other] = publicApiCustomer();
+    $key = app(ApiKeyService::class)->create($customer, 'School portal')['key'];
+    app(ApiKeyService::class)->create($other, 'Clinic app');
+
+    foreach (range(1, 25) as $index) {
+        ApiLog::query()->create([
+            'api_key_id' => $key->id,
+            'customer_id' => $customer->id,
+            'method' => 'GET',
+            'path' => '/api/v1/balance',
+            'status_code' => 200,
+            'request_id' => 'req-'.$index,
+            'created_at' => now(),
+        ]);
+    }
+    ApiLog::query()->create([
+        'customer_id' => $other->id,
+        'method' => 'POST',
+        'path' => '/api/v1/sms/send',
+        'status_code' => 402,
+        'request_id' => 'req-credit',
+        'error' => 'Not enough SMS credits.',
+        'created_at' => now(),
+    ]);
+
+    $this->actingAs($admin)
+        ->getJson('/api/admin/api-usage/requests?page=2')
+        ->assertOk()
+        ->assertJsonPath('meta.total', 26)
+        ->assertJsonPath('meta.lastPage', 2)
+        ->assertJsonCount(6, 'logs');
+
+    $this->actingAs($admin)
+        ->getJson('/api/admin/api-usage/requests?q=402')
+        ->assertOk()
+        ->assertJsonPath('meta.total', 1)
+        ->assertJsonPath('logs.0.requestId', 'req-credit');
+
+    $this->actingAs($admin)
+        ->getJson('/api/admin/api-usage/requests?q='.urlencode($customer->user->email))
+        ->assertOk()
+        ->assertJsonPath('meta.total', 25);
+
+    $this->actingAs($admin)
+        ->getJson('/api/admin/api-usage/keys?q=clinic')
+        ->assertOk()
+        ->assertJsonPath('meta.total', 1)
+        ->assertJsonPath('keys.0.name', 'Clinic app');
+});
+
+it('keeps admin API usage away from customers', function () {
+    [$user] = publicApiCustomer();
+
+    $this->actingAs($user)->getJson('/api/admin/api-usage/requests')->assertForbidden();
+    $this->actingAs($user)->getJson('/api/admin/api-usage/keys')->assertForbidden();
+    $this->actingAs($user)->getJson('/api/admin/api-usage/webhook-deliveries')->assertForbidden();
 });
