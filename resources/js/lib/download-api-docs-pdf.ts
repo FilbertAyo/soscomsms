@@ -199,6 +199,8 @@ class PdfWriter {
 
   cover(): void {
     this.header()
+    this.rule()
+    this.y += 4
     this.doc.setFont('helvetica', 'bold')
     this.doc.setFontSize(18)
     this.doc.setTextColor(...ink)
@@ -348,24 +350,25 @@ class PdfWriter {
   }
 
   private header(): void {
-    this.doc.setFillColor(0, 0, 0)
-    this.doc.rect(0, 0, pageWidth, 24, 'F')
+    const iconSize = 10
+    const baseline = 16
+    let textX = marginX
     if (this.logo) {
-      this.doc.addImage(this.logo, 'PNG', marginX, 4, 48, 16)
-    } else {
-      this.doc.setFont('helvetica', 'bold')
-      this.doc.setFontSize(14)
-      this.doc.setTextColor(255, 255, 255)
-      this.doc.text('soscom', marginX, 15)
-      const soscomWidth = this.doc.getTextWidth('soscom')
-      this.doc.setTextColor(...brandGreen)
-      this.doc.text('sms', marginX + soscomWidth, 15)
+      this.doc.addImage(this.logo, 'PNG', marginX, baseline - 7.5, iconSize, iconSize)
+      textX = marginX + iconSize + 3
     }
+    this.doc.setFont('helvetica', 'bold')
+    this.doc.setFontSize(18)
+    this.doc.setTextColor(...ink)
+    this.doc.text('soscom', textX, baseline)
+    const soscomWidth = this.doc.getTextWidth('soscom')
+    this.doc.setTextColor(...brandGreen)
+    this.doc.text('sms', textX + soscomWidth, baseline)
     this.doc.setFont('helvetica', 'normal')
     this.doc.setFontSize(9)
-    this.doc.setTextColor(180, 180, 180)
-    this.doc.text('API Documentation', pageWidth - marginX, 14, { align: 'right' })
-    this.y = 34
+    this.doc.setTextColor(...muted)
+    this.doc.text('API Documentation', pageWidth - marginX, baseline, { align: 'right' })
+    this.y = 24
   }
 
   private rule(): void {
@@ -399,7 +402,7 @@ class PdfWriter {
 
 async function loadLogoDataUrl(): Promise<string | null> {
   try {
-    const response = await fetch('/images/soscom-sms-wordmark.png')
+    const response = await fetch('/images/soscom-sms-icon.png')
     if (!response.ok) {
       return null
     }
