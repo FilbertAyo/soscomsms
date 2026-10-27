@@ -21,6 +21,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { AppHeader } from '@/components/soscom/app-header'
+import { QueryLoadError } from '@/components/soscom/query-load-error'
 import { EmptyState } from '@/components/soscom/empty-state'
 import { PageHeader } from '@/components/soscom/page-header'
 import { TableSkeleton } from '@/components/soscom/skeletons'
@@ -176,9 +177,10 @@ export function DeliveryReportsPage() {
           />
         </div>
         {reportsQuery.isError ? (
-          <p className='text-sm text-destructive'>
-            Could not load delivery reports.
-          </p>
+          <QueryLoadError
+            message="We couldn't load delivery reports."
+            onRetry={() => void reportsQuery.refetch()}
+          />
         ) : reportsQuery.isPending ? (
           <TableSkeleton rows={8} />
         ) : reports.length === 0 ? (

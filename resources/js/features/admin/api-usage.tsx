@@ -22,6 +22,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { QueryLoadError } from '@/components/soscom/query-load-error'
 import { AdminPage } from './page'
 
 type UsageTab = 'requests' | 'keys' | 'webhooks'
@@ -134,7 +135,10 @@ function RequestsTab() {
         label='Search API requests'
       />
       {query.isError ? (
-        <p className='text-sm text-destructive'>Could not load API requests.</p>
+        <QueryLoadError
+          message="We couldn't load API requests."
+          onRetry={() => void query.refetch()}
+        />
       ) : (
         <>
           <TableWrap>
@@ -210,7 +214,10 @@ function KeysTab() {
         label='Search API keys'
       />
       {query.isError ? (
-        <p className='text-sm text-destructive'>Could not load API keys.</p>
+        <QueryLoadError
+          message="We couldn't load API keys."
+          onRetry={() => void query.refetch()}
+        />
       ) : (
         <>
           <TableWrap>
@@ -285,9 +292,10 @@ function WebhooksTab() {
         label='Search webhook deliveries'
       />
       {query.isError ? (
-        <p className='text-sm text-destructive'>
-          Could not load webhook deliveries.
-        </p>
+        <QueryLoadError
+          message="We couldn't load webhook deliveries."
+          onRetry={() => void query.refetch()}
+        />
       ) : (
         <>
           <TableWrap>

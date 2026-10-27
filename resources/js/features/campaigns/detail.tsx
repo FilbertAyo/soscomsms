@@ -8,6 +8,7 @@ import {
   cancelCampaign,
   fetchCampaign,
 } from '@/lib/campaigns'
+import { normalizeError } from '@/lib/api-error'
 import { creditTransactionsQueryKey, walletQueryKey, withSmsBalance } from '@/lib/credits'
 import { formatDateTime, formatNumber } from '@/lib/format'
 import { useAuthStore } from '@/stores/auth-store'
@@ -16,6 +17,7 @@ import { ConfirmDialog } from '@/components/confirm-dialog'
 import { AppHeader } from '@/components/soscom/app-header'
 import { EmptyState } from '@/components/soscom/empty-state'
 import { PageHeader } from '@/components/soscom/page-header'
+import { QueryLoadError } from '@/components/soscom/query-load-error'
 import {
   CardSkeletonGrid,
   PanelSkeleton,
@@ -76,7 +78,12 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
     },
   })
 
-  if (!/^\d+$/.test(campaignId) || campaignQuery.isError) {
+  const missingCampaign =
+    !/^\d+$/.test(campaignId) ||
+    (campaignQuery.isError &&
+      normalizeError(campaignQuery.error).status === 404)
+
+  if (missingCampaign) {
     return (
       <>
         <AppHeader />
@@ -86,6 +93,20 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
             description='This campaign does not belong to your account.'
             actionLabel='Back to campaigns'
             actionTo='/campaigns'
+          />
+        </Main>
+      </>
+    )
+  }
+
+  if (campaignQuery.isError) {
+    return (
+      <>
+        <AppHeader />
+        <Main>
+          <QueryLoadError
+            message="We couldn't load this campaign."
+            onRetry={() => void campaignQuery.refetch()}
           />
         </Main>
       </>

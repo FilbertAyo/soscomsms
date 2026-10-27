@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { toast } from 'sonner'
+import { normalizeError } from '@/lib/api-error'
 import { applyValidationErrors } from '@/lib/auth'
 import {
   assertIdentityPdf,
@@ -24,6 +25,7 @@ import {
 import { AppHeader } from '@/components/soscom/app-header'
 import { EmptyState } from '@/components/soscom/empty-state'
 import { PageHeader } from '@/components/soscom/page-header'
+import { QueryLoadError } from '@/components/soscom/query-load-error'
 import { RequestTimeline } from '@/components/soscom/request-timeline'
 import { PanelSkeleton } from '@/components/soscom/skeletons'
 import { StatusBadge } from '@/components/soscom/status-badge'
@@ -44,7 +46,13 @@ export function SenderIdRequestDetail({ senderId }: { senderId: string }) {
   })
   const item = requestQuery.data
 
-  if (!/^\d+$/.test(senderId) || (requestQuery.isError && !item)) {
+  const missingRequest =
+    !/^\d+$/.test(senderId) ||
+    (requestQuery.isError &&
+      !item &&
+      normalizeError(requestQuery.error).status === 404)
+
+  if (missingRequest) {
     return (
       <>
         <AppHeader />
@@ -54,6 +62,20 @@ export function SenderIdRequestDetail({ senderId }: { senderId: string }) {
             description='This Sender ID request does not belong to your account.'
             actionLabel='Back to Sender IDs'
             actionTo='/sender-ids'
+          />
+        </Main>
+      </>
+    )
+  }
+
+  if (requestQuery.isError && !item) {
+    return (
+      <>
+        <AppHeader />
+        <Main>
+          <QueryLoadError
+            message="We couldn't load this Sender ID request."
+            onRetry={() => void requestQuery.refetch()}
           />
         </Main>
       </>

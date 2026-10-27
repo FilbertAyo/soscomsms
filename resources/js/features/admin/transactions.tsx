@@ -23,6 +23,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { type CreditTransaction } from '@/types/credits'
+import { QueryLoadError } from '@/components/soscom/query-load-error'
 import { AdminPage } from './page'
 
 export function AdminTransactions() {
@@ -54,7 +55,10 @@ export function AdminTransactions() {
       description='Append-only credit ledger. Refunds and corrections add a new reversing row.'
     >
       {transactionsQuery.isError ? (
-        <p className='text-sm text-destructive'>Could not load transactions.</p>
+        <QueryLoadError
+          message="We couldn't load transactions."
+          onRetry={() => void transactionsQuery.refetch()}
+        />
       ) : (
         <TableWrap>
           <Table>

@@ -7,6 +7,7 @@ import {
 } from '@/lib/credits'
 import { formatDateTime, formatNumber, formatTZS } from '@/lib/format'
 import { AppHeader } from '@/components/soscom/app-header'
+import { QueryLoadError } from '@/components/soscom/query-load-error'
 import { EmptyState } from '@/components/soscom/empty-state'
 import { PageHeader } from '@/components/soscom/page-header'
 import { TableSkeleton } from '@/components/soscom/skeletons'
@@ -40,9 +41,10 @@ export function TransactionsPage() {
           title='Transactions'
        />
         {transactionsQuery.isError ? (
-          <p className='text-sm text-destructive'>
-            Could not load transactions. Refresh and try again.
-          </p>
+          <QueryLoadError
+            message="We couldn't load transactions."
+            onRetry={() => void transactionsQuery.refetch()}
+          />
         ) : transactionsQuery.isLoading ? (
           <TableSkeleton />
         ) : transactions.length === 0 ? (

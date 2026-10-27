@@ -8,6 +8,7 @@ import { useAuthStore } from '@/stores/auth-store'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { AppHeader } from '@/components/soscom/app-header'
+import { QueryLoadError } from '@/components/soscom/query-load-error'
 import { EmptyState } from '@/components/soscom/empty-state'
 import { PageHeader } from '@/components/soscom/page-header'
 import { ListSkeleton } from '@/components/soscom/skeletons'
@@ -43,9 +44,10 @@ export function WalletPage() {
           description='SMS credits are used each time you send a message. New accounts start with 20 free SMS.'
         />
         {walletQuery.isError ? (
-          <p className='text-sm text-destructive'>
-            Could not load your wallet. Refresh and try again.
-          </p>
+          <QueryLoadError
+            message="We couldn't load your wallet."
+            onRetry={() => void walletQuery.refetch()}
+          />
         ) : (
           <>
             <div className='mb-8 rounded-xl border bg-card p-6'>

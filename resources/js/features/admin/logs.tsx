@@ -5,6 +5,7 @@ import { formatDateTime, formatTzMobile } from '@/lib/format'
 import { Badge } from '@/components/ui/badge'
 import { ListPagination } from '@/components/soscom/list-pagination'
 import { StatusBadge } from '@/components/soscom/status-badge'
+import { QueryLoadError } from '@/components/soscom/query-load-error'
 import { AdminPage } from './page'
 import { type AdminAuditLog, type AdminProviderLog } from '@/types/admin'
 
@@ -25,7 +26,10 @@ export function AdminAuditLogs() {
       description='Admin audit trail. Passwords are never shown.'
     >
       {logsQuery.isError ? (
-        <p className='text-sm text-destructive'>Could not load audit logs.</p>
+        <QueryLoadError
+          message="We couldn't load audit logs."
+          onRetry={() => void logsQuery.refetch()}
+        />
       ) : (
         <>
           {logs.length === 0 ? (
@@ -68,7 +72,10 @@ export function AdminGatewayLogs() {
         did not get the SMS.
       </p>
       {logsQuery.isError ? (
-        <p className='text-sm text-destructive'>Could not load gateway logs.</p>
+        <QueryLoadError
+          message="We couldn't load gateway logs."
+          onRetry={() => void logsQuery.refetch()}
+        />
       ) : (
         <>
           {logs.length === 0 ? (

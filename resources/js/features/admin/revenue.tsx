@@ -11,6 +11,7 @@ import { applyValidationErrors } from '@/lib/auth'
 import { formatTZS } from '@/lib/format'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { QueryLoadError } from '@/components/soscom/query-load-error'
 import { AdminPage } from './page'
 
 export function AdminRevenue() {
@@ -41,7 +42,10 @@ export function AdminRevenue() {
       description='Confirmed purchase and grant revenue, estimated send margin, and volume tiers used for new quotes.'
     >
       {pricingQuery.isError ? (
-        <p className='text-sm text-destructive'>Could not load pricing tiers.</p>
+        <QueryLoadError
+          message="We couldn't load pricing tiers."
+          onRetry={() => void pricingQuery.refetch()}
+        />
       ) : (
         <div className='space-y-4'>
           <div className='grid gap-4 sm:grid-cols-2 xl:grid-cols-4'>

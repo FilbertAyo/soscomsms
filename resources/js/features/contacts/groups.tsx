@@ -25,6 +25,7 @@ import {
 } from '@/components/ui/dialog'
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { AppHeader } from '@/components/soscom/app-header'
+import { QueryLoadError } from '@/components/soscom/query-load-error'
 import { EmptyState } from '@/components/soscom/empty-state'
 import { PageHeader } from '@/components/soscom/page-header'
 import { CardSkeletonGrid } from '@/components/soscom/skeletons'
@@ -121,9 +122,10 @@ export function ContactGroupsPage() {
           actions={<Button onClick={openCreate}>Create Group</Button>}
         />
         {groupsQuery.isError ? (
-          <p className='text-sm text-destructive'>
-            Could not load groups. Refresh and try again.
-          </p>
+          <QueryLoadError
+            message="We couldn't load groups."
+            onRetry={() => void groupsQuery.refetch()}
+          />
         ) : groupsQuery.isPending ? (
           <CardSkeletonGrid />
         ) : groups.length === 0 ? (

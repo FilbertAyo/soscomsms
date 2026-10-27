@@ -1,9 +1,11 @@
 <?php
 
+use App\Http\Middleware\AssignRequestId;
 use App\Http\Middleware\AuthenticateApiKey;
 use App\Http\Middleware\EnsureCustomerProfileComplete;
 use App\Http\Middleware\EnsureUserIsAdmin;
 use App\Http\Middleware\ShareCsrfToken;
+use App\Support\ApiError;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -12,6 +14,7 @@ use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 return Application::configure(basePath: dirname(__DIR__))
@@ -22,6 +25,7 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->prepend(AssignRequestId::class);
         $middleware->statefulApi();
         $trusted = trim((string) env('TRUSTED_PROXIES', ''));
         if ($trusted === '*') {
@@ -49,6 +53,17 @@ return Application::configure(basePath: dirname(__DIR__))
             return $request->is('api/*') || $request->expectsJson();
         });
 
+        $exceptions->context(function () {
+            $request = request();
+
+            return array_filter([
+                'request_id' => $request->attributes->get('request_id'),
+                'user_id' => $request->user()?->id,
+                'method' => $request->method(),
+                'path' => '/'.$request->path(),
+            ], fn (mixed $value): bool => $value !== null && $value !== '');
+        });
+
         $exceptions->render(function (Throwable $e, Request $request) {
             if (
                 $e instanceof ValidationException
@@ -74,11 +89,14 @@ return Application::configure(basePath: dirname(__DIR__))
             }
 
             if ($json) {
-                return response()->json([
-                    'message' => $status === 404
-                        ? "We couldn't find that."
-                        : 'Something went wrong. Please try again.',
-                ], $status === 404 ? 404 : 500);
+                $safeStatus = $status === 404 ? 404 : ($status === 503 ? 503 : 500);
+                $message = match ($safeStatus) {
+                    404 => "We couldn't find that.",
+                    503 => 'The service is temporarily unavailable. Please try again.',
+                    default => 'Something went wrong. Please try again.',
+                };
+
+                return ApiError::json($message, $safeStatus);
             }
 
             return response()->view(
@@ -86,5 +104,12 @@ return Application::configure(basePath: dirname(__DIR__))
                 [],
                 $status === 404 ? 404 : 500,
             );
+        });
+
+        $exceptions->respond(function (Response $response, Throwable $e, Request $request) {
+            $enriched = ApiError::enrich($response, $request, $e);
+            AuthenticateApiKey::logUnhandled($request, $enriched);
+
+            return $enriched;
         });
     })->create();

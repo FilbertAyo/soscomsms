@@ -13,6 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { QueryLoadError } from '@/components/soscom/query-load-error'
 import { AdminPage } from './page'
 
 export function AdminPayments() {
@@ -30,7 +31,10 @@ export function AdminPayments() {
       description='Mobile money purchases. .'
     >
       {paymentsQuery.isError ? (
-        <p className='text-sm text-destructive'>Could not load payments.</p>
+        <QueryLoadError
+          message="We couldn't load payments."
+          onRetry={() => void paymentsQuery.refetch()}
+        />
       ) : (
         <TableWrap>
           <Table>

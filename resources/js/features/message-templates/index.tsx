@@ -35,6 +35,7 @@ import { ConfirmDialog } from '@/components/confirm-dialog'
 import { AppHeader } from '@/components/soscom/app-header'
 import { EmptyState } from '@/components/soscom/empty-state'
 import { PageHeader } from '@/components/soscom/page-header'
+import { QueryLoadError } from '@/components/soscom/query-load-error'
 import { ListSkeleton } from '@/components/soscom/skeletons'
 import { Main } from '@/components/layout/main'
 import {
@@ -166,9 +167,14 @@ export function MessageTemplatesPage() {
           actions={<Button onClick={openCreate}>New template</Button>}
         />
 
-        {templatesQuery.isPending ? <ListSkeleton /> : null}
-
-        {!templatesQuery.isPending && templates.length === 0 ? (
+        {templatesQuery.isError ? (
+          <QueryLoadError
+            message="We couldn't load templates."
+            onRetry={() => void templatesQuery.refetch()}
+          />
+        ) : templatesQuery.isPending ? (
+          <ListSkeleton />
+        ) : templates.length === 0 ? (
           <EmptyState
             icon={FileText}
             title='No templates yet'
@@ -176,9 +182,7 @@ export function MessageTemplatesPage() {
             actionLabel='New template'
             onAction={openCreate}
           />
-        ) : null}
-
-        {templates.length > 0 ? (
+        ) : (
           <div className='space-y-3'>
             {templates.map((template) => (
               <article
@@ -223,7 +227,7 @@ export function MessageTemplatesPage() {
               </article>
             ))}
           </div>
-        ) : null}
+        )}
       </Main>
 
       <Dialog open={dialogOpen} onOpenChange={closeDialog}>

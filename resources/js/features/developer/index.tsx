@@ -25,6 +25,7 @@ import {
 } from '@/components/ui/dialog'
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { AppHeader } from '@/components/soscom/app-header'
+import { QueryLoadError } from '@/components/soscom/query-load-error'
 import { EmptyState } from '@/components/soscom/empty-state'
 import { PageHeader } from '@/components/soscom/page-header'
 import { TableSkeleton } from '@/components/soscom/skeletons'
@@ -118,7 +119,10 @@ export function DeveloperPage() {
           )}
         </div>
         {keysQuery.isError ? (
-          <p className='text-sm text-destructive'>Could not load API keys.</p>
+          <QueryLoadError
+            message="We couldn't load API keys."
+            onRetry={() => void keysQuery.refetch()}
+          />
         ) : keysQuery.isLoading ? (
           <TableSkeleton rows={3} />
         ) : keys.length === 0 ? (

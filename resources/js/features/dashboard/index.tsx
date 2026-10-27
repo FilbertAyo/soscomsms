@@ -17,6 +17,7 @@ import { useAuthStore } from '@/stores/auth-store'
 import { needsProfileCompletion } from '@/types/auth'
 import { Button } from '@/components/ui/button'
 import { AppHeader } from '@/components/soscom/app-header'
+import { QueryLoadError } from '@/components/soscom/query-load-error'
 import { statusLabel } from '@/components/soscom/status-badge'
 import {
   DashboardStatsSkeleton,
@@ -132,9 +133,11 @@ export function Dashboard() {
             {statsQuery.isLoading ? (
               <DashboardStatsSkeleton />
             ) : statsQuery.isError ? (
-              <p className='text-sm text-muted-foreground lg:col-span-2'>
-                We couldn't load your totals. Refresh the page and try again.
-              </p>
+              <QueryLoadError
+                className='lg:col-span-2'
+                message="We couldn't load your totals."
+                onRetry={() => void statsQuery.refetch()}
+              />
             ) : (
             <div className='grid gap-4 sm:grid-cols-2 lg:col-span-2'>
               <Stat label='SMS being sent' value={formatNumber(smsQueued)} />
@@ -177,9 +180,10 @@ export function Dashboard() {
               {campaignsQuery.isLoading ? (
                 <TableSkeleton rows={4} />
               ) : campaignsQuery.isError ? (
-                <p className='text-sm text-muted-foreground'>
-                  We couldn't load campaigns. Refresh the page and try again.
-                </p>
+                <QueryLoadError
+                  message="We couldn't load campaigns."
+                  onRetry={() => void campaignsQuery.refetch()}
+                />
               ) : (
               <TableWrap>
                 <Table>
@@ -240,9 +244,10 @@ export function Dashboard() {
               {transactionsQuery.isLoading ? (
                 <TableSkeleton rows={4} />
               ) : transactionsQuery.isError ? (
-                <p className='text-sm text-muted-foreground'>
-                  We couldn't load transactions. Refresh the page and try again.
-                </p>
+                <QueryLoadError
+                  message="We couldn't load transactions."
+                  onRetry={() => void transactionsQuery.refetch()}
+                />
               ) : (
               <TableWrap>
                 <Table>

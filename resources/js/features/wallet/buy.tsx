@@ -22,6 +22,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { AppHeader } from '@/components/soscom/app-header'
+import { QueryLoadError } from '@/components/soscom/query-load-error'
 import { Main } from '@/components/layout/main'
 import { type PricingTier } from '@/types/credits'
 import { type PaymentRecord } from '@/types/payments'
@@ -144,9 +145,10 @@ export function BuySmsPage() {
             </div>
 
             {walletQuery.isError ? (
-              <p className='text-sm text-destructive'>
-                Could not load SMS prices. Refresh and try again.
-              </p>
+              <QueryLoadError
+                message="We couldn't load SMS prices."
+                onRetry={() => void walletQuery.refetch()}
+              />
             ) : waiting && activePayment ? (
               <WaitingCard payment={activePayment} />
             ) : activePayment && activePayment.status !== 'pending' && watchingId === activePayment.id ? (

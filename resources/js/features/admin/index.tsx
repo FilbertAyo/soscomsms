@@ -14,6 +14,7 @@ import {
   fetchAdminSenderIdRequests,
 } from '@/lib/sender-ids'
 import { Button } from '@/components/ui/button'
+import { QueryLoadError } from '@/components/soscom/query-load-error'
 import { StatusBadge } from '@/components/soscom/status-badge'
 import { AdminPage } from './page'
 
@@ -41,7 +42,10 @@ export function AdminOverview() {
       description='Live customers, SMS traffic, confirmed purchase revenue, and Sender ID requests.'
     >
       {overviewQuery.isError ? (
-        <p className='text-sm text-destructive'>Could not load admin overview.</p>
+        <QueryLoadError
+          message="We couldn't load the admin overview."
+          onRetry={() => void overviewQuery.refetch()}
+        />
       ) : (
         <>
           <div className='grid gap-4 sm:grid-cols-2 xl:grid-cols-3'>

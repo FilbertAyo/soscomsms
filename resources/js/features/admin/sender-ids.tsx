@@ -34,6 +34,7 @@ import {
   senderIdUseCaseLabel,
   type SenderIdRequestRecord,
 } from '@/types/sender-ids'
+import { QueryLoadError } from '@/components/soscom/query-load-error'
 import { AdminPage } from './page'
 
 export function AdminSenderIds() {
@@ -135,7 +136,10 @@ export function AdminSenderIds() {
       description='Review customer requests, submit them to Mobishastra outside this system, then record the outcome here. No provider API call is made.'
     >
       {requestsQuery.isError ? (
-        <p className='text-sm text-destructive'>Could not load requests.</p>
+        <QueryLoadError
+          message="We couldn't load requests."
+          onRetry={() => void requestsQuery.refetch()}
+        />
       ) : (
         <div className='grid items-start gap-4 lg:grid-cols-[18rem_minmax(0,1fr)]'>
           <div className='rounded-lg border bg-card'>

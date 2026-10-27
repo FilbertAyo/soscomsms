@@ -30,6 +30,7 @@ import {
 } from '@/components/ui/dialog'
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { AppHeader } from '@/components/soscom/app-header'
+import { QueryLoadError } from '@/components/soscom/query-load-error'
 import { EmptyState } from '@/components/soscom/empty-state'
 import { PageHeader } from '@/components/soscom/page-header'
 import { TableSkeleton } from '@/components/soscom/skeletons'
@@ -141,7 +142,10 @@ export function WebhooksPage() {
           }
         />
         {webhooksQuery.isError ? (
-          <p className='text-sm text-destructive'>Could not load webhooks.</p>
+          <QueryLoadError
+            message="We couldn't load webhooks."
+            onRetry={() => void webhooksQuery.refetch()}
+          />
         ) : webhooksQuery.isLoading ? (
           <TableSkeleton rows={3} />
         ) : webhooks.length === 0 ? (

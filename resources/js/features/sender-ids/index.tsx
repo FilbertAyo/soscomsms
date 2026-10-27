@@ -10,6 +10,7 @@ import {
 import { formatDate } from '@/lib/format'
 import { Button } from '@/components/ui/button'
 import { AppHeader } from '@/components/soscom/app-header'
+import { QueryLoadError } from '@/components/soscom/query-load-error'
 import { EmptyState } from '@/components/soscom/empty-state'
 import { PageHeader } from '@/components/soscom/page-header'
 import { CardSkeletonGrid } from '@/components/soscom/skeletons'
@@ -55,9 +56,13 @@ export function SenderIdsPage() {
           }
         />
         {isError ? (
-          <p className='text-sm text-destructive'>
-            Could not load Sender IDs. Refresh and try again.
-          </p>
+          <QueryLoadError
+            message="We couldn't load Sender IDs."
+            onRetry={() => {
+              void senderIdsQuery.refetch()
+              void requestsQuery.refetch()
+            }}
+          />
         ) : isPending ? (
           <CardSkeletonGrid count={4} className={gridClassName} />
         ) : empty ? (

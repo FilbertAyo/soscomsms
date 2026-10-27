@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { type ProviderBalance, type SchedulerHealth } from '@/types/credits'
+import { QueryLoadError } from '@/components/soscom/query-load-error'
 import { AdminPage } from './page'
 
 export function AdminProviderBalance() {
@@ -41,9 +42,10 @@ export function AdminProviderBalance() {
       description='Mobishastra remaining, unused customer credits, and the real leftover after bonuses and buys. Customers never see this.'
     >
       {balanceQuery.isError ? (
-        <p className='text-sm text-destructive'>
-          Could not load the provider balance.
-        </p>
+        <QueryLoadError
+          message="We couldn't load the provider balance."
+          onRetry={() => void balanceQuery.refetch()}
+        />
       ) : (
         <div className='space-y-4'>
           <div className='grid gap-4 md:grid-cols-2 xl:grid-cols-3'>

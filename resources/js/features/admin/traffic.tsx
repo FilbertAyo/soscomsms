@@ -13,6 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { QueryLoadError } from '@/components/soscom/query-load-error'
 import { AdminPage } from './page'
 
 export function AdminTraffic() {
@@ -31,7 +32,10 @@ export function AdminTraffic() {
       description='Campaign volume across Soscom SMS.'
     >
       {trafficQuery.isError ? (
-        <p className='text-sm text-destructive'>Could not load SMS traffic.</p>
+        <QueryLoadError
+          message="We couldn't load SMS traffic."
+          onRetry={() => void trafficQuery.refetch()}
+        />
       ) : (
         <>
           <div className='mb-6 grid gap-4 sm:grid-cols-3'>

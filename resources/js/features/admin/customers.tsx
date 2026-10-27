@@ -41,6 +41,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { type AdminCustomer } from '@/types/credits'
+import { QueryLoadError } from '@/components/soscom/query-load-error'
 import { AdminPage } from './page'
 
 export function AdminCustomers() {
@@ -154,7 +155,10 @@ export function AdminCustomers() {
         />
       </div>
       {customersQuery.isError ? (
-        <p className='text-sm text-destructive'>Could not load customers.</p>
+        <QueryLoadError
+          message="We couldn't load customers."
+          onRetry={() => void customersQuery.refetch()}
+        />
       ) : (
         <TableWrap>
           <Table>
@@ -297,9 +301,10 @@ export function AdminCustomers() {
                 each ({formatTZS(quote.totalTzs)}).
               </p>
             ) : grantQuantity > 0 && pricingQuery.isError ? (
-              <p className='text-sm text-destructive'>
-                Could not load volume prices. You can still enter a price.
-              </p>
+              <QueryLoadError
+                message="We couldn't load volume prices. You can still enter a price."
+                onRetry={() => void pricingQuery.refetch()}
+              />
             ) : null}
             <div className='grid gap-4 sm:grid-cols-2'>
               <div className='space-y-2'>

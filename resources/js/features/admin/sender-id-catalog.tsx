@@ -29,6 +29,7 @@ import { ConfirmDialog } from '@/components/confirm-dialog'
 import { StatusBadge } from '@/components/soscom/status-badge'
 import { type AdminSenderIdCatalogRecord } from '@/types/sender-ids'
 import { type AdminCustomer } from '@/types/credits'
+import { QueryLoadError } from '@/components/soscom/query-load-error'
 import { AdminPage } from './page'
 
 const MIN_CUSTOMER_SEARCH = 2
@@ -177,9 +178,10 @@ export function AdminSenderIdCatalog() {
       }
     >
       {catalogQuery.isError ? (
-        <p className='text-sm text-muted-foreground'>
-          We couldn't load Sender IDs. Refresh the page and try again.
-        </p>
+        <QueryLoadError
+          message="We couldn't load Sender IDs."
+          onRetry={() => void catalogQuery.refetch()}
+        />
       ) : (
         <div className='grid items-start gap-4 lg:grid-cols-[18rem_minmax(0,1fr)]'>
           <div className='rounded-lg border bg-card'>

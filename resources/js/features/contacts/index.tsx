@@ -32,6 +32,7 @@ import {
 } from '@/components/ui/select'
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { AppHeader } from '@/components/soscom/app-header'
+import { QueryLoadError } from '@/components/soscom/query-load-error'
 import { EmptyState } from '@/components/soscom/empty-state'
 import { PageHeader } from '@/components/soscom/page-header'
 import { TableSkeleton } from '@/components/soscom/skeletons'
@@ -255,9 +256,10 @@ export function ContactsPage() {
           </Select>
         </div>
         {contactsQuery.isError ? (
-          <p className='text-sm text-destructive'>
-            Could not load contacts. Refresh and try again.
-          </p>
+          <QueryLoadError
+            message="We couldn't load contacts."
+            onRetry={() => void contactsQuery.refetch()}
+          />
         ) : contactsQuery.isPending ? (
           <TableSkeleton />
         ) : contacts.length === 0 ? (

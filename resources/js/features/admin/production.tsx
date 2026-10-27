@@ -15,6 +15,7 @@ import { adminProviderBalanceQueryKey } from '@/lib/credits'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { QueryLoadError } from '@/components/soscom/query-load-error'
 import { AdminPage } from './page'
 
 export function AdminProduction() {
@@ -103,9 +104,10 @@ export function AdminProduction() {
       description='Record the SOSCOM static IP, confirm Mobishastra has whitelisted it, and keep local/staging on the fake gateway until that gate is done.'
     >
       {query.isError ? (
-        <p className='text-sm text-destructive'>
-          Could not load production readiness.
-        </p>
+        <QueryLoadError
+          message="We couldn't load production readiness."
+          onRetry={() => void query.refetch()}
+        />
       ) : (
         <div className='space-y-6'>
           <div className='rounded-xl border bg-card p-5'>

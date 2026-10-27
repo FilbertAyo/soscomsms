@@ -1,5 +1,6 @@
 import { type QueryClient } from '@tanstack/react-query'
 import { fetchMe, isUnauthorized, meQueryKey } from '@/lib/auth'
+import { logClientError } from '@/lib/log-client-error'
 import { useAuthStore } from '@/stores/auth-store'
 import { type AuthUser } from '@/types/auth'
 
@@ -65,18 +66,18 @@ export async function peekSession(
     const user = await queryClient.fetchQuery({
       queryKey: meQueryKey,
       queryFn: fetchMe,
-      retry: false,
       staleTime: 30 * 1000,
     })
     useAuthStore.getState().setUser(user)
     return user
   } catch (error) {
-    if (isUnauthorized(error)) {
-      queryClient.removeQueries({ queryKey: meQueryKey })
-      useAuthStore.getState().reset()
-      return null
+    queryClient.removeQueries({ queryKey: meQueryKey })
+    useAuthStore.getState().reset()
+
+    if (!isUnauthorized(error)) {
+      logClientError(error, { source: 'peekSession' })
     }
 
-    throw error
+    return null
   }
 }

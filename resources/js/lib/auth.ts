@@ -1,6 +1,6 @@
-import { AxiosError } from 'axios'
 import { api } from '@/lib/api'
-import { safeUserText, userFacingMessage } from '@/lib/handle-server-error'
+import { isUnauthorized as isUnauthorizedError, normalizeError } from '@/lib/api-error'
+import { userFacingMessage } from '@/lib/handle-server-error'
 import { type AuthUser } from '@/types/auth'
 
 export const meQueryKey = ['auth', 'me'] as const
@@ -111,24 +111,12 @@ export async function updatePasswordRequest(payload: {
 }
 
 export function isUnauthorized(error: unknown): boolean {
-  return error instanceof AxiosError && error.response?.status === 401
+  return isUnauthorizedError(error)
 }
 
 export function validationMessage(error: unknown, field: string): string | null {
-  if (!(error instanceof AxiosError)) {
-    return null
-  }
-
-  const messages = error.response?.data?.errors?.[field]
-  if (Array.isArray(messages) && typeof messages[0] === 'string') {
-    return safeUserText(messages[0], '') || null
-  }
-
-  if (typeof error.response?.data?.message === 'string') {
-    return safeUserText(error.response.data.message, '') || null
-  }
-
-  return null
+  const normalized = normalizeError(error)
+  return normalized.fieldErrors[field] ?? null
 }
 
 export function applyValidationErrors(
@@ -136,18 +124,9 @@ export function applyValidationErrors(
   setError: (field: string, error: { message: string }) => void,
   fieldMap: Record<string, string> = {}
 ): string {
-  if (error instanceof AxiosError) {
-    const errors = error.response?.data?.errors
-    if (errors && typeof errors === 'object') {
-      for (const [field, messages] of Object.entries(errors)) {
-        if (Array.isArray(messages) && typeof messages[0] === 'string') {
-          const message = safeUserText(messages[0], '')
-          if (message !== '') {
-            setError(fieldMap[field] ?? field, { message })
-          }
-        }
-      }
-    }
+  const normalized = normalizeError(error)
+  for (const [field, message] of Object.entries(normalized.fieldErrors)) {
+    setError(fieldMap[field] ?? field, { message })
   }
 
   return userFacingMessage(error, 'Something went wrong. Try again.')

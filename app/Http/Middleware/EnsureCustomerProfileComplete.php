@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 
 use App\Enums\CustomerStatus;
 use App\Models\User;
+use App\Support\ApiError;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -25,9 +26,10 @@ class EnsureCustomerProfileComplete
         $user->loadMissing('customer');
 
         if ($user->customer === null || $user->customer->status === CustomerStatus::PendingProfile) {
-            return response()->json([
-                'message' => 'Complete your business name and Tanzanian phone number before using this feature.',
-            ], 403);
+            return ApiError::json(
+                'Complete your business name and Tanzanian phone number before using this feature.',
+                403,
+            );
         }
 
         return $next($request);

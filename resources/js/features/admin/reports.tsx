@@ -19,6 +19,7 @@ import { ListPagination } from '@/components/soscom/list-pagination'
 import { StatusBadge } from '@/components/soscom/status-badge'
 import { TableWrap } from '@/components/soscom/table-wrap'
 import { type AdminDeliveryReport } from '@/types/admin'
+import { QueryLoadError } from '@/components/soscom/query-load-error'
 import { AdminPage } from './page'
 
 const badgeClass = 'px-1.5 py-0 text-[10px] leading-4'
@@ -69,9 +70,10 @@ export function AdminReports() {
         />
       </div>
       {reportsQuery.isError ? (
-        <p className='text-sm text-destructive'>
-          Could not load delivery reports.
-        </p>
+        <QueryLoadError
+          message="We couldn't load delivery reports."
+          onRetry={() => void reportsQuery.refetch()}
+        />
       ) : (
         <TableWrap>
           <Table>

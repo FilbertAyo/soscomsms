@@ -1,6 +1,7 @@
 import axios, { type AxiosError, type AxiosRequestConfig, type AxiosResponse, type InternalAxiosRequestConfig } from 'axios'
 
 const XSRF_COOKIE = 'XSRF-TOKEN'
+const REQUEST_TIMEOUT_MS = 30_000
 
 declare module 'axios' {
   export interface AxiosRequestConfig {
@@ -51,24 +52,46 @@ function dropStaleCsrfHeader(config: InternalAxiosRequestConfig): void {
   delete headers['X-CSRF-TOKEN']
 }
 
+function newRequestId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID()
+  }
+
+  return `req-${Date.now()}-${Math.random().toString(16).slice(2)}`
+}
+
 const csrfClient = axios.create({
   baseURL: '/',
   withCredentials: true,
+  timeout: REQUEST_TIMEOUT_MS,
   headers: {
     Accept: 'application/json',
     'X-Requested-With': 'XMLHttpRequest',
   },
 })
 
+let csrfRefresh: Promise<void> | null = null
+
 export async function refreshCsrfCookie(): Promise<void> {
-  const response = await csrfClient.get('/sanctum/csrf-cookie')
-  syncCsrfFromResponse(response)
+  if (csrfRefresh) {
+    return csrfRefresh
+  }
+
+  csrfRefresh = (async () => {
+    const response = await csrfClient.get('/sanctum/csrf-cookie')
+    syncCsrfFromResponse(response)
+  })().finally(() => {
+    csrfRefresh = null
+  })
+
+  return csrfRefresh
 }
 
 export const api = axios.create({
   baseURL: '/',
   withCredentials: true,
   withXSRFToken: true,
+  timeout: REQUEST_TIMEOUT_MS,
   xsrfCookieName: XSRF_COOKIE,
   xsrfHeaderName: 'X-XSRF-TOKEN',
   headers: {
@@ -93,6 +116,8 @@ api.interceptors.request.use(async (config) => {
       config.headers['X-CSRF-TOKEN'] = token
     }
   }
+
+  config.headers['X-Request-Id'] = newRequestId()
 
   return config
 })

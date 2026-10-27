@@ -46,6 +46,7 @@ import {
 } from '@/components/ui/dialog'
 import { AppHeader } from '@/components/soscom/app-header'
 import { PageHeader } from '@/components/soscom/page-header'
+import { QueryLoadError } from '@/components/soscom/query-load-error'
 import { ListSkeleton } from '@/components/soscom/skeletons'
 import { Main } from '@/components/layout/main'
 import { type CampaignPayload } from '@/types/campaigns'
@@ -286,6 +287,12 @@ export function SendSms() {
               </div>
               {senderIdsQuery.isPending ? (
                 <Skeleton className='mt-2 h-9 w-full' />
+              ) : senderIdsQuery.isError ? (
+                <QueryLoadError
+                  className='mt-2'
+                  message="We couldn't load Sender IDs."
+                  onRetry={() => void senderIdsQuery.refetch()}
+                />
               ) : (
                 <Select
                   value={senderId || undefined}
@@ -334,22 +341,29 @@ export function SendSms() {
                   />
                 </TabsContent>
                 <TabsContent value='group'>
-                  <Select
-                    value={groupId || undefined}
-                    onValueChange={setGroupId}
-                    disabled={groups.length === 0}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder='Select contact group' />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {groups.map((group) => (
-                        <SelectItem key={group.id} value={String(group.id)}>
-                          {group.name} ({formatNumber(group.contactsCount)})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  {groupsQuery.isError ? (
+                    <QueryLoadError
+                      message="We couldn't load contact groups."
+                      onRetry={() => void groupsQuery.refetch()}
+                    />
+                  ) : (
+                    <Select
+                      value={groupId || undefined}
+                      onValueChange={setGroupId}
+                      disabled={groups.length === 0}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder='Select contact group' />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {groups.map((group) => (
+                          <SelectItem key={group.id} value={String(group.id)}>
+                            {group.name} ({formatNumber(group.contactsCount)})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
                 </TabsContent>
                 <TabsContent value='upload'>
                   <Input
@@ -477,32 +491,39 @@ export function SendSms() {
             </DialogDescription>
           </DialogHeader>
           <div className='max-h-80 space-y-2 overflow-y-auto'>
-            {templates.map((template) => (
-              <button
-                key={template.id}
-                type='button'
-                className='w-full rounded-lg border px-3 py-2 text-left hover:bg-accent'
-                onClick={() => insertTemplate(template)}
-              >
-                <span className='block text-sm font-medium'>{template.name}</span>
-                <span className='mt-1 block truncate text-xs text-muted-foreground'>
-                  {template.body}
-                </span>
-                <span className='mt-1 block text-xs text-muted-foreground'>
-                  {formatNumber(template.characterCount)} characters ·{' '}
-                  {formatNumber(template.segmentCount)} SMS
-                </span>
-              </button>
-            ))}
-            {templatesQuery.isPending ? <ListSkeleton rows={3} /> : null}
-            {!templatesQuery.isPending && templates.length === 0 ? (
+            {templatesQuery.isError ? (
+              <QueryLoadError
+                message="We couldn't load templates."
+                onRetry={() => void templatesQuery.refetch()}
+              />
+            ) : templatesQuery.isPending ? (
+              <ListSkeleton rows={3} />
+            ) : templates.length === 0 ? (
               <p className='text-sm text-muted-foreground'>
                 No templates yet.{' '}
                 <Link to='/templates' className='text-primary hover:underline'>
                   Create one
                 </Link>
               </p>
-            ) : null}
+            ) : (
+              templates.map((template) => (
+                <button
+                  key={template.id}
+                  type='button'
+                  className='w-full rounded-lg border px-3 py-2 text-left hover:bg-accent'
+                  onClick={() => insertTemplate(template)}
+                >
+                  <span className='block text-sm font-medium'>{template.name}</span>
+                  <span className='mt-1 block truncate text-xs text-muted-foreground'>
+                    {template.body}
+                  </span>
+                  <span className='mt-1 block text-xs text-muted-foreground'>
+                    {formatNumber(template.characterCount)} characters ·{' '}
+                    {formatNumber(template.segmentCount)} SMS
+                  </span>
+                </button>
+              ))
+            )}
           </div>
         </DialogContent>
       </Dialog>

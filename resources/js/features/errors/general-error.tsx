@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { logClientError } from '@/lib/log-client-error'
 import { cn } from '@/lib/utils'
 import { FriendlyError } from './friendly-error'
 
@@ -14,7 +15,7 @@ export function GeneralError({
 }: GeneralErrorProps) {
   useEffect(() => {
     if (error) {
-      console.error(error)
+      logClientError(error, { source: 'router-error' })
     }
   }, [error])
 

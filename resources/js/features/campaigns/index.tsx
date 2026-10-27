@@ -6,6 +6,7 @@ import { campaignsQueryKey, fetchCampaigns } from '@/lib/campaigns'
 import { formatDateTime, formatNumber, formatTzMobile } from '@/lib/format'
 import { Button } from '@/components/ui/button'
 import { AppHeader } from '@/components/soscom/app-header'
+import { QueryLoadError } from '@/components/soscom/query-load-error'
 import { EmptyState } from '@/components/soscom/empty-state'
 import { ListPagination } from '@/components/soscom/list-pagination'
 import { PageHeader } from '@/components/soscom/page-header'
@@ -56,7 +57,10 @@ export function Campaigns() {
           }
         />
         {campaignsQuery.isError ? (
-          <p className='text-sm text-destructive'>Could not load campaigns.</p>
+          <QueryLoadError
+            message="We couldn't load campaigns."
+            onRetry={() => void campaignsQuery.refetch()}
+          />
         ) : (
           <Tabs
             value={tab}

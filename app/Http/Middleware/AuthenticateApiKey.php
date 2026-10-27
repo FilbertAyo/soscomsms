@@ -7,11 +7,11 @@ use App\Models\ApiKey;
 use App\Models\ApiLog;
 use App\Models\Customer;
 use App\Services\ApiKeyService;
+use App\Support\ApiError;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\Response;
-use Throwable;
 
 class AuthenticateApiKey
 {
@@ -24,11 +24,12 @@ class AuthenticateApiKey
     {
         $request->headers->set('Accept', 'application/json');
 
-        $requestId = $request->header('X-Request-Id');
-        if (! is_string($requestId) || $requestId === '') {
+        $requestId = ApiError::requestId($request);
+        if ($requestId === '') {
             $requestId = (string) Str::uuid();
+            $request->attributes->set('request_id', $requestId);
+            $request->attributes->set('api_request_id', $requestId);
         }
-        $request->attributes->set('api_request_id', $requestId);
 
         $plaintext = $this->extractToken($request);
         $key = $plaintext === null ? null : $this->keys->findByPlaintext($plaintext);
@@ -70,12 +71,7 @@ class AuthenticateApiKey
         $request->attributes->set('api_customer', $customer);
         $this->keys->touchLastUsed($key);
 
-        try {
-            $response = $next($request);
-        } catch (Throwable $exception) {
-            $this->writeLog($request, $key, 500, 'Request failed.');
-            throw $exception;
-        }
+        $response = $next($request);
 
         $error = $response->getStatusCode() >= 400
             ? $this->errorFromResponse($response)
@@ -84,6 +80,24 @@ class AuthenticateApiKey
         $response->headers->set('X-Request-Id', $requestId);
 
         return $response;
+    }
+
+    public static function logUnhandled(Request $request, Response $response): void
+    {
+        if ($request->attributes->get('api_logged')) {
+            return;
+        }
+
+        $key = $request->attributes->get('api_key');
+        if (! $key instanceof ApiKey) {
+            return;
+        }
+
+        $instance = app(self::class);
+        $error = $response->getStatusCode() >= 400
+            ? $instance->errorFromResponse($response)
+            : null;
+        $instance->writeLog($request, $key, $response->getStatusCode(), $error);
     }
 
     private function extractToken(Request $request): ?string
@@ -105,14 +119,15 @@ class AuthenticateApiKey
 
     private function deny(string $message, string $code, int $status): Response
     {
-        return response()->json([
-            'message' => $message,
-            'code' => $code,
-        ], $status);
+        return ApiError::json($message, $status, $code);
     }
 
     private function writeLog(Request $request, ?ApiKey $key, int $status, ?string $error): void
     {
+        if ($request->attributes->get('api_logged')) {
+            return;
+        }
+
         $customer = $request->attributes->get('api_customer');
         $campaignId = $request->attributes->get('api_campaign_id');
 
@@ -124,10 +139,12 @@ class AuthenticateApiKey
             'path' => '/'.$request->path(),
             'status_code' => $status,
             'ip' => $request->ip(),
-            'request_id' => (string) $request->attributes->get('api_request_id'),
+            'request_id' => (string) ($request->attributes->get('api_request_id') ?: $request->attributes->get('request_id')),
             'error' => $error === null || $error === '' ? null : Str::limit($error, 240),
             'created_at' => now(),
         ]);
+
+        $request->attributes->set('api_logged', true);
     }
 
     private function errorFromResponse(Response $response): ?string

@@ -5,6 +5,7 @@ import { fetchPayments, paymentsQueryKey } from '@/lib/credits'
 import { formatDateTime, formatNumber, formatTZS } from '@/lib/format'
 import { useAuthStore } from '@/stores/auth-store'
 import { Button } from '@/components/ui/button'
+import { QueryLoadError } from '@/components/soscom/query-load-error'
 import { StatusBadge } from '@/components/soscom/status-badge'
 import { ListPagination } from '@/components/soscom/list-pagination'
 import { TableSkeleton } from '@/components/soscom/skeletons'
@@ -52,7 +53,10 @@ export function SettingsBilling() {
           </Button>
         </div>
         {paymentsQuery.isError ? (
-          <p className='text-sm text-destructive'>Could not load payments.</p>
+          <QueryLoadError
+            message="We couldn't load payments."
+            onRetry={() => void paymentsQuery.refetch()}
+          />
         ) : paymentsQuery.isLoading ? (
           <TableSkeleton rows={4} />
         ) : payments.length === 0 ? (
