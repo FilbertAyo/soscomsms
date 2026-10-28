@@ -142,7 +142,7 @@ export function AdminCustomers() {
   return (
     <AdminPage
       title='Customers'
-      description='Search accounts, view balances, grant credits, and suspend or unsuspend customers.'
+      description='Search accounts and open a customer to view details, grant credits, or change status.'
     >
       <div className='mb-4 max-w-md'>
         <Input
@@ -193,33 +193,13 @@ export function AdminCustomers() {
                       <StatusBadge status={item.status} />
                     </TableCell>
                     <TableCell className='text-end'>
-                      <div className='flex justify-end gap-2'>
-                        <Button
-                          size='sm'
-                          variant='ghost'
-                          onClick={() => setViewing(item)}
-                        >
-                          View
-                        </Button>
-                        <Button
-                          size='sm'
-                          variant='outline'
-                          onClick={() => {
-                            setTarget(item)
-                            resetGrantForm()
-                          }}
-                        >
-                          Grant SMS
-                        </Button>
-                        <Button
-                          size='sm'
-                          variant={item.status === 'suspended' ? 'outline' : 'destructive'}
-                          disabled={suspendMutation.isPending}
-                          onClick={() => suspendMutation.mutate(item)}
-                        >
-                          {item.status === 'suspended' ? 'Unsuspend' : 'Suspend'}
-                        </Button>
-                      </div>
+                      <Button
+                        size='sm'
+                        variant='ghost'
+                        onClick={() => setViewing(item)}
+                      >
+                        View
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))
@@ -258,18 +238,29 @@ export function AdminCustomers() {
               </dd>
             </div>
           </dl>
-          <DialogFooter>
+          <DialogFooter className='flex-col gap-2 sm:flex-row sm:justify-end'>
             <Button variant='outline' onClick={() => setViewing(null)}>
               Close
             </Button>
             {viewing ? (
-              <Button
-                variant={viewing.status === 'suspended' ? 'outline' : 'destructive'}
-                disabled={suspendMutation.isPending}
-                onClick={() => suspendMutation.mutate(viewing)}
-              >
-                {viewing.status === 'suspended' ? 'Unsuspend' : 'Suspend'}
-              </Button>
+              <>
+                <Button
+                  variant='outline'
+                  onClick={() => {
+                    setTarget(viewing)
+                    resetGrantForm()
+                  }}
+                >
+                  Grant SMS
+                </Button>
+                <Button
+                  variant={viewing.status === 'suspended' ? 'outline' : 'destructive'}
+                  disabled={suspendMutation.isPending}
+                  onClick={() => suspendMutation.mutate(viewing)}
+                >
+                  {viewing.status === 'suspended' ? 'Unsuspend' : 'Suspend'}
+                </Button>
+              </>
             ) : null}
           </DialogFooter>
         </DialogContent>
