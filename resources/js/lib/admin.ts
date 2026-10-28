@@ -23,6 +23,10 @@ export function adminCustomersSearchQueryKey(q: string) {
   return ['admin', 'customers', q] as const
 }
 
+export function adminCustomerQueryKey(id: number | string) {
+  return ['admin', 'customers', 'detail', String(id)] as const
+}
+
 export async function fetchAdminOverview(): Promise<AdminOverview> {
   const { data } = await api.get<AdminOverview>('/api/admin/overview')
   return data
