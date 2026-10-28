@@ -83,7 +83,8 @@ class AuditLog extends Model
             AuditAction::PaymentRejected,
             AuditAction::SenderIdRejected,
             AuditAction::SenderIdResubmissionRequested => 'warning',
-            AuditAction::CreditsReversed => 'warning',
+            AuditAction::CreditsReversed,
+            AuditAction::CustomerPriceRemoved => 'warning',
             AuditAction::CreditsGranted,
             AuditAction::CustomerUnsuspended,
             AuditAction::PaymentConfirmed,
@@ -95,6 +96,7 @@ class AuditLog extends Model
             AuditAction::SenderIdGranted,
             AuditAction::SenderIdRevoked,
             AuditAction::PricingUpdated,
+            AuditAction::CustomerPriceSaved,
             AuditAction::ProviderSettingsUpdated,
             AuditAction::ProviderWhitelistConfirmed,
             AuditAction::ProviderAccountConfirmed => 'info',
@@ -115,6 +117,7 @@ class AuditLog extends Model
         $to = isset($payload['to']) ? (int) $payload['to'] : null;
         $reason = isset($payload['reason']) ? (string) $payload['reason'] : null;
         $amount = isset($payload['amount_tzs']) ? (int) $payload['amount_tzs'] : null;
+        $list = isset($payload['list_unit_price_tzs']) ? (int) $payload['list_unit_price_tzs'] : null;
 
         return match ($this->action) {
             AuditAction::CreditsGranted => $quantity === null
@@ -163,6 +166,14 @@ class AuditLog extends Model
             AuditAction::PricingUpdated => $label === null || $from === null || $to === null
                 ? "{$who} updated a pricing tier."
                 : "{$who} updated {$label} from TZS {$from} to TZS {$to} per SMS.",
+            AuditAction::CustomerPriceSaved => $label === null || $to === null
+                ? "{$who} set a special SMS price for {$customer}."
+                : ($from === null
+                    ? "{$who} set {$label} to TZS {$to} per SMS for {$customer}".($list === null ? '.' : " (normal TZS {$list}).")
+                    : "{$who} changed {$label} for {$customer} from TZS {$from} to TZS {$to} per SMS."),
+            AuditAction::CustomerPriceRemoved => $label === null
+                ? "{$who} removed a special SMS price for {$customer}."
+                : "{$who} removed the special {$label} price for {$customer}.",
             AuditAction::ProviderSettingsUpdated => "{$who} updated production provider settings.",
             AuditAction::ProviderWhitelistConfirmed => "{$who} confirmed Mobishastra has whitelisted the SOSCOM static IP.",
             AuditAction::ProviderAccountConfirmed => "{$who} confirmed the Tanzania Mobishastra account details.",

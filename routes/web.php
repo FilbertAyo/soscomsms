@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\Admin\ApiUsageController as AdminApiUsageController;
 use App\Http\Controllers\Api\Admin\CreditTransactionController as AdminCreditTransactionController;
 use App\Http\Controllers\Api\Admin\CustomerController as AdminCustomerController;
+use App\Http\Controllers\Api\Admin\CustomerPriceController as AdminCustomerPriceController;
 use App\Http\Controllers\Api\Admin\DeliveryReportController as AdminDeliveryReportController;
 use App\Http\Controllers\Api\Admin\LogController as AdminLogController;
 use App\Http\Controllers\Api\Admin\OverviewController as AdminOverviewController;
@@ -125,6 +126,9 @@ Route::prefix('api')->group(function (): void {
             Route::get('/logs', [AdminLogController::class, 'index']);
             Route::get('/customers', [AdminCustomerController::class, 'index']);
             Route::get('/customers/{customer}', [AdminCustomerController::class, 'show']);
+            Route::get('/customers/{customer}/prices', [AdminCustomerPriceController::class, 'index']);
+            Route::post('/customers/{customer}/prices', [AdminCustomerPriceController::class, 'store']);
+            Route::delete('/customers/{customer}/prices/{customerPrice}', [AdminCustomerPriceController::class, 'destroy']);
             Route::post('/customers/{customer}/credits', [AdminCustomerController::class, 'grantCredits']);
             Route::post('/customers/{customer}/suspension', [AdminCustomerController::class, 'suspend']);
             Route::post('/customers/{customer}/unsuspension', [AdminCustomerController::class, 'unsuspend']);

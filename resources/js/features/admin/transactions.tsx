@@ -92,7 +92,18 @@ export function AdminTransactions() {
                     {formatNumber(item.quantity)}
                   </TableCell>
                   <TableCell>
-                    {item.amountTzs ? formatTZS(item.amountTzs) : '—'}
+                    {item.amountTzs ? (
+                      <>
+                        <p>{formatTZS(item.amountTzs)}</p>
+                        {item.customerUnitPrice != null && item.customerUnitPrice > 0 ? (
+                          <p className='text-xs text-muted-foreground'>
+                            {formatTZS(item.customerUnitPrice)} each
+                          </p>
+                        ) : null}
+                      </>
+                    ) : (
+                      '—'
+                    )}
                   </TableCell>
                   <TableCell>
                     <StatusBadge status={item.type} />

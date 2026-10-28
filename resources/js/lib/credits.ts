@@ -5,6 +5,7 @@ import { emptyPageMeta, type PageMeta } from '@/types/pagination'
 import {
   type AdminCustomer,
   type CreditTransaction,
+  type CustomerPricePackage,
   type PricingTier,
   type ProviderBalance,
   type SchedulerHealth,
@@ -102,6 +103,41 @@ export async function fetchAdminCustomers(
     customers: data.customers,
     meta: data.meta ?? emptyPageMeta,
   }
+}
+
+export function adminCustomerPricesQueryKey(customerId: number | string) {
+  return ['admin', 'customers', String(customerId), 'prices'] as const
+}
+
+export async function fetchAdminCustomerPrices(
+  customerId: number
+): Promise<{ packages: CustomerPricePackage[] }> {
+  const { data } = await api.get<{ packages: CustomerPricePackage[] }>(
+    `/api/admin/customers/${customerId}/prices`
+  )
+  return data
+}
+
+export async function saveAdminCustomerPrice(
+  customerId: number,
+  payload: {
+    pricing_tier_id: number
+    unit_price_tzs: number
+    expires_at?: string | null
+  }
+): Promise<CustomerPricePackage> {
+  const { data } = await api.post<{ package: CustomerPricePackage }>(
+    `/api/admin/customers/${customerId}/prices`,
+    payload
+  )
+  return data.package
+}
+
+export async function removeAdminCustomerPrice(
+  customerId: number,
+  priceId: number
+): Promise<void> {
+  await api.delete(`/api/admin/customers/${customerId}/prices/${priceId}`)
 }
 
 export async function grantCustomerCredits(

@@ -169,8 +169,14 @@ export function BuySmsPage() {
                       >
                         <p className='text-sm font-medium'>{tier.label}</p>
                         <p className='mt-0.5 text-xs text-muted-foreground'>
+                          {tier.specialPrice ? 'Your price ' : ''}
                           {formatTZS(tier.unitPriceTzs)} each
                         </p>
+                        {tier.specialPrice && tier.listUnitPriceTzs != null ? (
+                          <p className='text-xs text-muted-foreground line-through'>
+                            {formatTZS(tier.listUnitPriceTzs)}
+                          </p>
+                        ) : null}
                       </button>
                     ))}
                   </div>
@@ -203,7 +209,13 @@ export function BuySmsPage() {
                   <p className='mt-1 text-3xl font-semibold tracking-tight'>
                     {quote ? formatTZS(quote.totalTzs) : '—'}
                   </p>
-                  {quote ? (
+                  {quote?.specialPrice ? (
+                    <p className='mt-1 text-sm text-muted-foreground'>
+                      Your price: {formatNumber(quote.quantity)} SMS at{' '}
+                      {formatTZS(quote.unitPriceTzs)} each. Normal price is{' '}
+                      {formatTZS(quote.listUnitPriceTzs ?? quote.unitPriceTzs)} each.
+                    </p>
+                  ) : quote ? (
                     <p className='mt-1 text-sm text-muted-foreground'>
                       {formatNumber(quote.quantity)} SMS at {formatTZS(quote.unitPriceTzs)} each
                     </p>
@@ -277,7 +289,11 @@ function WaitingCard({ payment }: { payment: PaymentRecord }) {
       </p>
       <AmountPanel
         amount={formatTZS(payment.amountTzs)}
-        detail={`${formatNumber(payment.quantity)} SMS`}
+        detail={
+          payment.specialPrice && payment.listUnitPriceTzs != null
+            ? `${formatNumber(payment.quantity)} SMS at your price of ${formatTZS(payment.unitPriceTzs)} each (normal ${formatTZS(payment.listUnitPriceTzs)})`
+            : `${formatNumber(payment.quantity)} SMS at ${formatTZS(payment.unitPriceTzs)} each`
+        }
       />
     </div>
   )
@@ -394,6 +410,8 @@ function AmountPanel({ amount, detail }: { amount: string; detail: string }) {
 type QuotePreview = {
   quantity: number
   unitPriceTzs: number
+  listUnitPriceTzs: number
+  specialPrice: boolean
   totalTzs: number
   tier: PricingTier
 }
@@ -434,9 +452,13 @@ function quoteFromTiers(
     return null
   }
 
+  const listUnitPriceTzs = tier.listUnitPriceTzs ?? tier.unitPriceTzs
+
   return {
     quantity,
     unitPriceTzs: tier.unitPriceTzs,
+    listUnitPriceTzs,
+    specialPrice: tier.specialPrice === true && tier.unitPriceTzs !== listUnitPriceTzs,
     totalTzs: quantity * tier.unitPriceTzs,
     tier,
   }

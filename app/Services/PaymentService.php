@@ -37,7 +37,7 @@ class PaymentService
         }
 
         $phone = $this->payingPhone($payload['payer_reference']);
-        $quote = $this->pricing->quote($payload['quantity']);
+        $quote = $this->pricing->quote($payload['quantity'], $customer);
 
         if ($quote['totalTzs'] < 500) {
             throw ValidationException::withMessages([
@@ -65,6 +65,7 @@ class PaymentService
             return $customer->payments()->create([
                 'quantity' => $quote['quantity'],
                 'unit_price_tzs' => $quote['unitPriceTzs'],
+                'list_unit_price_tzs' => $quote['listUnitPriceTzs'],
                 'amount_tzs' => $quote['totalTzs'],
                 'method' => PaymentMethod::Snippe,
                 'lipa_namba' => null,
@@ -323,12 +324,20 @@ class PaymentService
                 }
 
                 $settlement = is_array($data['settlement'] ?? null) ? $data['settlement'] : [];
+                $description = "Purchase of {$locked->quantity} SMS via mobile money";
+                if (
+                    $locked->list_unit_price_tzs !== null
+                    && $locked->list_unit_price_tzs !== $locked->unit_price_tzs
+                ) {
+                    $description .= " at TZS {$locked->unit_price_tzs} (normal TZS {$locked->list_unit_price_tzs})";
+                }
+
                 $transaction = $this->ledger->purchase(
                     $customer,
                     $locked->quantity,
                     $locked->unit_price_tzs,
                     'PAY-'.$locked->id,
-                    "Purchase of {$locked->quantity} SMS via mobile money",
+                    $description,
                 );
 
                 $locked->forceFill([

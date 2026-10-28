@@ -39,7 +39,7 @@ export function AdminRevenue() {
   return (
     <AdminPage
       title='Pricing'
-      description='Confirmed purchase and grant revenue, estimated send margin, and volume tiers used for new quotes.'
+      description='Confirmed purchase and grant revenue, estimated send margin, and the normal volume prices. A special price for one customer is set on that customer’s page and does not change these prices.'
     >
       {pricingQuery.isError ? (
         <QueryLoadError

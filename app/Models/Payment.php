@@ -21,6 +21,7 @@ class Payment extends Model
         'customer_id',
         'quantity',
         'unit_price_tzs',
+        'list_unit_price_tzs',
         'amount_tzs',
         'method',
         'lipa_namba',
@@ -49,6 +50,7 @@ class Payment extends Model
         return [
             'quantity' => 'integer',
             'unit_price_tzs' => 'integer',
+            'list_unit_price_tzs' => 'integer',
             'amount_tzs' => 'integer',
             'fee_tzs' => 'integer',
             'net_tzs' => 'integer',
@@ -95,6 +97,9 @@ class Payment extends Model
             'id' => $this->id,
             'quantity' => $this->quantity,
             'unitPriceTzs' => $this->unit_price_tzs,
+            'listUnitPriceTzs' => $this->list_unit_price_tzs,
+            'specialPrice' => $this->list_unit_price_tzs !== null
+                && $this->list_unit_price_tzs !== $this->unit_price_tzs,
             'amountTzs' => $this->amount_tzs,
             'method' => $this->method->value,
             'payerReference' => $this->payer_reference,

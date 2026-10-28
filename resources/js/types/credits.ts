@@ -13,12 +13,16 @@ export type PricingTier = {
   minQuantity: number
   maxQuantity: number | null
   unitPriceTzs: number
+  listUnitPriceTzs?: number
+  specialPrice?: boolean
   label: string
 }
 
 export type SmsQuote = {
   quantity: number
   unitPriceTzs: number
+  listUnitPriceTzs?: number
+  specialPrice?: boolean
   totalTzs: number
   providerUnitCostTzs: number
   estimatedMarginTzs: number
@@ -47,8 +51,26 @@ export type CreditTransaction = {
 export type SmsPackageQuote = {
   quantity: number
   unitPriceTzs: number
+  listUnitPriceTzs?: number
+  specialPrice?: boolean
   totalTzs: number
   popular: boolean
+}
+
+export type CustomerPricePackage = {
+  tierId: number
+  label: string
+  minQuantity: number
+  maxQuantity: number | null
+  listUnitPriceTzs: number
+  price: {
+    id: number
+    tierId: number
+    unitPriceTzs: number
+    expiresAt: string | null
+    active: boolean
+    updatedAt: string | null
+  } | null
 }
 
 export type WalletSnapshot = {

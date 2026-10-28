@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use App\Models\Customer;
+use App\Models\CustomerPrice;
 use App\Models\PricingTier;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
@@ -88,17 +90,39 @@ class PricingService
     }
 
     /**
-     * @return array{quantity: int, unitPriceTzs: int, totalTzs: int, providerUnitCostTzs: int, estimatedMarginTzs: int, tier: array{id: int, minQuantity: int, maxQuantity: int|null, unitPriceTzs: int, label: string}}
+     * Public tiers with this customer's applicable unit price, when one is active.
+     *
+     * @return Collection<int, array{id: int, minQuantity: int, maxQuantity: int|null, unitPriceTzs: int, listUnitPriceTzs: int, specialPrice: bool, label: string}>
      */
-    public function quote(int $quantity): array
+    public function customerTiers(?Customer $customer): Collection
     {
-        return $this->quoteFromTier($quantity, $this->tierFor($quantity));
+        $prices = $this->activePrices($customer);
+
+        return $this->tiers()->map(function (PricingTier $tier) use ($prices): array {
+            $row = $tier->toApiArray();
+            $list = $tier->unit_price_tzs;
+            $override = $prices->get($tier->id);
+            $unit = $override instanceof CustomerPrice ? $override->unit_price_tzs : $list;
+            $row['unitPriceTzs'] = $unit;
+            $row['listUnitPriceTzs'] = $list;
+            $row['specialPrice'] = $unit !== $list;
+
+            return $row;
+        })->values();
+    }
+
+    /**
+     * @return array{quantity: int, unitPriceTzs: int, listUnitPriceTzs: int, specialPrice: bool, totalTzs: int, providerUnitCostTzs: int, estimatedMarginTzs: int, tier: array{id: int, minQuantity: int, maxQuantity: int|null, unitPriceTzs: int, label: string}}
+     */
+    public function quote(int $quantity, ?Customer $customer = null): array
+    {
+        return $this->quoteFromTier($quantity, $this->tierFor($quantity), $customer);
     }
 
     /**
      * Price any volume, including grants below the public purchase minimum.
      *
-     * @return array{quantity: int, unitPriceTzs: int, totalTzs: int, providerUnitCostTzs: int, estimatedMarginTzs: int, tier: array{id: int, minQuantity: int, maxQuantity: int|null, unitPriceTzs: int, label: string}}
+     * @return array{quantity: int, unitPriceTzs: int, listUnitPriceTzs: int, specialPrice: bool, totalTzs: int, providerUnitCostTzs: int, estimatedMarginTzs: int, tier: array{id: int, minQuantity: int, maxQuantity: int|null, unitPriceTzs: int, label: string}}
      */
     public function quoteVolume(int $quantity): array
     {
@@ -106,19 +130,56 @@ class PricingService
     }
 
     /**
-     * @return array{quantity: int, unitPriceTzs: int, totalTzs: int, providerUnitCostTzs: int, estimatedMarginTzs: int, tier: array{id: int, minQuantity: int, maxQuantity: int|null, unitPriceTzs: int, label: string}}
+     * @return Collection<int, CustomerPrice>
      */
-    private function quoteFromTier(int $quantity, PricingTier $tier): array
+    private function activePrices(?Customer $customer): Collection
+    {
+        if ($customer === null) {
+            return collect();
+        }
+
+        return CustomerPrice::query()
+            ->where('customer_id', $customer->id)
+            ->applicable()
+            ->get()
+            ->keyBy('pricing_tier_id');
+    }
+
+    private function unitPriceFor(PricingTier $tier, ?Customer $customer): int
+    {
+        if ($customer !== null) {
+            $override = CustomerPrice::query()
+                ->where('customer_id', $customer->id)
+                ->where('pricing_tier_id', $tier->id)
+                ->applicable()
+                ->value('unit_price_tzs');
+
+            if ($override !== null) {
+                return (int) $override;
+            }
+        }
+
+        return $tier->unit_price_tzs;
+    }
+
+    /**
+     * @return array{quantity: int, unitPriceTzs: int, listUnitPriceTzs: int, specialPrice: bool, totalTzs: int, providerUnitCostTzs: int, estimatedMarginTzs: int, tier: array{id: int, minQuantity: int, maxQuantity: int|null, unitPriceTzs: int, label: string}}
+     */
+    private function quoteFromTier(int $quantity, PricingTier $tier, ?Customer $customer = null): array
     {
         $providerCost = (int) config('sms.provider_unit_cost_tzs', 14);
-        $total = $quantity * $tier->unit_price_tzs;
+        $listUnit = $tier->unit_price_tzs;
+        $unit = $this->unitPriceFor($tier, $customer);
+        $total = $quantity * $unit;
 
         return [
             'quantity' => $quantity,
-            'unitPriceTzs' => $tier->unit_price_tzs,
+            'unitPriceTzs' => $unit,
+            'listUnitPriceTzs' => $listUnit,
+            'specialPrice' => $unit !== $listUnit,
             'totalTzs' => $total,
             'providerUnitCostTzs' => $providerCost,
-            'estimatedMarginTzs' => ($tier->unit_price_tzs - $providerCost) * $quantity,
+            'estimatedMarginTzs' => ($unit - $providerCost) * $quantity,
             'tier' => $tier->toApiArray(),
         ];
     }

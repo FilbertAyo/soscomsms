@@ -28,14 +28,16 @@ class WalletController extends Controller
             ], 404);
         }
 
-        $tiers = $pricing->tiers()->map->toApiArray()->values();
+        $tiers = $pricing->customerTiers($customer);
         $packages = collect(config('sms.packages', []))
-            ->map(function (int $quantity) use ($pricing): array {
-                $quote = $pricing->quote($quantity);
+            ->map(function (int $quantity) use ($pricing, $customer): array {
+                $quote = $pricing->quote($quantity, $customer);
 
                 return [
                     'quantity' => $quantity,
                     'unitPriceTzs' => $quote['unitPriceTzs'],
+                    'listUnitPriceTzs' => $quote['listUnitPriceTzs'],
+                    'specialPrice' => $quote['specialPrice'],
                     'totalTzs' => $quote['totalTzs'],
                     'popular' => $quantity === 1000,
                 ];

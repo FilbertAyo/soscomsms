@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { Building2, CalendarDays, Mail, Phone, ArrowLeft } from 'lucide-react'
@@ -13,12 +13,16 @@ import {
   unsuspendAdminCustomer,
 } from '@/lib/admin'
 import {
+  adminCustomerPricesQueryKey,
   adminCustomersQueryKey,
   adminPricingTiersQueryKey,
   adminTransactionsQueryKey,
+  fetchAdminCustomerPrices,
   fetchAdminPricingTiers,
   grantCustomerCredits,
   quoteVolumeFromTiers,
+  removeAdminCustomerPrice,
+  saveAdminCustomerPrice,
 } from '@/lib/credits'
 import { applyValidationErrors } from '@/lib/auth'
 import { normalizeError } from '@/lib/api-error'
@@ -33,6 +37,13 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { EmptyState } from '@/components/soscom/empty-state'
 import { QueryLoadError } from '@/components/soscom/query-load-error'
@@ -287,6 +298,8 @@ export function AdminCustomerDetail({ customerId }: { customerId: string }) {
             />
           </div>
 
+          <SpecialPrices customerId={customerId} />
+
           <section className='rounded-2xl border bg-card p-5 sm:p-6'>
             <h3 className='text-sm font-semibold tracking-tight'>Admin actions</h3>
             <p className='mt-1 max-w-2xl text-sm text-muted-foreground'>
@@ -452,6 +465,235 @@ export function AdminCustomerDetail({ customerId }: { customerId: string }) {
         handleConfirm={() => suspendMutation.mutate()}
       />
     </AdminPage>
+  )
+}
+
+function SpecialPrices({ customerId }: { customerId: string }) {
+  const queryClient = useQueryClient()
+  const [tierId, setTierId] = useState('')
+  const [unitPrice, setUnitPrice] = useState('')
+  const [expiresOn, setExpiresOn] = useState('')
+  const [removeId, setRemoveId] = useState<number | null>(null)
+  const pricesQuery = useQuery({
+    queryKey: adminCustomerPricesQueryKey(customerId),
+    queryFn: () => fetchAdminCustomerPrices(Number(customerId)),
+    enabled: /^\d+$/.test(customerId),
+  })
+  const packages = pricesQuery.data?.packages ?? []
+  const selected =
+    packages.find((item) => String(item.tierId) === tierId) ?? packages[0] ?? null
+  const parsedUnit = Number.parseInt(unitPrice, 10)
+  const unitIsValid = Number.isFinite(parsedUnit) && parsedUnit >= 1 && parsedUnit <= 1000
+  const exampleQuantity = selected?.minQuantity ?? 0
+  const exampleTotal = unitIsValid ? exampleQuantity * parsedUnit : 0
+  const normalTotal = selected ? exampleQuantity * selected.listUnitPriceTzs : 0
+  const currentExpiry = selected?.price?.expiresAt?.slice(0, 10) ?? ''
+  const unchanged =
+    selected?.price != null &&
+    selected.price.unitPriceTzs === parsedUnit &&
+    currentExpiry === expiresOn
+
+  function applyPackage(nextId: string, source = packages) {
+    setTierId(nextId)
+    const pack = source.find((item) => String(item.tierId) === nextId)
+    setUnitPrice(pack?.price ? String(pack.price.unitPriceTzs) : '')
+    setExpiresOn(pack?.price?.expiresAt ? pack.price.expiresAt.slice(0, 10) : '')
+  }
+
+  useEffect(() => {
+    if (tierId !== '' || packages.length === 0) {
+      return
+    }
+
+    const pack = packages[0]
+    setTierId(String(pack.tierId))
+    setUnitPrice(pack.price ? String(pack.price.unitPriceTzs) : '')
+    setExpiresOn(pack.price?.expiresAt ? pack.price.expiresAt.slice(0, 10) : '')
+  }, [packages, tierId])
+
+  const saveMutation = useMutation({
+    mutationFn: () =>
+      saveAdminCustomerPrice(Number(customerId), {
+        pricing_tier_id: selected?.tierId ?? 0,
+        unit_price_tzs: parsedUnit,
+        expires_at: expiresOn || null,
+      }),
+    onSuccess: async (pack) => {
+      toast.success(
+        `Special price saved: ${formatTZS(pack.price?.unitPriceTzs ?? parsedUnit)} per SMS for ${pack.label}.`
+      )
+      await queryClient.invalidateQueries({
+        queryKey: adminCustomerPricesQueryKey(customerId),
+      })
+      void queryClient.invalidateQueries({ queryKey: adminLogsQueryKey })
+    },
+    onError: (error) => {
+      toast.error(applyValidationErrors(error, () => undefined))
+    },
+  })
+
+  const removeMutation = useMutation({
+    mutationFn: (priceId: number) =>
+      removeAdminCustomerPrice(Number(customerId), priceId),
+    onSuccess: async () => {
+      toast.success('Special price removed. This customer pays the normal price again.')
+      setRemoveId(null)
+      setUnitPrice('')
+      setExpiresOn('')
+      await queryClient.invalidateQueries({
+        queryKey: adminCustomerPricesQueryKey(customerId),
+      })
+      void queryClient.invalidateQueries({ queryKey: adminLogsQueryKey })
+    },
+    onError: (error) => {
+      toast.error(applyValidationErrors(error, () => undefined))
+    },
+  })
+
+  const activeTierId = tierId || (selected ? String(selected.tierId) : '')
+
+  return (
+    <section className='rounded-2xl border bg-card p-5 sm:p-6'>
+      <h3 className='text-sm font-semibold tracking-tight'>Special SMS prices</h3>
+      <p className='mt-1 max-w-2xl text-sm text-muted-foreground'>
+        An agreed price applies only to this customer and only to the selected
+        SMS package. Everyone else keeps paying the normal price.
+      </p>
+
+      {pricesQuery.isError ? (
+        <div className='mt-4'>
+          <QueryLoadError
+            message="We couldn't load special prices."
+            onRetry={() => void pricesQuery.refetch()}
+          />
+        </div>
+      ) : pricesQuery.isLoading ? (
+        <p className='mt-4 text-sm text-muted-foreground'>Loading prices…</p>
+      ) : packages.length === 0 ? (
+        <p className='mt-4 text-sm text-muted-foreground'>No SMS packages are configured.</p>
+      ) : (
+        <div className='mt-4 space-y-4'>
+          {packages.some((item) => item.price) ? (
+            <div className='divide-y rounded-xl border'>
+              {packages
+                .filter((item) => item.price)
+                .map((item) => (
+                  <div
+                    key={item.tierId}
+                    className='flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between'
+                  >
+                    <div>
+                      <p className='text-sm font-medium'>{item.label}</p>
+                      <p className='text-sm text-muted-foreground'>
+                        Agreed {formatTZS(item.price?.unitPriceTzs ?? 0)} per SMS
+                        {' · '}
+                        normal {formatTZS(item.listUnitPriceTzs)}
+                        {item.price?.expiresAt
+                          ? ` · until ${formatDate(item.price.expiresAt)}`
+                          : ''}
+                        {item.price && !item.price.active ? ' · expired' : ''}
+                      </p>
+                    </div>
+                    <Button
+                      variant='outline'
+                      size='sm'
+                      onClick={() => setRemoveId(item.price?.id ?? null)}
+                    >
+                      Remove
+                    </Button>
+                  </div>
+                ))}
+            </div>
+          ) : (
+            <p className='text-sm text-muted-foreground'>
+              No special price. This customer pays the normal package price.
+            </p>
+          )}
+
+          <div className='grid gap-4 sm:grid-cols-2'>
+            <div className='space-y-2'>
+              <Label>SMS package</Label>
+              <Select
+                value={activeTierId}
+                onValueChange={(value) => applyPackage(value)}
+              >
+                <SelectTrigger className='w-full'>
+                  <SelectValue placeholder='Select a package' />
+                </SelectTrigger>
+                <SelectContent>
+                  {packages.map((item) => (
+                    <SelectItem key={item.tierId} value={String(item.tierId)}>
+                      {item.label} · {formatTZS(item.listUnitPriceTzs)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className='space-y-2'>
+              <Label htmlFor='special-unit-price'>Agreed price per SMS (TZS)</Label>
+              <Input
+                id='special-unit-price'
+                type='number'
+                min={1}
+                max={1000}
+                value={unitPrice}
+                onChange={(event) => setUnitPrice(event.target.value)}
+              />
+            </div>
+            <div className='space-y-2'>
+              <Label htmlFor='special-expires'>Expires (optional)</Label>
+              <Input
+                id='special-expires'
+                type='date'
+                value={expiresOn}
+                onChange={(event) => setExpiresOn(event.target.value)}
+              />
+            </div>
+          </div>
+
+          {selected && unitIsValid ? (
+            <p className='text-sm text-muted-foreground'>
+              {formatNumber(exampleQuantity)} SMS at this price is {formatTZS(exampleTotal)}.
+              The normal total is {formatTZS(normalTotal)}.
+              {exampleTotal < 500
+                ? ' Mobile money payments under TZS 500 are not accepted.'
+                : ''}
+            </p>
+          ) : null}
+
+          <Button
+            disabled={
+              saveMutation.isPending ||
+              !selected ||
+              !unitIsValid ||
+              unchanged
+            }
+            onClick={() => saveMutation.mutate()}
+          >
+            {saveMutation.isPending
+              ? 'Saving…'
+              : selected?.price
+                ? 'Update special price'
+                : 'Save special price'}
+          </Button>
+        </div>
+      )}
+
+      <ConfirmDialog
+        open={removeId !== null}
+        onOpenChange={(open) => {
+          if (!open) setRemoveId(null)
+        }}
+        title='Remove this special price?'
+        desc='This customer will pay the normal package price on the next purchase. Past purchases keep the price they were charged.'
+        confirmText={removeMutation.isPending ? 'Removing…' : 'Remove price'}
+        destructive
+        isLoading={removeMutation.isPending}
+        handleConfirm={() => {
+          if (removeId !== null) removeMutation.mutate(removeId)
+        }}
+      />
+    </section>
   )
 }
 

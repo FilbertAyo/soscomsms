@@ -132,6 +132,14 @@ class Customer extends Model
     }
 
     /**
+     * @return HasMany<CustomerPrice, $this>
+     */
+    public function prices(): HasMany
+    {
+        return $this->hasMany(CustomerPrice::class);
+    }
+
+    /**
      * @return HasMany<ApiKey, $this>
      */
     public function apiKeys(): HasMany

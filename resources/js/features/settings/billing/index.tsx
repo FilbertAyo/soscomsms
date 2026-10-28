@@ -80,7 +80,15 @@ export function SettingsBilling() {
                       {item.createdAt ? formatDateTime(item.createdAt) : '—'}
                     </TableCell>
                     <TableCell>{formatNumber(item.quantity)}</TableCell>
-                    <TableCell>{formatTZS(item.amountTzs)}</TableCell>
+                    <TableCell>
+                      <p>{formatTZS(item.amountTzs)}</p>
+                      <p className='text-xs text-muted-foreground'>
+                        {formatNumber(item.quantity)} SMS at {formatTZS(item.unitPriceTzs)}
+                        {item.specialPrice && item.listUnitPriceTzs != null
+                          ? ` · your price, normal ${formatTZS(item.listUnitPriceTzs)}`
+                          : ' each'}
+                      </p>
+                    </TableCell>
                     <TableCell>{item.payerReference}</TableCell>
                     <TableCell>
                       <StatusBadge status={item.status} />

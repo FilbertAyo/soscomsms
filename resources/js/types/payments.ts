@@ -4,6 +4,8 @@ export type PaymentRecord = {
   id: number
   quantity: number
   unitPriceTzs: number
+  listUnitPriceTzs: number | null
+  specialPrice: boolean
   amountTzs: number
   method: 'lipa_namba' | 'snippe'
   payerReference: string

@@ -68,7 +68,20 @@ export function AdminPayments() {
                       </p>
                     </TableCell>
                     <TableCell>{formatNumber(item.quantity)}</TableCell>
-                    <TableCell>{formatTZS(item.amountTzs)}</TableCell>
+                    <TableCell>
+                      <p>{formatTZS(item.amountTzs)}</p>
+                      <p className='text-xs text-muted-foreground'>
+                        {formatTZS(item.unitPriceTzs)} each
+                        {item.specialPrice && item.listUnitPriceTzs != null
+                          ? ` · normal ${formatTZS(item.listUnitPriceTzs)}`
+                          : ''}
+                      </p>
+                      {item.snippeReference ? (
+                        <p className='text-xs text-muted-foreground'>
+                          {item.snippeReference}
+                        </p>
+                      ) : null}
+                    </TableCell>
                     <TableCell>{item.payerReference}</TableCell>
                     <TableCell className='capitalize'>{item.provider ?? '—'}</TableCell>
                     <TableCell>
