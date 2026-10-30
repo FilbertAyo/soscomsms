@@ -19,6 +19,7 @@ use App\Models\ProviderLog;
 use App\Services\Gateway\GatewaySendResult;
 use App\Services\Gateway\OutboundSms;
 use App\Services\Gateway\ProviderDeliveryStatus;
+use App\Support\AdminAlerts;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
@@ -107,8 +108,8 @@ class CampaignDispatcher
     }
 
     /**
-     * Cancel remaining unsent recipients that were already attempted (no provider id).
-     * Never resend those — retries can duplicate SMS at the gateway.
+     * Resolve attempted recipients with no provider message id without retrying.
+     * Credits stay charged (Mobishastra is source of truth); admins are alerted only.
      */
     public function cancelStuckSending(): int
     {
@@ -129,7 +130,7 @@ class CampaignDispatcher
             ->orderBy('id')
             ->pluck('id');
 
-        $cancelled = 0;
+        $resolved = 0;
         foreach ($ids as $id) {
             /** @var Campaign|null $campaign */
             $campaign = Campaign::query()->with(['customer', 'recipients.delivery'])->find($id);
@@ -137,13 +138,13 @@ class CampaignDispatcher
                 continue;
             }
 
-            $didCancel = $this->cancelAmbiguousUnsent($campaign);
-            if ($didCancel) {
-                $cancelled++;
+            $didResolve = $this->resolveAmbiguousUnsent($campaign);
+            if ($didResolve) {
+                $resolved++;
             }
         }
 
-        return $cancelled;
+        return $resolved;
     }
 
     /**
@@ -194,9 +195,11 @@ class CampaignDispatcher
     }
 
     /**
-     * Mark attempted-but-unconfirmed queued recipients as failed without sending.
+     * Hold attempted-but-unconfirmed recipients as unknown: never resend, never
+     * refund or debit again. Mobishastra remains the billing/delivery truth;
+     * only admins are alerted so they can follow up with the customer if needed.
      */
-    private function cancelAmbiguousUnsent(Campaign $campaign): bool
+    private function resolveAmbiguousUnsent(Campaign $campaign): bool
     {
         $recipients = $campaign->recipients()
             ->with('delivery')
@@ -218,34 +221,44 @@ class CampaignDispatcher
             return false;
         }
 
-        $now = now();
+        $phones = [];
 
         foreach ($recipients as $recipient) {
-            $recipient->status = CampaignRecipientStatus::Failed;
-            $recipient->save();
-
-            $delivery = $recipient->delivery;
-            if ($delivery !== null) {
-                $delivery->status = DeliveryStatus::Failed;
-                $delivery->provider_response_code = 'cancelled';
-                $delivery->provider_response = 'Cancelled to prevent duplicate SMS';
-                $delivery->updated_at = $now;
-                $delivery->save();
-            }
-
-            // Ambiguous attempts were consumed before the provider call; refund them.
-            $this->refundFailedRecipient($campaign, $recipient, 'Cancelled ambiguous send');
+            // Same treatment as a gateway timeout: keep the charge, do not retry.
+            $this->markUnknown($recipient, new GatewaySendResult(
+                recipientId: $recipient->id,
+                phone: $recipient->phone,
+                accepted: false,
+                timedOut: true,
+                code: 'ambiguous',
+                raw: 'Ambiguous send held; Mobishastra is source of truth',
+            ));
+            $phones[] = $recipient->phone;
         }
 
         ProviderLog::query()->create([
             'provider_id' => Provider::current()->id,
             'campaign_id' => $campaign->id,
-            'action' => 'cancel_stuck',
+            'action' => 'ambiguous_held',
             'status' => 'ok',
-            'error' => 'Cancelled attempted unsent recipients to stop duplicate SMS',
+            'error' => 'Ambiguous attempted recipients held without refund or retry',
         ]);
 
-        $this->finishDispatch($campaign, notify: true);
+        $campaign->loadMissing('customer.user');
+        $owner = $campaign->customer?->business_name
+            ?: ($campaign->customer?->user?->name ?? 'a customer');
+        $phoneList = implode(', ', $phones);
+
+        AdminAlerts::technical(
+            'ambiguous-send:'.$campaign->id,
+            'Ambiguous SMS send — no credit change',
+            'Campaign #'.$campaign->id.' ('.$campaign->name.') for '.$owner
+                .' had ambiguous send(s) with no provider message id: '.$phoneList
+                .'. Credits were left as charged (Mobishastra is source of truth).'
+                .' Confirm delivery in Mobishastra if needed; the customer was not notified or refunded.',
+        );
+
+        $this->finishDispatch($campaign, notify: false);
 
         return true;
     }

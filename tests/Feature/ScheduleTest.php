@@ -266,30 +266,31 @@ it('cancels stuck attempted recipients instead of resending them', function () {
     }
 
     $this->artisan('sms:dispatch-scheduled')
-        ->expectsOutputToContain('Cancelled 1 stuck sending campaign(s).')
+        ->expectsOutputToContain('Held 1 ambiguous send campaign(s) for admin review.')
         ->assertSuccessful();
 
     $this->assertDatabaseHas('campaigns', [
         'id' => $campaign->id,
-        'status' => CampaignStatus::PartiallyDelivered->value,
+        'status' => CampaignStatus::Completed->value,
     ]);
     $this->assertDatabaseHas('campaign_recipients', [
         'phone' => '+255754221891',
-        'status' => CampaignRecipientStatus::Failed->value,
+        'status' => CampaignRecipientStatus::Unknown->value,
     ]);
     $this->assertDatabaseHas('campaign_recipients', [
         'phone' => '+255765000001',
-        'status' => CampaignRecipientStatus::Failed->value,
+        'status' => CampaignRecipientStatus::Unknown->value,
     ]);
     $this->assertDatabaseHas('deliveries', [
-        'provider_response_code' => 'cancelled',
+        'provider_response_code' => 'ambiguous',
     ]);
-    // Reserved 3 at create; refunded 2 ambiguous cancels → only 1 sent SMS billed.
-    expect($customer->fresh()->sms_balance)->toBe(49);
+    // Reserved 3 at create; ambiguous holds keep the charge (Mobishastra is truth).
+    expect($customer->fresh()->sms_balance)->toBe(47)
+        ->and(CreditTransaction::query()->where('type', CreditTransactionType::Refund)->count())->toBe(0);
 });
 
 it('does not resend a recently attempted delivery without a provider message id', function () {
-    [$user, , $sender] = scheduleCustomer(20);
+    [$user, $customer, $sender] = scheduleCustomer(20);
 
     $this->actingAs($user)
         ->postJson('/api/campaigns', [
@@ -305,6 +306,7 @@ it('does not resend a recently attempted delivery without a provider message id'
     $campaign->forceFill([
         'status' => CampaignStatus::Sending,
         'queued_at' => now(),
+        'consumed_segments' => 1,
     ])->save();
 
     $recipient = $campaign->recipients()->firstOrFail();
@@ -317,15 +319,18 @@ it('does not resend a recently attempted delivery without a provider message id'
     ]);
 
     $this->artisan('sms:dispatch-scheduled')
-        ->expectsOutputToContain('Cancelled 1 stuck sending campaign(s).')
+        ->expectsOutputToContain('Held 1 ambiguous send campaign(s) for admin review.')
         ->assertSuccessful();
 
     $this->assertDatabaseHas('campaign_recipients', [
         'id' => $recipient->id,
-        'status' => CampaignRecipientStatus::Failed->value,
+        'status' => CampaignRecipientStatus::Unknown->value,
     ]);
     $this->assertDatabaseHas('deliveries', [
         'campaign_recipient_id' => $recipient->id,
-        'provider_response_code' => 'cancelled',
+        'provider_response_code' => 'ambiguous',
     ]);
+    // No refund / no extra debit for ambiguous — reservation stays consumed.
+    expect($customer->fresh()->sms_balance)->toBe(19)
+        ->and(CreditTransaction::query()->where('type', CreditTransactionType::Refund)->count())->toBe(0);
 });
