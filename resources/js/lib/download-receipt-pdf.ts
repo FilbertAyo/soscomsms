@@ -68,30 +68,46 @@ function drawHeader(doc: PdfDoc, logo: string | null, y: number): number {
 }
 
 function drawMeta(doc: PdfDoc, receipt: PurchaseReceipt, y: number): number {
-  const boxHeight = 18
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(10)
+  const numberLines = doc.splitTextToSize(receipt.receiptNumber, contentWidth - 12) as string[]
+  const numberHeight = numberLines.length * 4.6
+  const boxHeight = 26 + numberHeight
   doc.setFillColor(...paper)
   doc.setDrawColor(...rule)
   doc.setLineWidth(0.2)
   doc.roundedRect(marginX, y, contentWidth, boxHeight, 1.5, 1.5, 'FD')
 
-  const columns = [
-    ['Receipt number', receipt.receiptNumber],
-    ['Date', receipt.issuedAtLabel ?? '—'],
-    ['Status', receipt.status === 'reversed' ? 'REVERSED' : 'PAID'],
-  ] as const
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(8)
+  doc.setTextColor(...muted)
+  doc.text('RECEIPT NUMBER', marginX + 6, y + 6)
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(10)
+  doc.setTextColor(...ink)
+  numberLines.forEach((line, index) => {
+    doc.text(line, marginX + 6, y + 11.5 + index * 4.6)
+  })
 
-  columns.forEach(([label, value], index) => {
-    const x = marginX + 6 + index * (contentWidth / 3)
+  const detailY = y + 16 + numberHeight
+  const statusColor: [number, number, number] =
+    receipt.status === 'reversed' ? reversed : brandGreen
+  const status = receipt.status === 'reversed' ? 'REVERSED' : 'PAID'
+  const columns: Array<[string, string, [number, number, number]]> = [
+    ['DATE', receipt.issuedAtLabel ?? '—', ink],
+    ['STATUS', status, statusColor],
+  ]
+
+  columns.forEach(([label, value, color], index) => {
+    const x = marginX + 6 + index * (contentWidth / 2)
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(8)
     doc.setTextColor(...muted)
-    doc.text(label.toUpperCase(), x, y + 6)
-    const statusColor: [number, number, number] =
-      receipt.status === 'reversed' ? reversed : brandGreen
+    doc.text(label, x, detailY)
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(11)
-    doc.setTextColor(...(label === 'Status' ? statusColor : ink))
-    doc.text(value, x, y + 12)
+    doc.setTextColor(...color)
+    doc.text(value, x, detailY + 5.5)
   })
 
   return y + boxHeight + 8
@@ -169,16 +185,16 @@ function drawLine(doc: PdfDoc, receipt: PurchaseReceipt, y: number): number {
 function drawPayment(doc: PdfDoc, receipt: PurchaseReceipt, y: number): number {
   const rows: Array<[string, string]> = [
     ['Payment method', receipt.paymentMethodLabel],
-    ['Transaction ID', receipt.transactionId ?? 'Not provided'],
     ['Reference', receipt.internalReference || '—'],
   ]
 
-  if (receipt.payerReference) {
-    rows.push(['Paid from', receipt.payerReference])
+  const transactionId = receipt.transactionId?.trim()
+  if (transactionId) {
+    rows.splice(1, 0, ['Transaction ID', transactionId])
   }
 
-  if (receipt.note) {
-    rows.push(['Note', receipt.note])
+  if (receipt.payerReference) {
+    rows.push(['Paid from', receipt.payerReference])
   }
 
   rows.forEach(([label, value]) => {
