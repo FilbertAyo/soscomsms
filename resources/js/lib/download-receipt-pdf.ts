@@ -153,25 +153,18 @@ function drawLine(doc: PdfDoc, receipt: PurchaseReceipt, y: number): number {
   const line = receipt.line
   doc.setFillColor(255, 255, 255)
   doc.setDrawColor(...rule)
-  doc.rect(marginX, y, contentWidth, 16, 'S')
+  doc.rect(marginX, y, contentWidth, 12, 'S')
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(11)
   doc.setTextColor(...ink)
-  doc.text(line.description, marginX + 3, y + 7)
+  doc.text(line.description, marginX + 3, y + 8)
   doc.setFont('helvetica', 'normal')
-  doc.text(formatNumber(line.quantity), marginX + 92, y + 7, { align: 'right' })
-  doc.text(formatTZS(line.unitPriceTzs), marginX + 128, y + 7, { align: 'right' })
+  doc.text(formatNumber(line.quantity), marginX + 92, y + 8, { align: 'right' })
+  doc.text(formatTZS(line.unitPriceTzs), marginX + 128, y + 8, { align: 'right' })
   doc.setFont('helvetica', 'bold')
-  doc.text(formatTZS(line.amountTzs), pageWidth - marginX - 3, y + 7, { align: 'right' })
+  doc.text(formatTZS(line.amountTzs), pageWidth - marginX - 3, y + 8, { align: 'right' })
 
-  if (line.specialPrice && line.listUnitPriceTzs != null) {
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(8)
-    doc.setTextColor(...muted)
-    doc.text(`Normal price ${formatTZS(line.listUnitPriceTzs)} each`, marginX + 3, y + 12)
-  }
-
-  return y + 22
+  return y + 18
 }
 
 function drawPayment(doc: PdfDoc, receipt: PurchaseReceipt, y: number): number {
