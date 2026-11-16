@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Payment;
 use App\Services\PaymentService;
 use App\Support\PaginationMeta;
+use App\Support\ReceiptData;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -56,5 +57,15 @@ class PaymentController extends Controller
             'smsBalance' => $customer->fresh()?->sms_balance,
             'csrf_token' => csrf_token(),
         ], 201);
+    }
+
+    public function receipt(Request $request, Payment $payment, ReceiptData $receipts): JsonResponse
+    {
+        $customer = $this->currentCustomer($request);
+        abort_unless($payment->customer_id === $customer->id, 403);
+
+        return response()->json([
+            'receipt' => $receipts->forPayment($payment),
+        ]);
     }
 }

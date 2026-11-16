@@ -4,8 +4,10 @@ namespace App\Services;
 
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
+use App\Models\CreditTransaction;
 use App\Models\Customer;
 use App\Models\Payment;
+use App\Models\User;
 use App\Notifications\PaymentConfirmedNotification;
 use App\Notifications\PaymentRequestedNotification;
 use App\Support\TanzaniaPhone;
@@ -235,6 +237,35 @@ class PaymentService
     /**
      * @param  array<string, mixed>  $data
      */
+    public function recordManualGrant(
+        Customer $customer,
+        CreditTransaction $transaction,
+        PaymentMethod $method,
+        ?string $transactionId,
+        ?string $note,
+        User $confirmedBy,
+    ): Payment {
+        $quote = $this->pricing->quoteVolume($transaction->quantity, $customer);
+        $phone = trim((string) $customer->phone);
+        $reference = trim((string) $transactionId);
+
+        return Payment::query()->create([
+            'customer_id' => $customer->id,
+            'quantity' => $transaction->quantity,
+            'unit_price_tzs' => (int) ($transaction->customer_unit_price ?? $quote['unitPriceTzs']),
+            'list_unit_price_tzs' => $quote['listUnitPriceTzs'],
+            'amount_tzs' => (int) ($transaction->amount_tzs ?? $quote['totalTzs']),
+            'method' => $method,
+            'payer_reference' => $phone !== '' ? $phone : '-',
+            'external_reference' => $reference !== '' ? mb_substr($reference, 0, 64) : null,
+            'status' => PaymentStatus::Paid,
+            'credit_transaction_id' => $transaction->id,
+            'confirmed_by' => $confirmedBy->id,
+            'confirmed_at' => now(),
+            'admin_note' => filled($note) ? $note : null,
+        ]);
+    }
+
     private function paymentForWebhook(array $data): ?Payment
     {
         $reference = $this->stringValue($data['reference'] ?? null);

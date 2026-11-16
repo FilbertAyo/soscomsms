@@ -11,6 +11,7 @@ import { applyValidationErrors } from '@/lib/auth'
 import { formatDateTime, formatNumber, formatTZS } from '@/lib/format'
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/confirm-dialog'
+import { ReceiptDownloadButton } from '@/components/soscom/receipt-download-button'
 import { StatusBadge } from '@/components/soscom/status-badge'
 import { TableWrap } from '@/components/soscom/table-wrap'
 import { ListPagination } from '@/components/soscom/list-pagination'
@@ -110,16 +111,25 @@ export function AdminTransactions() {
                   </TableCell>
                   <TableCell>{item.reference}</TableCell>
                   <TableCell className='text-end'>
-                    {item.type !== 'reversal' && !item.reversed ? (
-                      <Button
-                        size='sm'
-                        variant='outline'
-                        disabled={reverseMutation.isPending}
-                        onClick={() => setReverseTarget(item)}
-                      >
-                        Reverse
-                      </Button>
-                    ) : null}
+                    <div className='flex justify-end gap-2'>
+                      {item.receiptAvailable ? (
+                        <ReceiptDownloadButton
+                          paymentId={item.paymentId}
+                          transactionId={item.id}
+                          admin
+                        />
+                      ) : null}
+                      {item.type !== 'reversal' && !item.reversed ? (
+                        <Button
+                          size='sm'
+                          variant='outline'
+                          disabled={reverseMutation.isPending}
+                          onClick={() => setReverseTarget(item)}
+                        >
+                          Reverse
+                        </Button>
+                      ) : null}
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}

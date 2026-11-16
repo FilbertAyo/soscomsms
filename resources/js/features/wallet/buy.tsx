@@ -18,6 +18,7 @@ import {
 import { formatNumber, formatTZS } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/auth-store'
+import { ReceiptDownloadButton } from '@/components/soscom/receipt-download-button'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -341,8 +342,16 @@ function ResultCard({
             : `${formatNumber(payment.quantity)} SMS · ${payment.payerReference}`
         }
       />
+      {paid ? (
+        <ReceiptDownloadButton
+          paymentId={payment.id}
+          size='default'
+          label='Download receipt'
+          className='mt-6 w-full'
+        />
+      ) : null}
       <Button
-        className='mt-6 w-full'
+        className={paid ? 'mt-2 w-full' : 'mt-6 w-full'}
         variant={paid ? 'default' : 'outline'}
         onClick={onAgain}
       >

@@ -62,7 +62,7 @@ class CreditLedger
             ]);
         }
 
-        $quote = app(PricingService::class)->quoteVolume($quantity);
+        $quote = app(PricingService::class)->quoteVolume($quantity, $customer);
         $unitPrice = $unitPriceTzs ?? $quote['unitPriceTzs'];
         $amount = $amountTzs ?? ($quantity * $unitPrice);
 

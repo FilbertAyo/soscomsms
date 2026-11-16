@@ -3,9 +3,13 @@
 use App\Enums\CreditTransactionType;
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
+use App\Models\CreditTransaction;
 use App\Models\Customer;
+use App\Models\CustomerPrice;
 use App\Models\Payment;
+use App\Models\PricingTier;
 use App\Models\User;
+use App\Services\CreditLedger;
 use Database\Seeders\PricingTierSeeder;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
@@ -340,4 +344,178 @@ it('lists purchases without a manual payment number', function () {
         ->getJson('/api/payments')
         ->assertOk()
         ->assertJsonMissingPath('lipaNamba');
+});
+
+it('gives the buyer a receipt after a paid mobile money purchase', function () {
+    [$user] = billingCustomer();
+    [$otherUser] = billingCustomer();
+
+    $create = $this->actingAs($user)
+        ->postJson('/api/payments', [
+            'quantity' => 100,
+            'payer_reference' => '0754221890',
+        ])
+        ->assertCreated();
+
+    $paymentId = (int) $create->json('payment.id');
+
+    $this->actingAs($user)
+        ->getJson("/api/payments/{$paymentId}/receipt")
+        ->assertNotFound();
+
+    postSnippeWebhook(snippeCompletedEvent('ref-pay-1', 2500, $paymentId))->assertOk();
+
+    $this->actingAs($user)
+        ->getJson("/api/payments/{$paymentId}/receipt")
+        ->assertOk()
+        ->assertJsonPath('receipt.receiptNumber', sprintf('RCP-%06d', $paymentId))
+        ->assertJsonPath('receipt.status', 'paid')
+        ->assertJsonPath('receipt.line.quantity', 100)
+        ->assertJsonPath('receipt.line.amountTzs', 2500)
+        ->assertJsonPath('receipt.line.unitPriceTzs', 25)
+        ->assertJsonPath('receipt.paymentMethod', PaymentMethod::Snippe->value)
+        ->assertJsonPath('receipt.paymentMethodLabel', 'Mobile money (mpesa)')
+        ->assertJsonPath('receipt.transactionId', 'ref-pay-1')
+        ->assertJsonPath('receipt.internalReference', 'PAY-'.$paymentId)
+        ->assertJsonPath('receipt.payerReference', '+255754221890')
+        ->assertJsonPath('receipt.billTo.name', 'Amina Juma')
+        ->assertJsonPath('receipt.issuer.company', 'SOSCOM Technologies Company Limited');
+
+    $this->actingAs($otherUser)
+        ->getJson("/api/payments/{$paymentId}/receipt")
+        ->assertForbidden();
+});
+
+it('records a cash grant at the customer price and puts that price on the receipt', function () {
+    $admin = User::factory()->admin()->create();
+    [$user, $customer] = billingCustomer();
+
+    $this->actingAs($admin)
+        ->postJson("/api/admin/customers/{$customer->id}/credits", [
+            'quantity' => 100,
+        ])
+        ->assertCreated()
+        ->assertJsonPath('transaction.amountTzs', 2500)
+        ->assertJsonPath('transaction.customerUnitPrice', 25)
+        ->assertJsonPath('smsBalance', 109);
+
+    $payment = Payment::query()->where('customer_id', $customer->id)->first();
+
+    expect($payment)->not->toBeNull()
+        ->and($payment->status)->toBe(PaymentStatus::Paid)
+        ->and($payment->method)->toBe(PaymentMethod::Cash)
+        ->and($payment->amount_tzs)->toBe(2500)
+        ->and($payment->external_reference)->toBeNull()
+        ->and($payment->confirmed_by)->toBe($admin->id)
+        ->and($payment->credit_transaction_id)->not->toBeNull();
+
+    $this->actingAs($user)
+        ->getJson("/api/payments/{$payment->id}/receipt")
+        ->assertOk()
+        ->assertJsonPath('receipt.line.amountTzs', 2500)
+        ->assertJsonPath('receipt.paymentMethod', PaymentMethod::Cash->value)
+        ->assertJsonPath('receipt.paymentMethodLabel', 'Cash')
+        ->assertJsonPath('receipt.transactionId', null)
+        ->assertJsonPath('receipt.smsAdded', 100)
+        ->assertJsonPath('receipt.balanceAfter', 109);
+
+    $this->actingAs($admin)
+        ->getJson("/api/admin/payments/{$payment->id}/receipt")
+        ->assertOk()
+        ->assertJsonPath('receipt.receiptNumber', sprintf('RCP-%06d', $payment->id));
+});
+
+it('stores the transaction id an admin enters when granting SMS', function () {
+    $admin = User::factory()->admin()->create();
+    [$user, $customer] = billingCustomer();
+
+    $this->actingAs($admin)
+        ->postJson("/api/admin/customers/{$customer->id}/credits", [
+            'quantity' => 100,
+            'payment_method' => PaymentMethod::Bank->value,
+            'transaction_id' => 'BANK-4481',
+            'note' => 'Paid at the counter',
+        ])
+        ->assertCreated();
+
+    $payment = Payment::query()->where('customer_id', $customer->id)->first();
+
+    expect($payment?->method)->toBe(PaymentMethod::Bank)
+        ->and($payment?->external_reference)->toBe('BANK-4481')
+        ->and($payment?->admin_note)->toBe('Paid at the counter');
+
+    $this->actingAs($user)
+        ->getJson("/api/payments/{$payment->id}/receipt")
+        ->assertOk()
+        ->assertJsonPath('receipt.transactionId', 'BANK-4481')
+        ->assertJsonPath('receipt.paymentMethodLabel', 'Bank transfer')
+        ->assertJsonPath('receipt.note', 'Paid at the counter');
+});
+
+it('prices a manual grant from the customer special price when the admin does not override it', function () {
+    $admin = User::factory()->admin()->create();
+    [$user, $customer] = billingCustomer();
+    $tier = PricingTier::query()->where('min_quantity', 1000)->first();
+
+    CustomerPrice::query()->create([
+        'customer_id' => $customer->id,
+        'pricing_tier_id' => $tier->id,
+        'unit_price_tzs' => 18,
+    ]);
+
+    $this->actingAs($admin)
+        ->postJson("/api/admin/customers/{$customer->id}/credits", [
+            'quantity' => 1000,
+            'payment_method' => PaymentMethod::ManualMobile->value,
+            'transaction_id' => 'MM-22',
+        ])
+        ->assertCreated()
+        ->assertJsonPath('transaction.customerUnitPrice', 18)
+        ->assertJsonPath('transaction.amountTzs', 18000);
+
+    $payment = Payment::query()->where('customer_id', $customer->id)->first();
+
+    expect($payment?->list_unit_price_tzs)->toBe(23)
+        ->and($payment?->unit_price_tzs)->toBe(18);
+
+    $this->actingAs($user)
+        ->getJson("/api/payments/{$payment->id}/receipt")
+        ->assertOk()
+        ->assertJsonPath('receipt.line.unitPriceTzs', 18)
+        ->assertJsonPath('receipt.line.listUnitPriceTzs', 23)
+        ->assertJsonPath('receipt.line.specialPrice', true)
+        ->assertJsonPath('receipt.line.amountTzs', 18000)
+        ->assertJsonPath('receipt.transactionId', 'MM-22')
+        ->assertJsonPath('receipt.paymentMethodLabel', 'Mobile money');
+});
+
+it('still issues a receipt for an older admin grant that has no payment row', function () {
+    [$user, $customer] = billingCustomer();
+    $transaction = CreditTransaction::query()->create([
+        'customer_id' => $customer->id,
+        'type' => CreditTransactionType::Grant,
+        'quantity' => 50,
+        'customer_unit_price' => 25,
+        'amount_tzs' => 1250,
+        'balance_after' => 59,
+        'reference' => 'GNT-LEGACY',
+        'description' => 'Counter sale',
+        'created_at' => now(),
+    ]);
+
+    $this->actingAs($user)
+        ->getJson("/api/credit-transactions/{$transaction->id}/receipt")
+        ->assertOk()
+        ->assertJsonPath('receipt.receiptNumber', 'GNT-LEGACY')
+        ->assertJsonPath('receipt.paymentMethod', 'admin_grant')
+        ->assertJsonPath('receipt.paymentMethodLabel', 'Admin grant')
+        ->assertJsonPath('receipt.transactionId', null)
+        ->assertJsonPath('receipt.note', 'Counter sale')
+        ->assertJsonPath('receipt.line.amountTzs', 1250);
+
+    $welcome = app(CreditLedger::class)->grantWelcome($customer);
+
+    $this->actingAs($user)
+        ->getJson("/api/credit-transactions/{$welcome->id}/receipt")
+        ->assertNotFound();
 });

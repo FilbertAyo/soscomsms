@@ -9,6 +9,7 @@ use App\Models\Customer;
 use App\Models\User;
 use App\Services\PricingService;
 use App\Support\PaginationMeta;
+use App\Support\ReceiptData;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Http\JsonResponse;
@@ -46,7 +47,7 @@ class WalletController extends Controller
 
         $giftUnitPrice = $pricing->firstRangeUnitPriceTzs();
         $recent = $this->purchaseTransactions($customer)
-            ->with(['reversal', 'relatedTransaction'])
+            ->with(['reversal', 'relatedTransaction', 'payment'])
             ->latest('id')
             ->limit(5)
             ->get()
@@ -77,7 +78,7 @@ class WalletController extends Controller
 
         $giftUnitPrice = $pricing->firstRangeUnitPriceTzs();
         $page = $this->purchaseTransactions($customer)
-            ->with(['reversal', 'relatedTransaction'])
+            ->with(['reversal', 'relatedTransaction', 'payment'])
             ->latest('id')
             ->paginate(PaginationMeta::perPage($request));
 
@@ -128,5 +129,22 @@ class WalletController extends Controller
         }
 
         return $row;
+    }
+
+    public function receipt(Request $request, CreditTransaction $creditTransaction, ReceiptData $receipts): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+        $customer = $user->customer;
+
+        if ($customer === null) {
+            abort(404);
+        }
+
+        abort_unless($creditTransaction->customer_id === $customer->id, 403);
+
+        return response()->json([
+            'receipt' => $receipts->forCreditTransaction($creditTransaction),
+        ]);
     }
 }

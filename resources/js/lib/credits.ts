@@ -1,5 +1,9 @@
 import { api } from '@/lib/api'
-import { type PaymentRecord } from '@/types/payments'
+import {
+  type ManualPaymentMethod,
+  type PaymentRecord,
+  type PurchaseReceipt,
+} from '@/types/payments'
 import { type AuthUser } from '@/types/auth'
 import { emptyPageMeta, type PageMeta } from '@/types/pagination'
 import {
@@ -40,7 +44,14 @@ export function quantityInTier(quantity: number, tier: PricingTier): boolean {
 export function quoteVolumeFromTiers(
   quantity: number,
   tiers: PricingTier[]
-): { quantity: number; unitPriceTzs: number; totalTzs: number; tier: PricingTier } | null {
+): {
+  quantity: number
+  unitPriceTzs: number
+  listUnitPriceTzs: number
+  specialPrice: boolean
+  totalTzs: number
+  tier: PricingTier
+} | null {
   if (quantity < 1 || tiers.length === 0) {
     return null
   }
@@ -55,8 +66,55 @@ export function quoteVolumeFromTiers(
   return {
     quantity,
     unitPriceTzs: tier.unitPriceTzs,
+    listUnitPriceTzs: tier.listUnitPriceTzs ?? tier.unitPriceTzs,
+    specialPrice: false,
     totalTzs: quantity * tier.unitPriceTzs,
     tier,
+  }
+}
+
+export function quoteVolumeFromPackages(
+  quantity: number,
+  packages: CustomerPricePackage[]
+): {
+  quantity: number
+  unitPriceTzs: number
+  listUnitPriceTzs: number
+  specialPrice: boolean
+  totalTzs: number
+  tier: { label: string }
+} | null {
+  if (quantity < 1 || packages.length === 0) {
+    return null
+  }
+
+  const pack =
+    packages.find((item) =>
+      quantityInTier(quantity, {
+        id: item.tierId,
+        minQuantity: item.minQuantity,
+        maxQuantity: item.maxQuantity,
+        unitPriceTzs: item.listUnitPriceTzs,
+        label: item.label,
+      })
+    ) ??
+    packages[0] ??
+    null
+
+  if (pack === null) {
+    return null
+  }
+
+  const unit =
+    pack.price?.active === true ? pack.price.unitPriceTzs : pack.listUnitPriceTzs
+
+  return {
+    quantity,
+    unitPriceTzs: unit,
+    listUnitPriceTzs: pack.listUnitPriceTzs,
+    specialPrice: unit !== pack.listUnitPriceTzs,
+    totalTzs: quantity * unit,
+    tier: { label: pack.label },
   }
 }
 
@@ -143,20 +201,40 @@ export async function removeAdminCustomerPrice(
 export async function grantCustomerCredits(
   customerId: number,
   quantity: number,
-  note?: string,
-  amountTzs?: number,
-  unitPriceTzs?: number
+  options?: {
+    note?: string
+    amountTzs?: number
+    unitPriceTzs?: number
+    paymentMethod?: ManualPaymentMethod
+    transactionId?: string
+  }
 ): Promise<{ smsBalance: number; transaction: CreditTransaction }> {
   const { data } = await api.post<{
     smsBalance: number
     transaction: CreditTransaction
   }>(`/api/admin/customers/${customerId}/credits`, {
     quantity,
-    note: note || undefined,
-    amount_tzs: amountTzs,
-    unit_price_tzs: unitPriceTzs,
+    note: options?.note || undefined,
+    amount_tzs: options?.amountTzs,
+    unit_price_tzs: options?.unitPriceTzs,
+    payment_method: options?.paymentMethod,
+    transaction_id: options?.transactionId || undefined,
   })
   return data
+}
+
+export async function fetchPurchaseReceipt(target: {
+  paymentId?: number | null
+  transactionId?: number | null
+  admin?: boolean
+}): Promise<PurchaseReceipt> {
+  const prefix = target.admin ? '/api/admin' : '/api'
+  const path =
+    target.paymentId != null
+      ? `${prefix}/payments/${target.paymentId}/receipt`
+      : `${prefix}/credit-transactions/${target.transactionId}/receipt`
+  const { data } = await api.get<{ receipt: PurchaseReceipt }>(path)
+  return data.receipt
 }
 
 export async function fetchAdminTransactions(page = 1): Promise<{

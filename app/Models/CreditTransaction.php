@@ -79,10 +79,28 @@ class CreditTransaction extends Model
         return $this->reversal()->exists();
     }
 
+    /**
+     * @return HasOne<Payment, $this>
+     */
+    public function payment(): HasOne
+    {
+        return $this->hasOne(Payment::class);
+    }
+
     public function isWelcomeGrant(): bool
     {
         return $this->type === CreditTransactionType::Grant
             && str_starts_with((string) $this->reference, 'WELCOME-');
+    }
+
+    public function receiptAvailable(): bool
+    {
+        if ($this->isWelcomeGrant()) {
+            return false;
+        }
+
+        return $this->type === CreditTransactionType::Purchase
+            || $this->type === CreditTransactionType::Grant;
     }
 
     /**
@@ -107,7 +125,7 @@ class CreditTransaction extends Model
      */
     public function toApiArray(): array
     {
-        $this->loadMissing('customer.user');
+        $this->loadMissing(['customer.user', 'payment']);
 
         return [
             'id' => $this->id,
@@ -119,6 +137,8 @@ class CreditTransaction extends Model
             'reference' => $this->reference,
             'description' => $this->description,
             'reversed' => $this->isReversed(),
+            'paymentId' => $this->payment?->id,
+            'receiptAvailable' => $this->receiptAvailable(),
             'createdAt' => $this->created_at?->toIso8601String(),
             'customer' => $this->customer === null ? null : [
                 'id' => $this->customer->id,

@@ -68,6 +68,7 @@ Route::prefix('api')->group(function (): void {
         Route::middleware('profile.complete')->middleware('throttle:api')->group(function (): void {
             Route::get('/wallet', [WalletController::class, 'show']);
             Route::get('/credit-transactions', [WalletController::class, 'transactions']);
+            Route::get('/credit-transactions/{creditTransaction}/receipt', [WalletController::class, 'receipt']);
 
             Route::get('/contact-groups', [ContactGroupController::class, 'index']);
             Route::post('/contact-groups', [ContactGroupController::class, 'store']);
@@ -116,6 +117,7 @@ Route::prefix('api')->group(function (): void {
 
             Route::get('/payments', [PaymentController::class, 'index']);
             Route::post('/payments', [PaymentController::class, 'store']);
+            Route::get('/payments/{payment}/receipt', [PaymentController::class, 'receipt']);
             Route::get('/payments/{payment}', [PaymentController::class, 'show']);
         });
 
@@ -133,6 +135,7 @@ Route::prefix('api')->group(function (): void {
             Route::post('/customers/{customer}/suspension', [AdminCustomerController::class, 'suspend']);
             Route::post('/customers/{customer}/unsuspension', [AdminCustomerController::class, 'unsuspend']);
             Route::get('/credit-transactions', [AdminCreditTransactionController::class, 'index']);
+            Route::get('/credit-transactions/{creditTransaction}/receipt', [AdminCreditTransactionController::class, 'receipt']);
             Route::post('/credit-transactions/{creditTransaction}/reversals', [AdminCreditTransactionController::class, 'reverse']);
             Route::get('/pricing-tiers', [AdminPricingTierController::class, 'index']);
             Route::patch('/pricing-tiers/{pricingTier}', [AdminPricingTierController::class, 'update']);
@@ -162,6 +165,7 @@ Route::prefix('api')->group(function (): void {
             Route::get('/api-usage/keys', [AdminApiUsageController::class, 'keys']);
             Route::get('/api-usage/webhook-deliveries', [AdminApiUsageController::class, 'webhookDeliveries']);
             Route::get('/payments', [AdminPaymentController::class, 'index']);
+            Route::get('/payments/{payment}/receipt', [AdminPaymentController::class, 'receipt']);
         });
     });
 });

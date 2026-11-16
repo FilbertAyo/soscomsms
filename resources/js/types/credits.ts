@@ -39,6 +39,8 @@ export type CreditTransaction = {
   reference: string
   description: string
   reversed: boolean
+  paymentId: number | null
+  receiptAvailable: boolean
   createdAt: string
   customer: {
     id: number

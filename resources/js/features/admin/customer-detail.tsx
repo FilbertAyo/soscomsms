@@ -15,11 +15,13 @@ import {
 import {
   adminCustomerPricesQueryKey,
   adminCustomersQueryKey,
+  adminPaymentsQueryKey,
   adminPricingTiersQueryKey,
   adminTransactionsQueryKey,
   fetchAdminCustomerPrices,
   fetchAdminPricingTiers,
   grantCustomerCredits,
+  quoteVolumeFromPackages,
   quoteVolumeFromTiers,
   removeAdminCustomerPrice,
   saveAdminCustomerPrice,
@@ -27,6 +29,7 @@ import {
 import { applyValidationErrors } from '@/lib/auth'
 import { normalizeError } from '@/lib/api-error'
 import { formatDate, formatNumber, formatTZS } from '@/lib/format'
+import { type ManualPaymentMethod } from '@/types/payments'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -62,6 +65,8 @@ export function AdminCustomerDetail({ customerId }: { customerId: string }) {
   const [unitPrice, setUnitPrice] = useState('')
   const [amount, setAmount] = useState('')
   const [note, setNote] = useState('')
+  const [paymentMethod, setPaymentMethod] = useState<ManualPaymentMethod>('cash')
+  const [transactionId, setTransactionId] = useState('')
 
   const customerQuery = useQuery({
     queryKey: adminCustomerQueryKey(customerId),
@@ -73,6 +78,11 @@ export function AdminCustomerDetail({ customerId }: { customerId: string }) {
     queryFn: fetchAdminPricingTiers,
     enabled: grantOpen,
   })
+  const pricesQuery = useQuery({
+    queryKey: adminCustomerPricesQueryKey(customerId),
+    queryFn: () => fetchAdminCustomerPrices(Number(customerId)),
+    enabled: grantOpen && /^\d+$/.test(customerId),
+  })
 
   const customer = customerQuery.data
   const tiers = pricingQuery.data?.tiers ?? []
@@ -80,8 +90,10 @@ export function AdminCustomerDetail({ customerId }: { customerId: string }) {
   const grantQuantity =
     Number.isFinite(parsedQuantity) && parsedQuantity > 0 ? parsedQuantity : 0
   const quote = useMemo(
-    () => quoteVolumeFromTiers(grantQuantity, tiers),
-    [grantQuantity, tiers]
+    () =>
+      quoteVolumeFromPackages(grantQuantity, pricesQuery.data?.packages ?? []) ??
+      quoteVolumeFromTiers(grantQuantity, tiers),
+    [grantQuantity, pricesQuery.data?.packages, tiers]
   )
   const quotedUnit = quote?.unitPriceTzs ?? 0
   const quotedTotal = quote?.totalTzs ?? 0
@@ -94,12 +106,15 @@ export function AdminCustomerDetail({ customerId }: { customerId: string }) {
   const grantAmount =
     Number.isFinite(parsedAmount) && parsedAmount >= 0 ? parsedAmount : 0
   const preferredPrice = quote !== null && grantAmount < quotedTotal
+  const priceOverridden = unitPrice !== '' || amount !== ''
 
   function resetGrantForm() {
     setQuantity('1000')
     setUnitPrice('')
     setAmount('')
     setNote('')
+    setPaymentMethod('cash')
+    setTransactionId('')
   }
 
   const invalidateCustomer = async () => {
@@ -109,18 +124,19 @@ export function AdminCustomerDetail({ customerId }: { customerId: string }) {
     void queryClient.invalidateQueries({ queryKey: adminOverviewQueryKey })
     void queryClient.invalidateQueries({ queryKey: adminLogsQueryKey })
     void queryClient.invalidateQueries({ queryKey: adminTransactionsQueryKey })
+    void queryClient.invalidateQueries({ queryKey: adminPaymentsQueryKey })
     void queryClient.invalidateQueries({ queryKey: adminPricingTiersQueryKey })
   }
 
   const grantMutation = useMutation({
     mutationFn: () =>
-      grantCustomerCredits(
-        Number(customerId),
-        grantQuantity,
-        note.trim(),
-        grantAmount,
-        grantUnitPrice
-      ),
+      grantCustomerCredits(Number(customerId), grantQuantity, {
+        note: note.trim(),
+        amountTzs: priceOverridden ? grantAmount : undefined,
+        unitPriceTzs: priceOverridden ? grantUnitPrice : undefined,
+        paymentMethod,
+        transactionId: transactionId.trim(),
+      }),
     onSuccess: async (result) => {
       toast.success(
         `Granted ${formatNumber(grantQuantity)} SMS for ${formatTZS(result.transaction.amountTzs ?? grantAmount)}. Balance is now ${formatNumber(result.smsBalance)}.`
@@ -359,8 +375,9 @@ export function AdminCustomerDetail({ customerId }: { customerId: string }) {
             </div>
             {quote ? (
               <p className='text-sm text-muted-foreground'>
-                Range price: {quote.tier.label} at {formatTZS(quote.unitPriceTzs)}{' '}
-                each ({formatTZS(quote.totalTzs)}).
+                {quote.specialPrice
+                  ? `This customer’s price: ${quote.tier.label} at ${formatTZS(quote.unitPriceTzs)} each (normal ${formatTZS(quote.listUnitPriceTzs)}).`
+                  : `Range price: ${quote.tier.label} at ${formatTZS(quote.unitPriceTzs)} each (${formatTZS(quote.totalTzs)}).`}
               </p>
             ) : grantQuantity > 0 && pricingQuery.isError ? (
               <QueryLoadError
@@ -409,6 +426,38 @@ export function AdminCustomerDetail({ customerId }: { customerId: string }) {
                 ? `Preferred price — ${formatTZS(grantAmount)} will be added to revenue instead of the range total.`
                 : 'This amount will be added to revenue. Lower it for a preferred customer.'}
             </p>
+            <div className='grid gap-4 sm:grid-cols-2'>
+              <div className='space-y-2'>
+                <Label htmlFor='grant-method'>Payment method</Label>
+                <Select
+                  value={paymentMethod}
+                  onValueChange={(value) => {
+                    if (value === 'cash' || value === 'bank' || value === 'manual_mobile') {
+                      setPaymentMethod(value)
+                    }
+                  }}
+                >
+                  <SelectTrigger id='grant-method' className='w-full'>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value='cash'>Cash</SelectItem>
+                    <SelectItem value='bank'>Bank transfer</SelectItem>
+                    <SelectItem value='manual_mobile'>Mobile money</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className='space-y-2'>
+                <Label htmlFor='grant-transaction-id'>Transaction ID (optional)</Label>
+                <Input
+                  id='grant-transaction-id'
+                  value={transactionId}
+                  maxLength={64}
+                  onChange={(event) => setTransactionId(event.target.value)}
+                  placeholder='Cash receipt or bank reference'
+                />
+              </div>
+            </div>
             <div className='space-y-2'>
               <Label htmlFor='grant-note'>Note (optional)</Label>
               <Input

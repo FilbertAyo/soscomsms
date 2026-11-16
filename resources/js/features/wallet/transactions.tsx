@@ -11,6 +11,7 @@ import { QueryLoadError } from '@/components/soscom/query-load-error'
 import { EmptyState } from '@/components/soscom/empty-state'
 import { PageHeader } from '@/components/soscom/page-header'
 import { TableSkeleton } from '@/components/soscom/skeletons'
+import { ReceiptDownloadButton } from '@/components/soscom/receipt-download-button'
 import { StatusBadge } from '@/components/soscom/status-badge'
 import { TableWrap } from '@/components/soscom/table-wrap'
 import { ListPagination } from '@/components/soscom/list-pagination'
@@ -65,6 +66,7 @@ export function TransactionsPage() {
                   <TableHead>SMS</TableHead>
                   <TableHead>Amount</TableHead>
                   <TableHead>Type</TableHead>
+                  <TableHead className='text-end'>Receipt</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -92,6 +94,14 @@ export function TransactionsPage() {
                     </TableCell>
                     <TableCell>
                       <StatusBadge status={item.type} />
+                    </TableCell>
+                    <TableCell className='text-end'>
+                      {item.receiptAvailable ? (
+                        <ReceiptDownloadButton
+                          paymentId={item.paymentId}
+                          transactionId={item.id}
+                        />
+                      ) : null}
                     </TableCell>
                   </TableRow>
                 ))}

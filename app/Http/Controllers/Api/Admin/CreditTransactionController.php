@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\CreditLedger;
 use App\Support\PaginationMeta;
+use App\Support\ReceiptData;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -17,7 +18,7 @@ class CreditTransactionController extends Controller
     public function index(Request $request): JsonResponse
     {
         $page = CreditTransaction::query()
-            ->with(['customer.user', 'reversal'])
+            ->with(['customer.user', 'reversal', 'payment'])
             ->when(
                 $request->filled('customer_id'),
                 fn ($query) => $query->where('customer_id', $request->integer('customer_id'))
@@ -55,6 +56,13 @@ class CreditTransactionController extends Controller
             'original' => $creditTransaction->fresh('reversal')?->toApiArray(),
             'csrf_token' => csrf_token(),
         ], 201);
+    }
+
+    public function receipt(CreditTransaction $creditTransaction, ReceiptData $receipts): JsonResponse
+    {
+        return response()->json([
+            'receipt' => $receipts->forCreditTransaction($creditTransaction),
+        ]);
     }
 
     private function admin(Request $request): User

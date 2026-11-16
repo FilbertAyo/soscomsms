@@ -107,6 +107,7 @@ class Payment extends Model
             'feeTzs' => $this->fee_tzs,
             'netTzs' => $this->net_tzs,
             'snippeReference' => $this->snippe_reference,
+            'externalReference' => $this->external_reference,
             'status' => $this->status->value,
             'creditTransactionId' => $this->credit_transaction_id,
             'rejectionReason' => $this->rejection_reason,

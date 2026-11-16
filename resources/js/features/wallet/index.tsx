@@ -12,6 +12,7 @@ import { QueryLoadError } from '@/components/soscom/query-load-error'
 import { EmptyState } from '@/components/soscom/empty-state'
 import { PageHeader } from '@/components/soscom/page-header'
 import { ListSkeleton } from '@/components/soscom/skeletons'
+import { ReceiptDownloadButton } from '@/components/soscom/receipt-download-button'
 import { StatusBadge } from '@/components/soscom/status-badge'
 import { Main } from '@/components/layout/main'
 
@@ -92,7 +93,15 @@ export function WalletPage() {
                           {formatNumber(item.quantity)} SMS
                         </p>
                       </div>
-                      <StatusBadge status={item.type} />
+                      <div className='flex items-center gap-2'>
+                        {item.receiptAvailable ? (
+                          <ReceiptDownloadButton
+                            paymentId={item.paymentId}
+                            transactionId={item.id}
+                          />
+                        ) : null}
+                        <StatusBadge status={item.type} />
+                      </div>
                     </div>
                   ))}
                 </div>

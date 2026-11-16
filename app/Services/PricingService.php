@@ -124,9 +124,9 @@ class PricingService
      *
      * @return array{quantity: int, unitPriceTzs: int, listUnitPriceTzs: int, specialPrice: bool, totalTzs: int, providerUnitCostTzs: int, estimatedMarginTzs: int, tier: array{id: int, minQuantity: int, maxQuantity: int|null, unitPriceTzs: int, label: string}}
      */
-    public function quoteVolume(int $quantity): array
+    public function quoteVolume(int $quantity, ?Customer $customer = null): array
     {
-        return $this->quoteFromTier($quantity, $this->tierForVolume($quantity));
+        return $this->quoteFromTier($quantity, $this->tierForVolume($quantity), $customer);
     }
 
     /**

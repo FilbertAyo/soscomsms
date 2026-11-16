@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Payment;
 use App\Support\PaginationMeta;
+use App\Support\ReceiptData;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -23,6 +24,13 @@ class PaymentController extends Controller
         return response()->json([
             'payments' => $page->getCollection()->map->toApiArray()->values(),
             'meta' => PaginationMeta::from($page),
+        ]);
+    }
+
+    public function receipt(Payment $payment, ReceiptData $receipts): JsonResponse
+    {
+        return response()->json([
+            'receipt' => $receipts->forPayment($payment),
         ]);
     }
 }
