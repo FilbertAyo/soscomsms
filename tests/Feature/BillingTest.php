@@ -393,10 +393,12 @@ it('records a cash grant at the customer price and puts that price on the receip
     $this->actingAs($admin)
         ->postJson("/api/admin/customers/{$customer->id}/credits", [
             'quantity' => 100,
+            'kind' => 'purchase',
         ])
         ->assertCreated()
         ->assertJsonPath('transaction.amountTzs', 2500)
         ->assertJsonPath('transaction.customerUnitPrice', 25)
+        ->assertJsonPath('transaction.receiptAvailable', true)
         ->assertJsonPath('smsBalance', 109);
 
     $payment = Payment::query()->where('customer_id', $customer->id)->first();
@@ -432,6 +434,7 @@ it('stores the transaction id an admin enters when granting SMS', function () {
     $this->actingAs($admin)
         ->postJson("/api/admin/customers/{$customer->id}/credits", [
             'quantity' => 100,
+            'kind' => 'purchase',
             'payment_method' => PaymentMethod::Bank->value,
             'transaction_id' => 'BANK-4481',
             'note' => 'Paid at the counter',
@@ -466,6 +469,7 @@ it('prices a manual grant from the customer special price when the admin does no
     $this->actingAs($admin)
         ->postJson("/api/admin/customers/{$customer->id}/credits", [
             'quantity' => 1000,
+            'kind' => 'purchase',
             'payment_method' => PaymentMethod::ManualMobile->value,
             'transaction_id' => 'MM-22',
         ])
@@ -489,7 +493,7 @@ it('prices a manual grant from the customer special price when the admin does no
         ->assertJsonPath('receipt.paymentMethodLabel', 'Mobile money');
 });
 
-it('still issues a receipt for an older admin grant that has no payment row', function () {
+it('does not issue a receipt for a bonus grant without a payment row', function () {
     [$user, $customer] = billingCustomer();
     $transaction = CreditTransaction::query()->create([
         'customer_id' => $customer->id,
@@ -499,19 +503,13 @@ it('still issues a receipt for an older admin grant that has no payment row', fu
         'amount_tzs' => 1250,
         'balance_after' => 59,
         'reference' => 'GNT-LEGACY',
-        'description' => 'Counter sale',
+        'description' => 'Grant of 50 SMS',
         'created_at' => now(),
     ]);
 
     $this->actingAs($user)
         ->getJson("/api/credit-transactions/{$transaction->id}/receipt")
-        ->assertOk()
-        ->assertJsonPath('receipt.receiptNumber', 'GNT-LEGACY')
-        ->assertJsonPath('receipt.paymentMethod', 'admin_grant')
-        ->assertJsonPath('receipt.paymentMethodLabel', 'Grant')
-        ->assertJsonPath('receipt.transactionId', null)
-        ->assertJsonPath('receipt.note', 'Counter sale')
-        ->assertJsonPath('receipt.line.amountTzs', 1250);
+        ->assertNotFound();
 
     $welcome = app(CreditLedger::class)->grantWelcome($customer);
 
@@ -531,7 +529,9 @@ it('labels a manual grant as a purchase or a bonus and hides the admin wording',
         ])
         ->assertCreated()
         ->assertJsonPath('transaction.type', 'purchase')
-        ->assertJsonPath('transaction.description', 'Purchase of 100 SMS');
+        ->assertJsonPath('transaction.description', 'Purchase of 100 SMS')
+        ->assertJsonPath('transaction.receiptAvailable', true)
+        ->assertJsonPath('payment.status', 'paid');
 
     $this->actingAs($admin)
         ->postJson("/api/admin/customers/{$customer->id}/credits", [
@@ -540,7 +540,9 @@ it('labels a manual grant as a purchase or a bonus and hides the admin wording',
         ])
         ->assertCreated()
         ->assertJsonPath('transaction.type', 'grant')
-        ->assertJsonPath('transaction.description', 'Grant of 20 SMS');
+        ->assertJsonPath('transaction.description', 'Grant of 20 SMS')
+        ->assertJsonPath('transaction.receiptAvailable', false)
+        ->assertJsonPath('payment', null);
 
     CreditTransaction::query()->create([
         'customer_id' => $customer->id,

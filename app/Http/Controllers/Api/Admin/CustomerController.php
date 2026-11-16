@@ -118,6 +118,10 @@ class CustomerController extends Controller
                 $asPurchase,
             );
 
+            if (! $asPurchase) {
+                return [$transaction, null];
+            }
+
             $payment = $payments->recordManualGrant(
                 customer: $customer,
                 transaction: $transaction,
@@ -143,15 +147,15 @@ class CustomerController extends Controller
                 'unit_price_tzs' => $transaction->customer_unit_price,
                 'note' => $validated['note'] ?? null,
                 'kind' => $asPurchase ? 'purchase' : 'bonus',
-                'payment_method' => $method->value,
-                'transaction_id' => $payment->external_reference,
-                'payment_id' => $payment->id,
+                'payment_method' => $asPurchase ? $method->value : null,
+                'transaction_id' => $payment?->external_reference,
+                'payment_id' => $payment?->id,
             ],
         );
 
         return response()->json([
             'transaction' => $transaction->fresh(['reversal', 'payment'])?->toApiArray(),
-            'payment' => $payment->toApiArray(),
+            'payment' => $payment?->toApiArray(),
             'smsBalance' => $customer->fresh()?->sms_balance,
             'csrf_token' => csrf_token(),
         ], 201);

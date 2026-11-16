@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\CreditTransactionType;
+use App\Enums\PaymentStatus;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -99,8 +100,15 @@ class CreditTransaction extends Model
             return false;
         }
 
-        return $this->type === CreditTransactionType::Purchase
-            || $this->type === CreditTransactionType::Grant;
+        if ($this->type === CreditTransactionType::Purchase) {
+            return true;
+        }
+
+        // Older cash grants were stored as type grant with a paid payment row.
+        $this->loadMissing('payment');
+
+        return $this->payment !== null
+            && $this->payment->status === PaymentStatus::Paid;
     }
 
     /**

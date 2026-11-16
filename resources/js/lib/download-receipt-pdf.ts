@@ -68,46 +68,38 @@ function drawHeader(doc: PdfDoc, logo: string | null, y: number): number {
 }
 
 function drawMeta(doc: PdfDoc, receipt: PurchaseReceipt, y: number): number {
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(10)
-  const numberLines = doc.splitTextToSize(receipt.receiptNumber, contentWidth - 12) as string[]
-  const numberHeight = numberLines.length * 4.6
-  const boxHeight = 26 + numberHeight
+  const boxHeight = 18
   doc.setFillColor(...paper)
   doc.setDrawColor(...rule)
   doc.setLineWidth(0.2)
   doc.roundedRect(marginX, y, contentWidth, boxHeight, 1.5, 1.5, 'FD')
 
-  doc.setFont('helvetica', 'normal')
-  doc.setFontSize(8)
-  doc.setTextColor(...muted)
-  doc.text('RECEIPT NUMBER', marginX + 6, y + 6)
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(10)
-  doc.setTextColor(...ink)
-  numberLines.forEach((line, index) => {
-    doc.text(line, marginX + 6, y + 11.5 + index * 4.6)
-  })
-
-  const detailY = y + 16 + numberHeight
   const statusColor: [number, number, number] =
     receipt.status === 'reversed' ? reversed : brandGreen
   const status = receipt.status === 'reversed' ? 'REVERSED' : 'PAID'
+  const colWidth = contentWidth / 3
   const columns: Array<[string, string, [number, number, number]]> = [
+    ['RECEIPT NUMBER', receipt.receiptNumber, ink],
     ['DATE', receipt.issuedAtLabel ?? '—', ink],
     ['STATUS', status, statusColor],
   ]
 
   columns.forEach(([label, value, color], index) => {
-    const x = marginX + 6 + index * (contentWidth / 2)
+    const x = marginX + 6 + index * colWidth
+    const maxWidth = colWidth - 10
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(8)
     doc.setTextColor(...muted)
-    doc.text(label, x, detailY)
+    doc.text(label, x, y + 6)
     doc.setFont('helvetica', 'bold')
-    doc.setFontSize(11)
     doc.setTextColor(...color)
-    doc.text(value, x, detailY + 5.5)
+    let size = 11
+    doc.setFontSize(size)
+    while (size > 7 && doc.getTextWidth(value) > maxWidth) {
+      size -= 0.5
+      doc.setFontSize(size)
+    }
+    doc.text(value, x, y + 12.5)
   })
 
   return y + boxHeight + 8

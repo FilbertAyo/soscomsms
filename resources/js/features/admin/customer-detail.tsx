@@ -448,38 +448,44 @@ export function AdminCustomerDetail({ customerId }: { customerId: string }) {
                 ? `Preferred price — ${formatTZS(grantAmount)} will be added to revenue instead of the range total.`
                 : 'This amount will be added to revenue. Lower it for a preferred customer.'}
             </p>
-            <div className='grid gap-4 sm:grid-cols-2'>
-              <div className='space-y-2'>
-                <Label htmlFor='grant-method'>Payment method</Label>
-                <Select
-                  value={paymentMethod}
-                  onValueChange={(value) => {
-                    if (value === 'cash' || value === 'bank' || value === 'manual_mobile') {
-                      setPaymentMethod(value)
-                    }
-                  }}
-                >
-                  <SelectTrigger id='grant-method' className='w-full'>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value='cash'>Cash</SelectItem>
-                    <SelectItem value='bank'>Bank transfer</SelectItem>
-                    <SelectItem value='manual_mobile'>Mobile money</SelectItem>
-                  </SelectContent>
-                </Select>
+            {grantKind === 'purchase' ? (
+              <div className='grid gap-4 sm:grid-cols-2'>
+                <div className='space-y-2'>
+                  <Label htmlFor='grant-method'>Payment method</Label>
+                  <Select
+                    value={paymentMethod}
+                    onValueChange={(value) => {
+                      if (value === 'cash' || value === 'bank' || value === 'manual_mobile') {
+                        setPaymentMethod(value)
+                      }
+                    }}
+                  >
+                    <SelectTrigger id='grant-method' className='w-full'>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value='cash'>Cash</SelectItem>
+                      <SelectItem value='bank'>Bank transfer</SelectItem>
+                      <SelectItem value='manual_mobile'>Mobile money</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className='space-y-2'>
+                  <Label htmlFor='grant-transaction-id'>Transaction ID (optional)</Label>
+                  <Input
+                    id='grant-transaction-id'
+                    value={transactionId}
+                    maxLength={64}
+                    onChange={(event) => setTransactionId(event.target.value)}
+                    placeholder='Cash receipt or bank reference'
+                  />
+                </div>
               </div>
-              <div className='space-y-2'>
-                <Label htmlFor='grant-transaction-id'>Transaction ID (optional)</Label>
-                <Input
-                  id='grant-transaction-id'
-                  value={transactionId}
-                  maxLength={64}
-                  onChange={(event) => setTransactionId(event.target.value)}
-                  placeholder='Cash receipt or bank reference'
-                />
-              </div>
-            </div>
+            ) : (
+              <p className='text-sm text-muted-foreground'>
+                Bonus credits have no payment record and no downloadable receipt.
+              </p>
+            )}
             <div className='space-y-2'>
               <Label htmlFor='grant-note'>Note (optional)</Label>
               <Input
