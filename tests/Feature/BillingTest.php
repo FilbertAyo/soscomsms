@@ -508,7 +508,7 @@ it('still issues a receipt for an older admin grant that has no payment row', fu
         ->assertOk()
         ->assertJsonPath('receipt.receiptNumber', 'GNT-LEGACY')
         ->assertJsonPath('receipt.paymentMethod', 'admin_grant')
-        ->assertJsonPath('receipt.paymentMethodLabel', 'Admin grant')
+        ->assertJsonPath('receipt.paymentMethodLabel', 'Grant')
         ->assertJsonPath('receipt.transactionId', null)
         ->assertJsonPath('receipt.note', 'Counter sale')
         ->assertJsonPath('receipt.line.amountTzs', 1250);
@@ -518,4 +518,48 @@ it('still issues a receipt for an older admin grant that has no payment row', fu
     $this->actingAs($user)
         ->getJson("/api/credit-transactions/{$welcome->id}/receipt")
         ->assertNotFound();
+});
+
+it('labels a manual grant as a purchase or a bonus and hides the admin wording', function () {
+    $admin = User::factory()->admin()->create();
+    [$user, $customer] = billingCustomer();
+
+    $this->actingAs($admin)
+        ->postJson("/api/admin/customers/{$customer->id}/credits", [
+            'quantity' => 100,
+            'kind' => 'purchase',
+        ])
+        ->assertCreated()
+        ->assertJsonPath('transaction.type', 'purchase')
+        ->assertJsonPath('transaction.description', 'Purchase of 100 SMS');
+
+    $this->actingAs($admin)
+        ->postJson("/api/admin/customers/{$customer->id}/credits", [
+            'quantity' => 20,
+            'kind' => 'bonus',
+        ])
+        ->assertCreated()
+        ->assertJsonPath('transaction.type', 'grant')
+        ->assertJsonPath('transaction.description', 'Grant of 20 SMS');
+
+    CreditTransaction::query()->create([
+        'customer_id' => $customer->id,
+        'type' => CreditTransactionType::Grant,
+        'quantity' => 10,
+        'customer_unit_price' => 25,
+        'amount_tzs' => 250,
+        'balance_after' => $customer->fresh()->sms_balance,
+        'reference' => 'GNT-OLD-WORDING',
+        'description' => 'Admin grant of 10 SMS',
+        'created_at' => now(),
+    ]);
+
+    $this->actingAs($user)
+        ->getJson('/api/credit-transactions')
+        ->assertOk()
+        ->assertJsonPath('transactions.0.description', 'Grant of 10 SMS')
+        ->assertJsonPath('transactions.1.type', 'grant')
+        ->assertJsonPath('transactions.1.description', 'Grant of 20 SMS')
+        ->assertJsonPath('transactions.2.type', 'purchase')
+        ->assertJsonPath('transactions.2.description', 'Purchase of 100 SMS');
 });

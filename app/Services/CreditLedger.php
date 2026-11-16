@@ -43,6 +43,7 @@ class CreditLedger
         ?string $note = null,
         ?int $amountTzs = null,
         ?int $unitPriceTzs = null,
+        bool $asPurchase = false,
     ): CreditTransaction {
         if ($quantity < 1) {
             throw ValidationException::withMessages([
@@ -70,11 +71,15 @@ class CreditLedger
             $unitPrice = intdiv($amount, $quantity);
         }
 
+        $type = $asPurchase ? CreditTransactionType::Purchase : CreditTransactionType::Grant;
+
         return $this->post(
             customer: $customer,
-            type: CreditTransactionType::Grant,
+            type: $type,
             quantity: $quantity,
-            description: $note ?: "Admin grant of {$quantity} SMS",
+            description: $note ?: ($asPurchase
+                ? "Purchase of {$quantity} SMS"
+                : "Grant of {$quantity} SMS"),
             customerUnitPrice: $unitPrice,
             providerUnitCost: 0,
             amountTzs: $amount,

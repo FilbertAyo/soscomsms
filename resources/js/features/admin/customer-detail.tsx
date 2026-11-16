@@ -67,6 +67,7 @@ export function AdminCustomerDetail({ customerId }: { customerId: string }) {
   const [note, setNote] = useState('')
   const [paymentMethod, setPaymentMethod] = useState<ManualPaymentMethod>('cash')
   const [transactionId, setTransactionId] = useState('')
+  const [grantKind, setGrantKind] = useState<'bonus' | 'purchase'>('purchase')
 
   const customerQuery = useQuery({
     queryKey: adminCustomerQueryKey(customerId),
@@ -115,6 +116,7 @@ export function AdminCustomerDetail({ customerId }: { customerId: string }) {
     setNote('')
     setPaymentMethod('cash')
     setTransactionId('')
+    setGrantKind('purchase')
   }
 
   const invalidateCustomer = async () => {
@@ -136,6 +138,7 @@ export function AdminCustomerDetail({ customerId }: { customerId: string }) {
         unitPriceTzs: priceOverridden ? grantUnitPrice : undefined,
         paymentMethod,
         transactionId: transactionId.trim(),
+        kind: grantKind,
       }),
     onSuccess: async (result) => {
       toast.success(
@@ -359,6 +362,25 @@ export function AdminCustomerDetail({ customerId }: { customerId: string }) {
             <DialogTitle>Grant SMS to {customer?.name ?? 'customer'}</DialogTitle>
           </DialogHeader>
           <div className='space-y-4'>
+            <div className='space-y-2'>
+              <Label htmlFor='grant-kind'>Type</Label>
+              <Select
+                value={grantKind}
+                onValueChange={(value) => {
+                  if (value === 'bonus' || value === 'purchase') {
+                    setGrantKind(value)
+                  }
+                }}
+              >
+                <SelectTrigger id='grant-kind' className='w-full'>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value='purchase'>Purchase</SelectItem>
+                  <SelectItem value='bonus'>Bonus</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <div className='space-y-2'>
               <Label htmlFor='grant-quantity'>SMS quantity</Label>
               <Input

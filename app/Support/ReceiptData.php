@@ -111,7 +111,7 @@ class ReceiptData
     private function methodLabel(?Payment $payment): string
     {
         if ($payment === null) {
-            return 'Admin grant';
+            return 'Grant';
         }
 
         $provider = trim((string) $payment->provider);

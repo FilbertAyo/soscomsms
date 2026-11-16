@@ -207,6 +207,7 @@ export async function grantCustomerCredits(
     unitPriceTzs?: number
     paymentMethod?: ManualPaymentMethod
     transactionId?: string
+    kind?: 'bonus' | 'purchase'
   }
 ): Promise<{ smsBalance: number; transaction: CreditTransaction }> {
   const { data } = await api.post<{
@@ -219,6 +220,7 @@ export async function grantCustomerCredits(
     unit_price_tzs: options?.unitPriceTzs,
     payment_method: options?.paymentMethod,
     transaction_id: options?.transactionId || undefined,
+    kind: options?.kind,
   })
   return data
 }

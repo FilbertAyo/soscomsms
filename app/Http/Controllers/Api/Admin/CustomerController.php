@@ -101,18 +101,21 @@ class CustomerController extends Controller
                 PaymentMethod::ManualMobile->value,
             ])],
             'transaction_id' => ['nullable', 'string', 'max:64'],
+            'kind' => ['nullable', Rule::in(['bonus', 'purchase'])],
         ]);
 
         $method = PaymentMethod::from($validated['payment_method'] ?? PaymentMethod::Cash->value);
+        $asPurchase = ($validated['kind'] ?? 'bonus') === 'purchase';
         $admin = $this->admin($request);
 
-        [$transaction, $payment] = DB::transaction(function () use ($ledger, $payments, $customer, $validated, $method, $admin) {
+        [$transaction, $payment] = DB::transaction(function () use ($ledger, $payments, $customer, $validated, $method, $admin, $asPurchase) {
             $transaction = $ledger->grant(
                 $customer,
                 (int) $validated['quantity'],
                 $validated['note'] ?? null,
                 isset($validated['amount_tzs']) ? (int) $validated['amount_tzs'] : null,
                 isset($validated['unit_price_tzs']) ? (int) $validated['unit_price_tzs'] : null,
+                $asPurchase,
             );
 
             $payment = $payments->recordManualGrant(
@@ -139,6 +142,7 @@ class CustomerController extends Controller
                 'amount_tzs' => $transaction->amount_tzs,
                 'unit_price_tzs' => $transaction->customer_unit_price,
                 'note' => $validated['note'] ?? null,
+                'kind' => $asPurchase ? 'purchase' : 'bonus',
                 'payment_method' => $method->value,
                 'transaction_id' => $payment->external_reference,
                 'payment_id' => $payment->id,

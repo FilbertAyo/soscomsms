@@ -128,7 +128,16 @@ class WalletController extends Controller
             $row['amountTzs'] = $original->amount_tzs ?: null;
         }
 
+        $row['description'] = $this->customerDescription((string) $row['description']);
+
         return $row;
+    }
+
+    private function customerDescription(string $description): string
+    {
+        $cleaned = preg_replace('/\bAdmin grant\b/i', 'Grant', $description);
+
+        return is_string($cleaned) ? $cleaned : $description;
     }
 
     public function receipt(Request $request, CreditTransaction $creditTransaction, ReceiptData $receipts): JsonResponse
