@@ -14,7 +14,7 @@ import {
   walletQueryKey,
   withSmsBalance,
 } from '@/lib/credits'
-import { parseCsvText } from '@/lib/csv'
+import { parseSpreadsheetFile, SPREADSHEET_ACCEPT } from '@/lib/spreadsheet'
 import { formatNumber, formatTzMobile } from '@/lib/format'
 import {
   fetchMessageTemplates,
@@ -315,7 +315,7 @@ export function SendSms() {
     setConfirmOpen(true)
   }
 
-  async function onUpload(file: File | null) {
+  async function onUpload(file: File | null, input?: HTMLInputElement) {
     setUploadName(file?.name ?? '')
     if (!file) {
       setUploadNumbers([])
@@ -323,10 +323,20 @@ export function SendSms() {
       return
     }
 
-    const rows = parseCsvText(await file.text())
-    const phones = rows.flatMap((row) => row.map((cell) => cell.trim())).filter(Boolean)
-    setUploadNumbers(phones)
-    setUploadNamed(parseUploadRecipients(rows))
+    try {
+      const rows = await parseSpreadsheetFile(file)
+      const phones = rows.flatMap((row) => row.map((cell) => cell.trim())).filter(Boolean)
+      setUploadNumbers(phones)
+      setUploadNamed(parseUploadRecipients(rows))
+    } catch {
+      setUploadName('')
+      setUploadNumbers([])
+      setUploadNamed([])
+      if (input) {
+        input.value = ''
+      }
+      toast.error('The file could not be read. Use a CSV or Excel file.')
+    }
   }
 
   function insertTemplate(template: MessageTemplate) {
@@ -447,7 +457,7 @@ export function SendSms() {
                 <TabsList className='mb-4 h-auto w-full flex-wrap'>
                   <TabsTrigger value='numbers'>Enter numbers</TabsTrigger>
                   <TabsTrigger value='group'>Select group</TabsTrigger>
-                  <TabsTrigger value='upload'>Upload CSV</TabsTrigger>
+                  <TabsTrigger value='upload'>Upload CSV or Excel</TabsTrigger>
                 </TabsList>
                 <TabsContent value='numbers'>
                   <Textarea
@@ -489,10 +499,11 @@ export function SendSms() {
                 <TabsContent value='upload'>
                   <Input
                     type='file'
-                    accept='.csv,.txt,text/csv'
-                    onChange={(event) =>
-                      void onUpload(event.target.files?.[0] ?? null)
-                    }
+                    accept={SPREADSHEET_ACCEPT}
+                    onChange={(event) => {
+                      const input = event.currentTarget
+                      void onUpload(input.files?.[0] ?? null, input)
+                    }}
                   />
                   <p className='mt-2 text-sm text-muted-foreground'>
                     {uploadName
@@ -500,8 +511,8 @@ export function SendSms() {
                         ? `${uploadName}: ${formatNumber(uploadNamed.length)} rows found.`
                         : `${uploadName}: ${formatNumber(uploadNumbers.length)} values found.`
                       : personalize
-                        ? 'Upload a CSV with two columns: number, then name. A header row like phone,name is fine.'
-                        : 'Upload a CSV of Tanzanian numbers.'}
+                        ? 'Upload a CSV or Excel file with two columns: number, then name. A header row like phone,name is fine.'
+                        : 'Upload a CSV or Excel file of Tanzanian numbers.'}
                   </p>
                 </TabsContent>
               </Tabs>

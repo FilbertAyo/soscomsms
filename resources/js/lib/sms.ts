@@ -57,9 +57,11 @@ export const NAME_EXAMPLE = 'Amina'
 const PHONE_HEADERS = new Set([
   'phone',
   'phones',
+  'phone number',
   'number',
   'numbers',
   'mobile',
+  'mobile number',
   'msisdn',
 ])
 

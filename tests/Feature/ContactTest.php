@@ -7,6 +7,8 @@ use App\Models\Customer;
 use App\Models\User;
 use App\Support\TanzaniaPhone;
 use Illuminate\Http\UploadedFile;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 function customerUser(): array
 {
@@ -235,12 +237,12 @@ it('imports a csv with created skipped and invalid counts', function () {
     ]);
 
     $csv = <<<'CSV'
-Name,Phone,Group
-Juma Hassan,0712 445 221,Parents
-Neema Mushi,0754 889 102,Customers
-Juma Duplicate,0712445221,Parents
-,07540000000,Parents
-Grace Kimaro,+254712345678,Parents
+Name,Phone
+Juma Hassan,0712 445 221
+Neema Mushi,0754 889 102
+Juma Duplicate,0712445221
+,07540000000
+Grace Kimaro,+254712345678
 CSV;
 
     $file = UploadedFile::fake()->createWithContent('contacts.csv', $csv);
@@ -250,7 +252,7 @@ CSV;
             'file' => $file,
             'name_column' => 'Name',
             'phone_column' => 'Phone',
-            'group_column' => 'Group',
+            'group_name' => 'Parents',
         ], ['Accept' => 'application/json'])
         ->assertOk()
         ->assertJsonPath('created', 1)
@@ -259,16 +261,18 @@ CSV;
 
     expect($customer->contacts()->count())->toBe(2)
         ->and($customer->contactGroups()->where('name', 'Parents')->exists())->toBeTrue()
-        ->and($customer->contacts()->where('phone', '+255712445221')->value('name'))->toBe('Juma Hassan');
+        ->and($customer->contactGroups()->count())->toBe(1)
+        ->and($customer->contacts()->where('phone', '+255712445221')->value('name'))->toBe('Juma Hassan')
+        ->and($customer->contacts()->where('phone', '+255712445221')->first()?->group?->name)->toBe('Parents');
 });
 
-it('imports a headerless phone and group file when name is ignored', function () {
+it('imports a headerless phone file into the named group when name is ignored', function () {
     [$user, $customer] = customerUser();
 
     $csv = <<<'CSV'
-0612189927,Habili - Mchango
-0613079395,Habili - Mchango
-0613455528,Habili - Mchango
+0612189927
+0613079395
+0613455528
 CSV;
 
     $file = UploadedFile::fake()->createWithContent('habili.csv', $csv);
@@ -277,11 +281,10 @@ CSV;
         ->post('/api/contacts/import', [
             'file' => $file,
             'name_column' => 'Ignore',
-            'phone_column' => 'Column 1',
-            'group_column' => 'Column 2',
+            'phone_column' => 'Column A',
+            'group_name' => 'Habili - Mchango',
             'has_header' => 0,
             'phone_index' => 0,
-            'group_index' => 1,
         ], ['Accept' => 'application/json'])
         ->assertOk()
         ->assertJsonPath('status', 'completed')
@@ -290,15 +293,15 @@ CSV;
 
     expect($customer->contacts()->count())->toBe(3)
         ->and($customer->contacts()->where('phone', '+255612189927')->value('name'))->toBe('+255612189927')
-        ->and($customer->contactGroups()->where('name', 'Habili - Mchango')->exists())->toBeTrue();
+        ->and($customer->contacts()->where('phone', '+255612189927')->first()?->group?->name)->toBe('Habili - Mchango');
 });
 
-it('reads a headerless file as column A number, column B group, and column C name', function () {
+it('reads a headerless file as column A number and column B name', function () {
     [$user, $customer] = customerUser();
 
     $csv = <<<'CSV'
-0612189927,Habili - Mchango,Amina
-0613079395,Habili - Mchango,Juma
+0612189927,Amina
+0613079395,Juma
 CSV;
 
     $file = UploadedFile::fake()->createWithContent('habili.csv', $csv);
@@ -307,15 +310,140 @@ CSV;
         ->post('/api/contacts/import', [
             'file' => $file,
             'has_header' => 0,
-            'phone_index' => 2,
-            'group_index' => 0,
-            'name_index' => 1,
+            'group_name' => 'Habili - Mchango',
         ], ['Accept' => 'application/json'])
         ->assertOk()
         ->assertJsonPath('created', 2);
 
     expect($customer->contacts()->where('phone', '+255612189927')->value('name'))->toBe('Amina')
         ->and($customer->contacts()->where('phone', '+255612189927')->first()?->group?->name)->toBe('Habili - Mchango');
+});
+
+it('rejects an import that does not choose a group', function () {
+    [$user] = customerUser();
+
+    $file = UploadedFile::fake()->createWithContent('contacts.csv', "Name,Phone\nAmina,0712445221\n");
+
+    $this->actingAs($user)
+        ->post('/api/contacts/import', [
+            'file' => $file,
+        ], ['Accept' => 'application/json'])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['group_name', 'contact_group_id']);
+});
+
+it('adds every imported contact to an existing group', function () {
+    [$user, $customer] = customerUser();
+    $group = ContactGroup::factory()->create([
+        'customer_id' => $customer->id,
+        'name' => 'Parents',
+    ]);
+
+    $file = UploadedFile::fake()->createWithContent('contacts.csv', "Name,Phone\nAmina,0712445221\n");
+
+    $this->actingAs($user)
+        ->post('/api/contacts/import', [
+            'file' => $file,
+            'contact_group_id' => $group->id,
+        ], ['Accept' => 'application/json'])
+        ->assertOk()
+        ->assertJsonPath('created', 1);
+
+    expect($customer->contactGroups()->count())->toBe(1)
+        ->and($customer->contacts()->where('phone', '+255712445221')->value('contact_group_id'))->toBe($group->id);
+});
+
+it('reuses a group when the typed name already exists', function () {
+    [$user, $customer] = customerUser();
+    $group = ContactGroup::factory()->create([
+        'customer_id' => $customer->id,
+        'name' => 'Parents',
+    ]);
+
+    $file = UploadedFile::fake()->createWithContent('contacts.csv', "Name,Phone\nAmina,0712445221\n");
+
+    $this->actingAs($user)
+        ->post('/api/contacts/import', [
+            'file' => $file,
+            'group_name' => 'parents',
+        ], ['Accept' => 'application/json'])
+        ->assertOk()
+        ->assertJsonPath('created', 1);
+
+    expect($customer->contactGroups()->count())->toBe(1)
+        ->and($customer->contactGroups()->value('name'))->toBe('Parents')
+        ->and($customer->contacts()->where('phone', '+255712445221')->value('contact_group_id'))->toBe($group->id);
+});
+
+it('rejects another customer group and a request that sends both group choices', function () {
+    [$user, $customer] = customerUser();
+    $own = ContactGroup::factory()->create([
+        'customer_id' => $customer->id,
+        'name' => 'Parents',
+    ]);
+    $theirs = ContactGroup::factory()->create([
+        'name' => 'Theirs',
+    ]);
+
+    $file = UploadedFile::fake()->createWithContent('contacts.csv', "Name,Phone\nAmina,0712445221\n");
+
+    $this->actingAs($user)
+        ->post('/api/contacts/import', [
+            'file' => $file,
+            'contact_group_id' => $theirs->id,
+        ], ['Accept' => 'application/json'])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('contact_group_id');
+
+    $this->actingAs($user)
+        ->post('/api/contacts/import', [
+            'file' => $file,
+            'contact_group_id' => $own->id,
+            'group_name' => 'Customers',
+        ], ['Accept' => 'application/json'])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['contact_group_id', 'group_name']);
+
+    expect($customer->contacts()->count())->toBe(0);
+});
+
+it('imports an excel file of names and numbers into one group', function () {
+    [$user, $customer] = customerUser();
+
+    $spreadsheet = new Spreadsheet;
+    $spreadsheet->getActiveSheet()->fromArray([
+        ['Name', 'Phone'],
+        ['Amina Juma', 712445221],
+        ['Neema Mushi', '0754221891'],
+    ]);
+    $path = tempnam(sys_get_temp_dir(), 'contacts');
+    (new Xlsx($spreadsheet))->save($path);
+    $spreadsheet->disconnectWorksheets();
+
+    $file = new UploadedFile(
+        $path,
+        'contacts.xlsx',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        null,
+        true,
+    );
+
+    $this->actingAs($user)
+        ->post('/api/contacts/import', [
+            'file' => $file,
+            'name_column' => 'Name',
+            'phone_column' => 'Phone',
+            'group_name' => 'Parents',
+        ], ['Accept' => 'application/json'])
+        ->assertOk()
+        ->assertJsonPath('created', 2)
+        ->assertJsonPath('invalid', 0);
+
+    expect($customer->contacts()->where('phone', '+255712445221')->value('name'))->toBe('Amina Juma')
+        ->and($customer->contacts()->where('phone', '+255754221891')->value('name'))->toBe('Neema Mushi')
+        ->and($customer->contacts()->where('phone', '+255712445221')->first()?->group?->name)->toBe('Parents');
+
+    @unlink($path);
 });
 
 it('paginates contacts ten at a time', function () {

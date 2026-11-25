@@ -26,7 +26,8 @@ class ImportContactsJob implements ShouldQueue
         public string $storedPath,
         public string $nameColumn,
         public string $phoneColumn,
-        public string $groupColumn,
+        public ?int $contactGroupId = null,
+        public ?string $groupName = null,
     ) {}
 
     public function handle(ContactImporter $importer): void
@@ -42,9 +43,14 @@ class ImportContactsJob implements ShouldQueue
         $this->result = $importer->importPath(
             $customer,
             $path,
+            strtolower(pathinfo($path, PATHINFO_EXTENSION)),
             $this->nameColumn,
             $this->phoneColumn,
-            $this->groupColumn,
+            true,
+            null,
+            null,
+            $this->contactGroupId,
+            $this->groupName,
         );
 
         $this->deleteStoredFile();

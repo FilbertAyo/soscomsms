@@ -104,25 +104,27 @@ export async function importContacts(
   columns: {
     name: string
     phone: string
-    group: string
     hasHeader: boolean
     nameIndex: number | null
     phoneIndex: number
-    groupIndex: number | null
+    contactGroupId: number | null
+    groupName: string | null
   }
 ): Promise<ContactImportResult> {
   const body = new FormData()
   body.append('file', file)
   body.append('name_column', columns.name)
   body.append('phone_column', columns.phone)
-  body.append('group_column', columns.group)
   body.append('has_header', columns.hasHeader ? '1' : '0')
   body.append('phone_index', String(columns.phoneIndex))
   if (columns.nameIndex !== null) {
     body.append('name_index', String(columns.nameIndex))
   }
-  if (columns.groupIndex !== null) {
-    body.append('group_index', String(columns.groupIndex))
+  if (columns.contactGroupId !== null) {
+    body.append('contact_group_id', String(columns.contactGroupId))
+  }
+  if (columns.groupName !== null) {
+    body.append('group_name', columns.groupName)
   }
 
   const { data } = await api.post<ContactImportResult>(

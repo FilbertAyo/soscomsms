@@ -269,7 +269,7 @@ export function ContactsPage() {
             description={
               hasFilters
                 ? 'Try another search, or clear the filters.'
-                : 'Add a Tanzanian number, or import a CSV.'
+                : 'Add a Tanzanian number, or import a CSV or Excel file. You choose the group when you import.'
             }
             actionLabel={hasFilters ? undefined : 'Add Contact'}
             onAction={hasFilters ? undefined : openCreate}

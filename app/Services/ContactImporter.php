@@ -8,12 +8,14 @@ use App\Models\ContactGroup;
 use App\Models\Customer;
 use App\Support\TanzaniaPhone;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Throwable;
 
 class ContactImporter
 {
+    public function __construct(private SpreadsheetReader $spreadsheets) {}
+
     /**
      * @return array{created: int, skipped: int, invalid: int, errors: list<array{row: int, reason: string}>}
      */
@@ -22,22 +24,23 @@ class ContactImporter
         UploadedFile $file,
         string $nameColumn = 'name',
         string $phoneColumn = 'phone',
-        ?string $groupColumn = 'group',
         bool $hasHeader = true,
         ?int $nameIndex = null,
         ?int $phoneIndex = null,
-        ?int $groupIndex = null,
+        ?int $contactGroupId = null,
+        ?string $groupName = null,
     ): array {
         return $this->importPath(
             $customer,
             $file->getRealPath() ?: $file->getPathname(),
+            strtolower($file->getClientOriginalExtension()),
             $nameColumn,
             $phoneColumn,
-            $groupColumn,
             $hasHeader,
             $nameIndex,
             $phoneIndex,
-            $groupIndex,
+            $contactGroupId,
+            $groupName,
         );
     }
 
@@ -47,184 +50,146 @@ class ContactImporter
     public function importPath(
         Customer $customer,
         string $path,
+        string $extension,
         string $nameColumn = 'name',
         string $phoneColumn = 'phone',
-        ?string $groupColumn = 'group',
         bool $hasHeader = true,
         ?int $nameIndex = null,
         ?int $phoneIndex = null,
-        ?int $groupIndex = null,
+        ?int $contactGroupId = null,
+        ?string $groupName = null,
     ): array {
-        $handle = fopen($path, 'r');
+        try {
+            $rows = $this->spreadsheets->rows($path, $extension);
+        } catch (Throwable) {
+            return $this->failure('The file could not be read. Use a CSV or Excel file.');
+        }
 
-        if ($handle === false) {
-            return [
-                'created' => 0,
-                'skipped' => 0,
-                'invalid' => 1,
-                'errors' => [['row' => 0, 'reason' => 'The file could not be read.']],
+        if ($this->usedRows($rows) === []) {
+            return $this->failure('The file is empty.', 1);
+        }
+
+        if ($hasHeader) {
+            $header = array_shift($rows);
+            if ($header === null) {
+                return $this->failure('The file is empty.', 1);
+            }
+
+            $fromHeader = $this->columnIndexes($header, $nameColumn, $phoneColumn);
+            $indexes = [
+                'name' => $this->isIgnored($nameColumn) ? null : ($nameIndex ?? $fromHeader['name']),
+                'phone' => $phoneIndex ?? $fromHeader['phone'],
+            ];
+        } else {
+            $indexes = [
+                'phone' => 0,
+                'name' => $this->isIgnored($nameColumn) ? null : 1,
             ];
         }
 
-        try {
-            $indexes = [
-                'name' => $this->isIgnored($nameColumn) ? null : $nameIndex,
-                'phone' => $phoneIndex,
-                'group' => $this->isIgnored($groupColumn) ? null : $groupIndex,
-            ];
+        if ($indexes['phone'] === null) {
+            return $this->failure('Choose the phone number column.', 1);
+        }
 
-            if (! $hasHeader) {
-                $indexes = [
-                    'phone' => 0,
-                    'group' => 1,
-                    'name' => 2,
-                ];
-            } else {
-                $header = fgetcsv($handle);
-                if ($header === false) {
-                    return [
-                        'created' => 0,
-                        'skipped' => 0,
-                        'invalid' => 1,
-                        'errors' => [['row' => 1, 'reason' => 'The file is empty.']],
-                    ];
-                }
+        $created = 0;
+        $skipped = 0;
+        $invalid = 0;
+        $errors = [];
+        $rowNumber = $hasHeader ? 1 : 0;
+        $seenInFile = [];
+        $pending = [];
 
-                $fromHeader = $this->columnIndexes($header, $nameColumn, $phoneColumn, $groupColumn);
-                $indexes['name'] = $this->isIgnored($nameColumn) ? null : ($nameIndex ?? $fromHeader['name']);
-                $indexes['phone'] = $phoneIndex ?? $fromHeader['phone'];
-                $indexes['group'] = $this->isIgnored($groupColumn)
-                    ? null
-                    : ($groupIndex ?? $fromHeader['group']);
+        return DB::transaction(function () use (
+            $rows,
+            $indexes,
+            $customer,
+            $contactGroupId,
+            $groupName,
+            &$created,
+            &$skipped,
+            &$invalid,
+            &$errors,
+            &$rowNumber,
+            &$seenInFile,
+            &$pending,
+        ): array {
+            $groupId = $this->existingGroupId($customer, $contactGroupId, $groupName);
+            if ($groupId === false) {
+                return $contactGroupId !== null
+                    ? $this->failure('Choose a group that belongs to this account.')
+                    : $this->failure('Choose a group for these contacts.');
             }
 
-            if ($indexes['phone'] === null) {
-                return [
-                    'created' => 0,
-                    'skipped' => 0,
-                    'invalid' => 1,
-                    'errors' => [['row' => 1, 'reason' => 'Choose the phone number column.']],
-                ];
-            }
+            foreach ($rows as $row) {
+                $rowNumber++;
 
-            $created = 0;
-            $skipped = 0;
-            $invalid = 0;
-            $errors = [];
-            $rowNumber = $hasHeader ? 1 : 0;
-            $seenInFile = [];
-            $pending = [];
-            $groups = $customer->contactGroups()
-                ->get()
-                ->keyBy(fn (ContactGroup $group): string => Str::lower($group->name));
-
-            return DB::transaction(function () use (
-                $handle,
-                $indexes,
-                $customer,
-                &$created,
-                &$skipped,
-                &$invalid,
-                &$errors,
-                &$rowNumber,
-                &$seenInFile,
-                &$pending,
-                &$groups,
-            ): array {
-                while (($row = fgetcsv($handle)) !== false) {
-                    $rowNumber++;
-
-                    if ($this->isEmptyRow($row)) {
-                        continue;
-                    }
-
-                    $phoneRaw = trim((string) ($row[$indexes['phone']] ?? ''));
-                    $groupName = $indexes['group'] === null
-                        ? ''
-                        : trim((string) ($row[$indexes['group']] ?? ''));
-                    $name = $indexes['name'] === null
-                        ? ''
-                        : trim((string) ($row[$indexes['name']] ?? ''));
-
-                    if (! TanzaniaPhone::isValid($phoneRaw)) {
-                        $invalid++;
-                        $errors[] = ['row' => $rowNumber, 'reason' => 'Enter a valid Tanzanian mobile number.'];
-
-                        continue;
-                    }
-
-                    $phone = TanzaniaPhone::normalize($phoneRaw);
-                    if ($name === '') {
-                        $name = $phone;
-                    }
-
-                    if (isset($seenInFile[$phone])) {
-                        $skipped++;
-
-                        continue;
-                    }
-
-                    $seenInFile[$phone] = true;
-                    $pending[] = [
-                        'name' => $name,
-                        'phone' => $phone,
-                        'group_id' => $this->groupIdFor($customer, $groups, $groupName),
-                    ];
-
-                    if (count($pending) >= 250) {
-                        [$createdChunk, $skippedChunk] = $this->flush($customer, $pending);
-                        $created += $createdChunk;
-                        $skipped += $skippedChunk;
-                        $pending = [];
-                    }
-
-                    if ($created + $skipped + $invalid + count($pending) >= 5000) {
-                        break;
-                    }
+                if ($this->isEmptyRow($row)) {
+                    continue;
                 }
 
-                if ($pending !== []) {
+                $phoneRaw = trim((string) ($row[$indexes['phone']] ?? ''));
+                $name = $indexes['name'] === null
+                    ? ''
+                    : trim((string) ($row[$indexes['name']] ?? ''));
+
+                if (! TanzaniaPhone::isValid($phoneRaw)) {
+                    $invalid++;
+                    $errors[] = ['row' => $rowNumber, 'reason' => 'Enter a valid Tanzanian mobile number.'];
+
+                    continue;
+                }
+
+                $phone = TanzaniaPhone::normalize($phoneRaw);
+                if ($name === '') {
+                    $name = $phone;
+                }
+
+                if (isset($seenInFile[$phone])) {
+                    $skipped++;
+
+                    continue;
+                }
+
+                $seenInFile[$phone] = true;
+                if ($groupId === null) {
+                    $groupId = $this->createGroup($customer, (string) $groupName)->id;
+                }
+
+                $pending[] = [
+                    'name' => $name,
+                    'phone' => $phone,
+                    'group_id' => $groupId,
+                ];
+
+                if (count($pending) >= 250) {
                     [$createdChunk, $skippedChunk] = $this->flush($customer, $pending);
                     $created += $createdChunk;
                     $skipped += $skippedChunk;
+                    $pending = [];
                 }
 
-                return [
-                    'created' => $created,
-                    'skipped' => $skipped,
-                    'invalid' => $invalid,
-                    'errors' => array_slice($errors, 0, 25),
-                ];
-            });
-        } finally {
-            fclose($handle);
-        }
+                if ($created + $skipped + $invalid + count($pending) >= 5000) {
+                    break;
+                }
+            }
+
+            if ($pending !== []) {
+                [$createdChunk, $skippedChunk] = $this->flush($customer, $pending);
+                $created += $createdChunk;
+                $skipped += $skippedChunk;
+            }
+
+            return [
+                'created' => $created,
+                'skipped' => $skipped,
+                'invalid' => $invalid,
+                'errors' => array_slice($errors, 0, 25),
+            ];
+        });
     }
 
     /**
-     * @param  Collection<string, ContactGroup>  $groups
-     */
-    private function groupIdFor(Customer $customer, $groups, string $groupName): ?int
-    {
-        if ($groupName === '') {
-            return null;
-        }
-
-        $key = Str::lower($groupName);
-        $group = $groups->get($key);
-        if ($group === null) {
-            $group = $customer->contactGroups()->create([
-                'name' => $groupName,
-                'description' => null,
-            ]);
-            $groups->put($key, $group);
-        }
-
-        return $group->id;
-    }
-
-    /**
-     * @param  list<array{name: string, phone: string, group_id: int|null}>  $pending
+     * @param  list<array{name: string, phone: string, group_id: int}>  $pending
      * @return array{0: int, 1: int}
      */
     private function flush(Customer $customer, array $pending): array
@@ -267,14 +232,43 @@ class ContactImporter
     }
 
     /**
-     * @param  list<string|null>  $header
-     * @return array{name: int|null, phone: int|null, group: int|null}
+     * Existing group id, null when a new name should be created on the first valid row, or false when the choice is invalid.
      */
-    private function columnIndexes(array $header, string $nameColumn, string $phoneColumn, ?string $groupColumn): array
+    private function existingGroupId(Customer $customer, ?int $contactGroupId, ?string $groupName): int|null|false
+    {
+        if ($contactGroupId !== null) {
+            return $customer->contactGroups()->whereKey($contactGroupId)->first()?->id ?? false;
+        }
+
+        $groupName = trim((string) $groupName);
+        if ($groupName === '') {
+            return false;
+        }
+
+        $existing = $customer->contactGroups()
+            ->get()
+            ->first(fn (ContactGroup $group): bool => Str::lower($group->name) === Str::lower($groupName));
+
+        return $existing?->id;
+    }
+
+    private function createGroup(Customer $customer, string $groupName): ContactGroup
+    {
+        return $customer->contactGroups()->create([
+            'name' => trim($groupName),
+            'description' => null,
+        ]);
+    }
+
+    /**
+     * @param  list<string>  $header
+     * @return array{name: int|null, phone: int|null}
+     */
+    private function columnIndexes(array $header, string $nameColumn, string $phoneColumn): array
     {
         $normalized = [];
         foreach ($header as $index => $label) {
-            $normalized[$this->normalizeHeader((string) $label)] = $index;
+            $normalized[$this->normalizeHeader($label)] = $index;
         }
 
         return [
@@ -282,9 +276,6 @@ class ContactImporter
                 ? null
                 : ($normalized[$this->normalizeHeader($nameColumn)] ?? $normalized['name'] ?? null),
             'phone' => $normalized[$this->normalizeHeader($phoneColumn)] ?? $normalized['phone'] ?? $normalized['phone number'] ?? null,
-            'group' => $groupColumn === null || $this->isIgnored($groupColumn)
-                ? null
-                : ($normalized[$this->normalizeHeader($groupColumn)] ?? $normalized['group'] ?? null),
         ];
     }
 
@@ -305,16 +296,41 @@ class ContactImporter
     }
 
     /**
-     * @param  list<string|null>  $row
+     * @param  list<string>  $row
      */
     private function isEmptyRow(array $row): bool
     {
         foreach ($row as $cell) {
-            if (trim((string) $cell) !== '') {
+            if (trim($cell) !== '') {
                 return false;
             }
         }
 
         return true;
+    }
+
+    /**
+     * @param  list<list<string>>  $rows
+     * @return list<list<string>>
+     */
+    private function usedRows(array $rows): array
+    {
+        return array_values(array_filter(
+            $rows,
+            fn (array $row): bool => ! $this->isEmptyRow($row),
+        ));
+    }
+
+    /**
+     * @return array{created: int, skipped: int, invalid: int, errors: list<array{row: int, reason: string}>}
+     */
+    private function failure(string $reason, int $row = 0): array
+    {
+        return [
+            'created' => 0,
+            'skipped' => 0,
+            'invalid' => 1,
+            'errors' => [['row' => $row, 'reason' => $reason]],
+        ];
     }
 }
