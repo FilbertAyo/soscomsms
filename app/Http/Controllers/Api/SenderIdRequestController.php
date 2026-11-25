@@ -90,7 +90,7 @@ class SenderIdRequestController extends Controller
             'name' => [
                 'required',
                 'string',
-                'max:13',
+                'max:11',
                 function (string $attribute, mixed $value, Closure $fail): void {
                     if (! SenderIdName::isValid((string) $value)) {
                         $fail(SenderIdName::invalidMessage());

@@ -56,7 +56,7 @@ class WalletController extends Controller
 
         return response()->json([
             'smsBalance' => $customer->sms_balance,
-            'welcomeCredits' => (int) config('sms.welcome_credits', 20),
+            'welcomeCredits' => (int) config('sms.welcome_credits', 10),
             'minPurchaseQuantity' => (int) config('sms.min_purchase_quantity', 50),
             'tiers' => $tiers,
             'packages' => $packages,

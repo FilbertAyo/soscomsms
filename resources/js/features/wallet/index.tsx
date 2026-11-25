@@ -42,7 +42,7 @@ export function WalletPage() {
       <Main>
         <PageHeader
           title='SMS Balance'
-          description='SMS credits are used each time you send a message. New accounts start with 20 free SMS.'
+          description='SMS credits are used each time you send a message. New accounts start with 10 free SMS.'
         />
         {walletQuery.isError ? (
           <QueryLoadError

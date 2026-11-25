@@ -84,7 +84,7 @@ class SmsController extends Controller
         }
 
         $validated = $request->validate([
-            'sender_id' => ['required', 'string', 'max:13'],
+            'sender_id' => ['required', 'string', 'max:11'],
             'to' => ['required', 'array', 'min:1', 'max:'.(int) config('sms.max_recipients_per_campaign', 5000)],
             'to.*' => ['required', 'string', 'max:32'],
             'message' => ['required', 'string', 'max:2000'],

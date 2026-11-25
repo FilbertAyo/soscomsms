@@ -14,7 +14,7 @@ class CreditLedger
 {
     public function grantWelcome(Customer $customer): CreditTransaction
     {
-        $quantity = (int) config('sms.welcome_credits', 20);
+        $quantity = (int) config('sms.welcome_credits', 10);
         $reference = $this->welcomeReference($customer);
         $unitPrice = app(PricingService::class)->firstRangeUnitPriceTzs();
 

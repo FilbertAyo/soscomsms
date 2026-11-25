@@ -28,7 +28,7 @@ it('registers a customer with a pending profile and signs them in after otp', fu
         ->assertJsonPath('user.email', 'neema@example.com')
         ->assertJsonPath('user.role', 'customer')
         ->assertJsonPath('user.customer.status', CustomerStatus::PendingProfile->value)
-        ->assertJsonPath('user.customer.smsBalance', 20);
+        ->assertJsonPath('user.customer.smsBalance', 10);
 
     $this->assertAuthenticated();
 
@@ -36,7 +36,7 @@ it('registers a customer with a pending profile and signs them in after otp', fu
     expect($user)->not->toBeNull()
         ->and($user?->customer)->not->toBeNull()
         ->and($user?->customer?->status)->toBe(CustomerStatus::PendingProfile)
-        ->and($user?->customer?->sms_balance)->toBe(20)
+        ->and($user?->customer?->sms_balance)->toBe(10)
         ->and($user?->customer?->creditTransactions()->count())->toBe(1);
 });
 

@@ -224,8 +224,8 @@ it('values the signup bonus at the first-range price and hides SMS usage from th
     $ledger->debitUsage($customer->fresh(), 2, 'Campaign send');
     $ledger->purchase($customer->fresh(), 300, 30, 'PAY-300', 'Purchase of 300 SMS via Lipa namba');
 
-    expect($welcome->quantity)->toBe(20)
-        ->and($welcome->amount_tzs)->toBe(500);
+    expect($welcome->quantity)->toBe(10)
+        ->and($welcome->amount_tzs)->toBe(250);
 
     $admin = User::factory()->admin()->create();
     $this->actingAs($admin)
@@ -239,8 +239,8 @@ it('values the signup bonus at the first-range price and hides SMS usage from th
         ->assertJsonCount(2, 'transactions')
         ->assertJsonPath('transactions.0.quantity', 300)
         ->assertJsonPath('transactions.0.amountTzs', 9000)
-        ->assertJsonPath('transactions.1.quantity', 20)
-        ->assertJsonPath('transactions.1.amountTzs', 500);
+        ->assertJsonPath('transactions.1.quantity', 10)
+        ->assertJsonPath('transactions.1.amountTzs', 250);
 
     $this->actingAs($user)
         ->getJson('/api/wallet')
@@ -264,11 +264,11 @@ it('shows admin grants in the customer wallet, transactions, and dashboard feed'
     $this->actingAs($user)
         ->getJson('/api/credit-transactions')
         ->assertOk()
-        ->assertJsonPath('smsBalance', 815)
+        ->assertJsonPath('smsBalance', 805)
         ->assertJsonCount(2, 'transactions')
         ->assertJsonPath('transactions.0.type', 'grant')
         ->assertJsonPath('transactions.0.quantity', 800)
-        ->assertJsonPath('transactions.1.quantity', 20);
+        ->assertJsonPath('transactions.1.quantity', 10);
 
     $this->actingAs($user)
         ->getJson('/api/wallet')

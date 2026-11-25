@@ -2,7 +2,7 @@
 
 return [
 
-    'welcome_credits' => (int) env('SMS_WELCOME_CREDITS', 20),
+    'welcome_credits' => (int) env('SMS_WELCOME_CREDITS', 10),
 
     'provider_unit_cost_tzs' => (int) env('SMS_PROVIDER_UNIT_COST_TZS', 14),
 
@@ -12,7 +12,7 @@ return [
 
     'generic_sender_ids' => ['HARUSI', 'SEND OFF', 'MWALIKO', 'MCHANGO'],
 
-    'sender_id_max_length' => 13,
+    'sender_id_max_length' => 11,
 
     'sender_id_blocklist' => [
         'CRDB',

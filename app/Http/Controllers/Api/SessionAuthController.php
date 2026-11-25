@@ -46,7 +46,7 @@ class SessionAuthController extends Controller
             return $user;
         });
 
-        $user->notify(new WelcomeCustomerNotification((int) config('sms.welcome_credits', 20)));
+        $user->notify(new WelcomeCustomerNotification((int) config('sms.welcome_credits', 10)));
         AdminAlerts::notify(new NewUserRegisteredNotification($user));
 
         return response()->json($otp->issue($user), 201);

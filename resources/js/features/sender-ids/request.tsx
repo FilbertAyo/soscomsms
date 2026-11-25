@@ -118,7 +118,7 @@ export function RequestSenderId() {
       <Main>
         <PageHeader
           title='Request Sender ID'
-          description='Ask to send SMS using your own business or organization name.'
+          description='Ask to send SMS using your own business or organization name. Approval can take 3–5 working days.'
         />
         <form
           className='max-w-xl space-y-5 rounded-xl border bg-card p-5'
@@ -153,11 +153,12 @@ export function RequestSenderId() {
               onChange={(event) =>
                 setName(event.target.value.replaceAll(/\s+/g, ''))
               }
-              maxLength={13}
+              maxLength={11}
               required
             />
             <p className='text-xs text-muted-foreground'>
-              3 to 13 letters or numbers. Spaces are not allowed.
+              3 to 11 letters or numbers. Spaces are not allowed. Tip: Sender ID
+              approval can take 3–5 working days.
             </p>
           </div>
           <div className='space-y-2'>

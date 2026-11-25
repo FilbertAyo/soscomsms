@@ -37,7 +37,7 @@ class SenderIdController extends Controller
         }
 
         $validated = $request->validate([
-            'sender_id' => ['required', 'string', 'max:13'],
+            'sender_id' => ['required', 'string', 'max:11'],
         ]);
 
         $senderId = $senderIds->assertUsable($customer, $validated['sender_id']);

@@ -150,7 +150,7 @@ class CampaignController extends Controller
             'group_id' => ['nullable', 'integer'],
             'name' => ['nullable', 'string', 'max:80'],
             'scheduled_at' => ['nullable', 'date'],
-            'sender_id' => [$requireSender ? 'required' : 'nullable', 'string', 'max:13'],
+            'sender_id' => [$requireSender ? 'required' : 'nullable', 'string', 'max:11'],
         ];
 
         return $request->validate($rules);

@@ -298,13 +298,13 @@ export function AdminSenderIdCatalog() {
               <Input
                 id='catalog-name'
                 value={name}
-                maxLength={13}
+                maxLength={11}
                 onChange={(event) =>
                   setName(event.target.value.replaceAll(/\s+/g, ' ').trimStart())
                 }
               />
               <p className='text-xs text-muted-foreground'>
-                3 to 13 letters, numbers, or single spaces (for example SEND OFF).
+                3 to 11 letters, numbers, or single spaces (for example SEND OFF).
               </p>
             </div>
             <ToggleRow

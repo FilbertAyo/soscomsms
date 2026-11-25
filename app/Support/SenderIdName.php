@@ -19,7 +19,7 @@ final class SenderIdName
     public static function isValid(string $value, bool $allowSpaces = false): bool
     {
         $name = self::normalize($value);
-        $max = (int) config('sms.sender_id_max_length', 13);
+        $max = (int) config('sms.sender_id_max_length', 11);
         $length = mb_strlen($name);
 
         if ($length < 3 || $length > $max) {
@@ -46,7 +46,7 @@ final class SenderIdName
 
     public static function invalidMessage(bool $allowSpaces = false): string
     {
-        $max = (int) config('sms.sender_id_max_length', 13);
+        $max = (int) config('sms.sender_id_max_length', 11);
 
         return $allowSpaces
             ? "Enter a Sender ID of 3 to {$max} letters, numbers, or single spaces."

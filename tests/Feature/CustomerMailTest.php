@@ -33,7 +33,7 @@ it('emails a welcome message after a customer registers', function () {
         $mail = $notification->toMail($user);
 
         return $mail->subject === 'Welcome to Soscom SMS'
-            && collect($mail->introLines)->contains(fn (string $line): bool => str_contains($line, '20 free SMS'));
+            && collect($mail->introLines)->contains(fn (string $line): bool => str_contains($line, '10 free SMS'));
     });
     Notification::assertSentTo($user, LoginOtpNotification::class);
 });

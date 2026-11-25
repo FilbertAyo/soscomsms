@@ -14,7 +14,7 @@ class PricingTierController extends Controller
             'tiers' => $pricing->tiers()->map->toApiArray()->values(),
             'packages' => config('sms.packages'),
             'minPurchaseQuantity' => (int) config('sms.min_purchase_quantity', 50),
-            'welcomeCredits' => (int) config('sms.welcome_credits', 20),
+            'welcomeCredits' => (int) config('sms.welcome_credits', 10),
         ]);
     }
 }
