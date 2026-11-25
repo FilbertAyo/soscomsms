@@ -40,7 +40,7 @@ import { type ContactImportResult } from '@/types/contacts'
 const steps = [
   { id: 'upload', label: 'Upload file' },
   { id: 'match', label: 'Match columns' },
-  { id: 'review', label: 'Review contacts' },
+  { id: 'group', label: 'Choose group' },
 ]
 
 const IGNORE = 'Ignore'
@@ -290,54 +290,54 @@ export function ImportContacts() {
         ) : null}
 
         {step === 1 ? (
-          <section className='rounded-xl border bg-card p-5'>
-            <h2 className='font-semibold'>Match columns</h2>
-            <p className='mt-1 text-sm text-muted-foreground'>
-              {hasHeader
-                ? 'These columns were detected from your header row. Change them if a column was matched incorrectly.'
-                : 'This file has no header. Column A is the number and column B is the name.'}
+          <section className='space-y-4'>
+            <div className='rounded-xl border bg-card p-5'>
+              <h2 className='font-semibold'>Match columns</h2>
+              <p className='mt-1 text-sm text-muted-foreground'>
+                {hasHeader
+                  ? 'These columns were detected from your header row. Change them if a column was matched incorrectly. The sample below updates as you change them.'
+                  : 'This file has no header. Column A is the number and column B is the name.'}
+              </p>
+              <div className='mt-5 grid gap-4 sm:grid-cols-2'>
+                <ColumnSelect
+                  label='Phone Number'
+                  value={phoneColumn}
+                  options={columnOptions}
+                  onChange={setPhoneColumn}
+                  disabled={!hasHeader}
+                />
+                <ColumnSelect
+                  label='Name'
+                  value={nameColumn}
+                  options={columnOptions}
+                  onChange={setNameColumn}
+                  disabled={!hasHeader}
+                />
+              </div>
+              <div className='mt-6 flex gap-2'>
+                <Button variant='outline' onClick={() => setStep(0)}>
+                  Back
+                </Button>
+                <Button onClick={next}>Continue</Button>
+              </div>
+            </div>
+            <p className='text-sm text-muted-foreground'>
+              {bodyRows.length > previewRows.length
+                ? `Sample from your file (${formatNumber(previewRows.length)} of ${formatNumber(bodyRows.length)}).`
+                : 'Sample from your file.'}
             </p>
-            <div className='mt-5 grid gap-4 sm:grid-cols-2'>
-              <ColumnSelect
-                label='Phone Number'
-                value={phoneColumn}
-                options={columnOptions}
-                onChange={setPhoneColumn}
-                disabled={!hasHeader}
-              />
-              <ColumnSelect
-                label='Name'
-                value={nameColumn}
-                options={columnOptions}
-                onChange={setNameColumn}
-                disabled={!hasHeader}
-              />
-            </div>
-            <div className='mt-6 flex gap-2'>
-              <Button variant='outline' onClick={() => setStep(0)}>
-                Back
-              </Button>
-              <Button onClick={next}>Continue</Button>
-            </div>
+            <ContactPreview rows={previewRows} />
           </section>
         ) : null}
 
         {step === 2 ? (
           <section className='space-y-4'>
             <div className='rounded-xl border bg-card p-5'>
-              <p className='text-lg font-semibold'>
-                {formatNumber(bodyRows.length)} contacts ready to import
+              <h2 className='font-semibold'>Choose a group</h2>
+              <p className='mt-1 text-sm text-muted-foreground'>
+                The file does not include a group. Add every contact to one group.
               </p>
-              <p className='text-sm text-muted-foreground'>
-                Review a sample below. If name is ignored, the phone number is
-                saved as the name. Duplicate phones are skipped.
-              </p>
-              <div className='mt-5'>
-                <h2 className='font-semibold'>Group</h2>
-                <p className='mt-1 text-sm text-muted-foreground'>
-                  The file does not include a group. Add every contact to one group.
-                </p>
-                {groupsQuery.isPending ? (
+              {groupsQuery.isPending ? (
                   <p className='mt-4 text-sm text-muted-foreground'>Loading groups…</p>
                 ) : groupsQuery.isError ? (
                   <QueryLoadError
@@ -400,26 +400,14 @@ export function ImportContacts() {
                     )}
                   </div>
                 )}
-              </div>
+              <p className='mt-5 text-lg font-semibold'>
+                {formatNumber(bodyRows.length)} contacts will be imported
+              </p>
+              <p className='text-sm text-muted-foreground'>
+                If name is ignored, the phone number is saved as the name.
+                Duplicate phones are skipped.
+              </p>
             </div>
-            <TableWrap>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Phone Number</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {previewRows.map((row) => (
-                    <TableRow key={row.id}>
-                      <TableCell>{row.name}</TableCell>
-                      <TableCell>{row.phone}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableWrap>
             {result ? (
               <div className='rounded-xl border bg-card p-5'>
                 <p className='font-semibold'>Import finished</p>
@@ -470,6 +458,33 @@ export function ImportContacts() {
         ) : null}
       </Main>
     </>
+  )
+}
+
+function ContactPreview({
+  rows,
+}: {
+  rows: Array<{ id: number; name: string; phone: string }>
+}) {
+  return (
+    <TableWrap>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Name</TableHead>
+            <TableHead>Phone Number</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {rows.map((row) => (
+            <TableRow key={row.id}>
+              <TableCell>{row.name}</TableCell>
+              <TableCell>{row.phone}</TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </TableWrap>
   )
 }
 
