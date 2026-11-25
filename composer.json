@@ -12,6 +12,7 @@
         "laravel/tinker": "^2.10.1",
         "livewire/livewire": "^3.6.4",
         "livewire/volt": "^1.7.0",
+        "maennchen/zipstream-php": "^2.4",
         "phpoffice/phpspreadsheet": "^5.12"
     },
     "require-dev": {
@@ -82,6 +83,9 @@
         "optimize-autoloader": true,
         "preferred-install": "dist",
         "sort-packages": true,
+        "platform": {
+            "php": "8.2.36"
+        },
         "allow-plugins": {
             "pestphp/pest-plugin": true,
             "php-http/discovery": true
