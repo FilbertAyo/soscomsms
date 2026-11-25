@@ -157,7 +157,7 @@ export function RequestSenderId() {
               required
             />
             <p className='text-xs text-muted-foreground'>
-              3 to 11 letters or numbers. Spaces are not allowed. Tip: Sender ID
+              3 to 11 letters or numbers. Spaces are not allowed. Sender ID
               approval can take 3–5 working days.
             </p>
           </div>
