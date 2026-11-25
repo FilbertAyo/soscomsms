@@ -93,7 +93,7 @@ class Delivery extends Model
             'campaignId' => $campaign?->id,
             'campaignName' => $campaign?->name,
             'senderId' => $campaign?->sender_name,
-            'message' => $message?->body,
+            'message' => $this->reportedMessage($recipient, $message),
             'status' => $recipient?->status->value,
             'providerMessageId' => $this->provider_message_id,
             'sentAt' => $this->sent_at?->toIso8601String(),
@@ -131,11 +131,21 @@ class Delivery extends Model
             'campaign_id' => $campaign?->id,
             'campaign_name' => $campaign?->name,
             'sender_id' => $campaign?->sender_name,
-            'message' => $message?->body,
+            'message' => $this->reportedMessage($recipient, $message),
             'status' => $recipient?->status->value,
             'provider_message_id' => $this->provider_message_id,
             'sent_at' => $this->sent_at?->toIso8601String(),
             'delivered_at' => $this->delivered_at?->toIso8601String(),
         ];
+    }
+
+    private function reportedMessage(?CampaignRecipient $recipient, ?Message $message): ?string
+    {
+        $sent = $recipient?->body;
+        if (is_string($sent) && $sent !== '') {
+            return $sent;
+        }
+
+        return $message?->body;
     }
 }

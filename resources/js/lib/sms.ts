@@ -51,6 +51,143 @@ export function parsePhoneNumbers(value: string) {
     .filter(Boolean)
 }
 
+export const NAME_PLACEHOLDER = '{name}'
+export const NAME_EXAMPLE = 'Amina'
+
+const PHONE_HEADERS = new Set([
+  'phone',
+  'phones',
+  'number',
+  'numbers',
+  'mobile',
+  'msisdn',
+])
+
+const NAME_HEADERS = new Set(['name', 'names', 'jina', 'fullname', 'full name'])
+
+export type NamedRecipient = {
+  phone: string
+  name: string
+}
+
+export function messageUsesName(body: string) {
+  return body.includes(NAME_PLACEHOLDER)
+}
+
+export function cleanRecipientName(name: string) {
+  const cleaned = name
+    .split(NAME_PLACEHOLDER)
+    .join('')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  if (!/\p{L}/u.test(cleaned)) {
+    return ''
+  }
+
+  return Array.from(cleaned).slice(0, 120).join('')
+}
+
+export function renderNamedMessage(body: string, name: string) {
+  return body.split(NAME_PLACEHOLDER).join(cleanRecipientName(name))
+}
+
+export function insertTextAtCursor(
+  value: string,
+  token: string,
+  selectionStart: number | null,
+  selectionEnd: number | null
+) {
+  const start = selectionStart ?? value.length
+  const end = selectionEnd ?? value.length
+  const next = value.slice(0, start) + token + value.slice(end)
+
+  return {
+    value: next,
+    caret: start + token.length,
+  }
+}
+
+export function parseNamedRecipients(value: string): NamedRecipient[] {
+  return value
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map(parseNamedLine)
+}
+
+export function parseUploadRecipients(rows: string[][]): NamedRecipient[] {
+  if (rows.length === 0) {
+    return []
+  }
+
+  const header = rows[0].map((cell) => cell.trim().toLowerCase())
+  const phoneHeader = header.findIndex((cell) => PHONE_HEADERS.has(cell))
+  const nameHeader = header.findIndex((cell) => NAME_HEADERS.has(cell))
+  const hasHeader = phoneHeader >= 0 || nameHeader >= 0
+  const phoneIndex = phoneHeader >= 0 ? phoneHeader : 0
+  const nameIndex = nameHeader >= 0 ? nameHeader : 1
+  const data = hasHeader ? rows.slice(1) : rows
+  const people: NamedRecipient[] = []
+
+  for (const row of data) {
+    const phoneCell = (row[phoneIndex] ?? '').trim()
+    const nameCell = (row[nameIndex] ?? '').trim()
+    if (phoneCell === '' && nameCell === '') {
+      continue
+    }
+
+    let phone = phoneCell
+    let name = row.length < 2 && !hasHeader ? '' : cleanRecipientName(nameCell)
+    if (!looksLikePhone(phone) && looksLikePhone(nameCell)) {
+      phone = nameCell
+      name = cleanRecipientName(phoneCell)
+    }
+
+    if (phone === '') {
+      continue
+    }
+
+    people.push({ phone, name })
+  }
+
+  return people
+}
+
+function parseNamedLine(line: string): NamedRecipient {
+  const separated = line.match(/^(.+?)[,;\t]\s*(.*)$/)
+  let phone = line
+  let name = ''
+
+  if (separated) {
+    phone = separated[1].trim()
+    name = separated[2] ?? ''
+  } else {
+    const parts = line.split(/\s+/)
+    if (parts.length >= 2) {
+      phone = parts[0] ?? line
+      name = parts.slice(1).join(' ')
+    }
+  }
+
+  if (!looksLikePhone(phone) && looksLikePhone(name)) {
+    const swappedPhone = name.trim()
+    const swappedName = phone
+    phone = swappedPhone
+    name = swappedName
+  }
+
+  return {
+    phone: phone.trim(),
+    name: cleanRecipientName(name),
+  }
+}
+
+function looksLikePhone(value: string) {
+  const digits = value.replace(/\D/g, '')
+  return digits.length >= 9 && digits.length <= 15 && !/\p{L}/u.test(value)
+}
+
 export function getGreeting(date = new Date()) {
   const hour = tanzaniaHour(date)
   if (hour < 12) return 'Good morning'

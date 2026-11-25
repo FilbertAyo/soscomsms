@@ -1,5 +1,6 @@
 <?php
 
+use App\Contracts\SmsGatewayInterface;
 use App\Enums\CampaignRecipientStatus;
 use App\Enums\CampaignStatus;
 use App\Enums\CreditTransactionType;
@@ -10,6 +11,10 @@ use App\Models\CreditTransaction;
 use App\Models\Customer;
 use App\Models\SenderId;
 use App\Models\User;
+use App\Services\Gateway\DeliveryReport;
+use App\Services\Gateway\GatewaySendResult;
+use App\Services\Gateway\OutboundSms;
+use App\Services\Gateway\ProviderBalance;
 use Illuminate\Support\Facades\Http;
 
 function campaignCustomer(int $balance = 20): array
@@ -24,6 +29,54 @@ function campaignCustomer(int $balance = 20): array
     ]);
 
     return [$user, $customer, $sender];
+}
+
+function bindCapturingGateway(): object
+{
+    $bucket = new stdClass;
+    $bucket->sent = [];
+
+    $fake = new class($bucket) implements SmsGatewayInterface
+    {
+        public function __construct(private stdClass $bucket) {}
+
+        public function send(OutboundSms $message): GatewaySendResult
+        {
+            return $this->sendBulk([$message])[0];
+        }
+
+        public function sendBulk(array $messages): array
+        {
+            $results = [];
+            foreach ($messages as $message) {
+                $this->bucket->sent[] = $message;
+                $results[] = new GatewaySendResult(
+                    recipientId: $message->recipientId,
+                    phone: $message->phone,
+                    accepted: true,
+                    providerMessageId: 'FAKE-R'.$message->recipientId,
+                    code: '000',
+                    raw: 'ok',
+                );
+            }
+
+            return $results;
+        }
+
+        public function checkBalance(): ProviderBalance
+        {
+            return new ProviderBalance(100000, 'fake');
+        }
+
+        public function checkDeliveryStatus(string $providerMessageId): DeliveryReport
+        {
+            return new DeliveryReport($providerMessageId, 'delivered', 'fake');
+        }
+    };
+
+    app()->instance(SmsGatewayInterface::class, $fake);
+
+    return $bucket;
 }
 
 beforeEach(function () {
@@ -347,5 +400,220 @@ it('persists a future schedule with reserved credits and rejects a past time', f
     $this->assertDatabaseHas('campaign_recipients', [
         'campaign_id' => $campaign->id,
         'status' => CampaignRecipientStatus::Pending->value,
+    ]);
+});
+
+it('sends each person their own name and previews the first one', function () {
+    [$user, $customer, $sender] = campaignCustomer(20);
+    $bucket = bindCapturingGateway();
+
+    $this->actingAs($user)
+        ->postJson('/api/sms/preview', [
+            'source' => 'numbers',
+            'personalize' => true,
+            'message' => 'Hello {name}, karibu.',
+            'sender_id' => $sender->name,
+            'named_recipients' => [
+                ['phone' => '0712445221', 'name' => 'Amina'],
+                ['phone' => '0754221891', 'name' => 'Ámina'],
+            ],
+        ])
+        ->assertOk()
+        ->assertJsonPath('personalized', true)
+        ->assertJsonPath('placeholderReady', true)
+        ->assertJsonPath('missingNameCount', 0)
+        ->assertJsonPath('recipientCount', 2)
+        ->assertJsonPath('example.name', 'Amina')
+        ->assertJsonPath('example.phone', '+255712445221')
+        ->assertJsonPath('example.message', 'Hello Amina, karibu.')
+        ->assertJsonPath('totalSms', 2);
+
+    $this->actingAs($user)
+        ->postJson('/api/campaigns', [
+            'source' => 'numbers',
+            'personalize' => true,
+            'message' => 'Hello {name}, karibu.',
+            'sender_id' => $sender->name,
+            'named_recipients' => [
+                ['phone' => '0712445221', 'name' => 'Amina'],
+                ['phone' => '0754221891', 'name' => 'Ámina'],
+            ],
+        ])
+        ->assertCreated()
+        ->assertJsonPath('campaign.personalized', true)
+        ->assertJsonPath('campaign.recipients', 2)
+        ->assertJsonPath('smsBalance', 18);
+
+    $campaign = Campaign::query()->first();
+    expect($customer->fresh()->sms_balance)->toBe(18)
+        ->and($bucket->sent)->toHaveCount(2)
+        ->and($bucket->sent[0]->body)->toBe('Hello Amina, karibu.')
+        ->and($bucket->sent[0]->encoding->value)->toBe('gsm')
+        ->and($bucket->sent[1]->body)->toBe('Hello Ámina, karibu.')
+        ->and($bucket->sent[1]->encoding->value)->toBe('unicode');
+
+    $this->assertDatabaseHas('campaign_recipients', [
+        'campaign_id' => $campaign->id,
+        'phone' => '+255712445221',
+        'recipient_name' => 'Amina',
+        'body' => 'Hello Amina, karibu.',
+    ]);
+
+    $this->actingAs($user)
+        ->getJson('/api/delivery-reports')
+        ->assertOk()
+        ->assertJsonFragment(['message' => 'Hello Amina, karibu.'])
+        ->assertJsonFragment(['message' => 'Hello Ámina, karibu.']);
+});
+
+it('charges the longer personalized message as more sms', function () {
+    [$user, $customer, $sender] = campaignCustomer(20);
+    $body = '{name}'.str_repeat('a', 156);
+
+    $this->actingAs($user)
+        ->postJson('/api/campaigns', [
+            'source' => 'numbers',
+            'personalize' => true,
+            'message' => $body,
+            'sender_id' => $sender->name,
+            'named_recipients' => [
+                ['phone' => '0712445221', 'name' => 'Bo'],
+                ['phone' => '0754221891', 'name' => 'Bartholomew'],
+            ],
+        ])
+        ->assertCreated()
+        ->assertJsonPath('campaign.totalSms', 3)
+        ->assertJsonPath('smsBalance', 17);
+
+    expect($customer->fresh()->sms_balance)->toBe(17);
+    $this->assertDatabaseHas('campaign_recipients', [
+        'phone' => '+255712445221',
+        'segment_count' => 1,
+    ]);
+    $this->assertDatabaseHas('campaign_recipients', [
+        'phone' => '+255754221891',
+        'segment_count' => 2,
+    ]);
+});
+
+it('keeps a shared message unchanged when names are off', function () {
+    [$user, , $sender] = campaignCustomer(20);
+    $bucket = bindCapturingGateway();
+
+    $this->actingAs($user)
+        ->postJson('/api/campaigns', [
+            'source' => 'numbers',
+            'message' => 'Hello {name}',
+            'sender_id' => $sender->name,
+            'numbers' => ['0712445221', '0754221891'],
+        ])
+        ->assertCreated()
+        ->assertJsonPath('campaign.personalized', false)
+        ->assertJsonPath('campaign.totalSms', 2)
+        ->assertJsonPath('smsBalance', 18);
+
+    expect($bucket->sent)->toHaveCount(2)
+        ->and($bucket->sent[0]->body)->toBe('Hello {name}')
+        ->and($bucket->sent[1]->body)->toBe('Hello {name}');
+
+    $this->assertDatabaseHas('campaign_recipients', [
+        'phone' => '+255712445221',
+        'recipient_name' => null,
+        'body' => null,
+    ]);
+});
+
+it('refuses a personalized send when a number has no name', function () {
+    [$user, $customer, $sender] = campaignCustomer(20);
+
+    $this->actingAs($user)
+        ->postJson('/api/sms/preview', [
+            'source' => 'numbers',
+            'personalize' => true,
+            'message' => 'Hello {name}',
+            'named_recipients' => [
+                ['phone' => '0712445221', 'name' => 'Amina'],
+                ['phone' => '0754221891', 'name' => ''],
+            ],
+        ])
+        ->assertOk()
+        ->assertJsonPath('recipientCount', 1)
+        ->assertJsonPath('missingNameCount', 1);
+
+    $this->actingAs($user)
+        ->postJson('/api/campaigns', [
+            'source' => 'numbers',
+            'personalize' => true,
+            'message' => 'Hello {name}',
+            'sender_id' => $sender->name,
+            'named_recipients' => [
+                ['phone' => '0712445221', 'name' => 'Amina'],
+                ['phone' => '0754221891', 'name' => ''],
+            ],
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('recipients');
+
+    $this->actingAs($user)
+        ->postJson('/api/campaigns', [
+            'source' => 'numbers',
+            'personalize' => true,
+            'message' => 'Hello there',
+            'sender_id' => $sender->name,
+            'named_recipients' => [
+                ['phone' => '0712445221', 'name' => 'Amina'],
+            ],
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('message');
+
+    expect($customer->fresh()->sms_balance)->toBe(20);
+    $this->assertDatabaseCount('campaigns', 0);
+});
+
+it('fills {name} from the contact saved on a group', function () {
+    [$user, $customer, $sender] = campaignCustomer(20);
+    $bucket = bindCapturingGateway();
+    $group = ContactGroup::factory()->create([
+        'customer_id' => $customer->id,
+        'name' => 'Parents',
+    ]);
+    Contact::factory()->create([
+        'customer_id' => $customer->id,
+        'contact_group_id' => $group->id,
+        'name' => 'Amina',
+        'phone' => '+255712445221',
+    ]);
+    Contact::factory()->create([
+        'customer_id' => $customer->id,
+        'contact_group_id' => $group->id,
+        'name' => 'Juma',
+        'phone' => '+255754221891',
+    ]);
+    Contact::factory()->inactive()->create([
+        'customer_id' => $customer->id,
+        'contact_group_id' => $group->id,
+        'name' => 'Hidden',
+        'phone' => '+255755000001',
+    ]);
+
+    $this->actingAs($user)
+        ->postJson('/api/campaigns', [
+            'source' => 'group',
+            'personalize' => true,
+            'group_id' => $group->id,
+            'message' => 'Habari {name}',
+            'sender_id' => $sender->name,
+        ])
+        ->assertCreated()
+        ->assertJsonPath('campaign.recipients', 2)
+        ->assertJsonPath('smsBalance', 18);
+
+    expect($bucket->sent)->toHaveCount(2)
+        ->and($bucket->sent[0]->body)->toBe('Habari Amina')
+        ->and($bucket->sent[1]->body)->toBe('Habari Juma');
+
+    $this->assertDatabaseMissing('campaign_recipients', [
+        'phone' => '+255755000001',
     ]);
 });

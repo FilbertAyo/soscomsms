@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { FileText } from 'lucide-react'
 import { toast } from 'sonner'
@@ -11,7 +11,14 @@ import {
   messageTemplatesQueryKey,
   updateMessageTemplate,
 } from '@/lib/message-templates'
-import { analyzeSms } from '@/lib/sms'
+import {
+  analyzeSms,
+  insertTextAtCursor,
+  messageUsesName,
+  NAME_EXAMPLE,
+  NAME_PLACEHOLDER,
+  renderNamedMessage,
+} from '@/lib/sms'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -66,13 +73,18 @@ export function MessageTemplatesPage() {
   const [editing, setEditing] = useState<MessageTemplate | null>(null)
   const [form, setForm] = useState<TemplateForm>(emptyForm)
   const [deleteTarget, setDeleteTarget] = useState<MessageTemplate | null>(null)
+  const bodyRef = useRef<HTMLTextAreaElement>(null)
 
   const templatesQuery = useQuery({
     queryKey: messageTemplatesQueryKey,
     queryFn: fetchMessageTemplates,
   })
   const templates = templatesQuery.data ?? []
-  const analysis = analyzeSms(form.body)
+  const usesName = messageUsesName(form.body)
+  const exampleBody = usesName
+    ? renderNamedMessage(form.body, NAME_EXAMPLE)
+    : form.body
+  const analysis = analyzeSms(exampleBody)
   const dialogOpen = creating || editing !== null
 
   const saveMutation = useMutation({
@@ -157,13 +169,33 @@ export function MessageTemplatesPage() {
     saveMutation.mutate()
   }
 
+  function insertName() {
+    const field = bodyRef.current
+    const next = insertTextAtCursor(
+      form.body,
+      NAME_PLACEHOLDER,
+      field?.selectionStart ?? null,
+      field?.selectionEnd ?? null
+    )
+    if (next.value.length > 2000) {
+      toast.error('The message is already at the 2,000 character limit.')
+      return
+    }
+
+    setForm((current) => ({ ...current, body: next.value }))
+    window.requestAnimationFrame(() => {
+      field?.focus()
+      field?.setSelectionRange(next.caret, next.caret)
+    })
+  }
+
   return (
     <>
       <AppHeader />
       <Main>
         <PageHeader
           title='Templates'
-          description='Save messages you send often. Insert one when you send SMS.'
+          description='Save messages you send often. Type {name} where a person’s name should appear when you send.'
           actions={<Button onClick={openCreate}>New template</Button>}
         />
 
@@ -196,13 +228,19 @@ export function MessageTemplatesPage() {
                       <Badge variant='secondary' className='text-xs'>
                         {messageTemplateTypeLabels[template.type]}
                       </Badge>
+                      {messageUsesName(template.body) ? (
+                        <Badge variant='outline' className='text-xs'>
+                          Uses {'{name}'}
+                        </Badge>
+                      ) : null}
                     </div>
                     <p className='mt-1 line-clamp-2 text-sm text-muted-foreground'>
                       {template.body}
                     </p>
                     <p className='mt-2 text-xs text-muted-foreground'>
-                      {formatNumber(template.characterCount)} characters ·{' '}
-                      {formatNumber(template.segmentCount)} SMS
+                      {messageUsesName(template.body)
+                        ? `About ${formatNumber(analyzeSms(renderNamedMessage(template.body, NAME_EXAMPLE)).segmentCount)} SMS with the name ${NAME_EXAMPLE}. A longer name can use more SMS.`
+                        : `${formatNumber(template.characterCount)} characters · ${formatNumber(template.segmentCount)} SMS`}
                     </p>
                   </div>
                   <div className='flex shrink-0 gap-2'>
@@ -272,26 +310,56 @@ export function MessageTemplatesPage() {
               </Select>
             </div>
             <div className='space-y-2'>
-              <Label htmlFor='template-body'>Message</Label>
+              <div className='flex items-center justify-between gap-3'>
+                <Label htmlFor='template-body'>Message</Label>
+                <Button
+                  type='button'
+                  size='sm'
+                  variant='outline'
+                  onClick={insertName}
+                >
+                  Insert {'{name}'}
+                </Button>
+              </div>
               <Textarea
+                ref={bodyRef}
                 id='template-body'
                 className='min-h-36'
                 value={form.body}
                 maxLength={2000}
-                placeholder='Type your message here...'
+                placeholder='Hello {name}, your fee is due tomorrow.'
                 onChange={(event) =>
                   setForm((current) => ({ ...current, body: event.target.value }))
                 }
               />
+              <p className='text-sm text-muted-foreground'>
+                Use {'{name}'} exactly, with the brackets and no spaces. When you send, each person’s name replaces it.
+              </p>
               <div className='flex flex-wrap gap-4 text-sm text-muted-foreground'>
                 <span>
                   Characters: {analysis.characterCount} / {analysis.singleLimit}
+                  {usesName ? ` for ${NAME_EXAMPLE}` : ''}
                 </span>
-                <span>Messages: {analysis.segmentCount} SMS</span>
+                <span>
+                  Messages: {analysis.segmentCount} SMS
+                  {usesName ? ' for this example' : ''}
+                </span>
               </div>
+              {usesName ? (
+                <div className='rounded-lg border bg-muted/40 px-3 py-3'>
+                  <p className='text-xs font-medium text-muted-foreground'>
+                    Example for {NAME_EXAMPLE}
+                  </p>
+                  <p className='mt-1 text-sm whitespace-pre-wrap'>{exampleBody}</p>
+                  <p className='mt-2 text-xs text-muted-foreground'>
+                    A longer name can use more SMS when you send.
+                  </p>
+                </div>
+              ) : null}
               {analysis.segmentCount > 1 ? (
                 <p className='text-sm text-amber-700 dark:text-amber-400'>
-                  This template uses {analysis.segmentCount} SMS for each person.
+                  This template uses {analysis.segmentCount} SMS for each person
+                  {usesName ? ` when the name is ${NAME_EXAMPLE}` : ''}.
                 </p>
               ) : null}
             </div>

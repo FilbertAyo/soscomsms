@@ -20,6 +20,7 @@ use App\Services\Gateway\GatewaySendResult;
 use App\Services\Gateway\OutboundSms;
 use App\Services\Gateway\ProviderDeliveryStatus;
 use App\Support\AdminAlerts;
+use App\Support\PersonalizedMessage;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
@@ -33,6 +34,7 @@ class CampaignDispatcher
         private DeliveryReportService $deliveryReports,
         private WebhookDispatcher $webhooks,
         private ProviderReadinessService $readiness,
+        private SegmentationService $segmentation,
     ) {}
 
     public function queue(Campaign $campaign): void
@@ -302,13 +304,24 @@ class CampaignDispatcher
 
         $funded = [];
         foreach ($recipients as $recipient) {
+            $body = $this->outboundBody($campaign, $recipient);
+            if ($body === null) {
+                $recipient->status = CampaignRecipientStatus::Failed;
+                $recipient->save();
+
+                continue;
+            }
+
             if (! $campaign->tryConsumeSegments($recipient->segment_count)) {
                 $this->markCreditExhausted($campaign, $recipient);
 
                 continue;
             }
 
-            $funded[] = $recipient;
+            $funded[] = [
+                'recipient' => $recipient,
+                'body' => $body,
+            ];
         }
 
         if ($funded === []) {
@@ -318,13 +331,17 @@ class CampaignDispatcher
         }
 
         $messages = [];
-        foreach ($funded as $recipient) {
+        $fundedRecipients = [];
+        foreach ($funded as $item) {
+            $recipient = $item['recipient'];
+            $body = $item['body'];
+            $fundedRecipients[] = $recipient;
             $messages[] = new OutboundSms(
                 recipientId: $recipient->id,
                 phone: $recipient->phone,
                 sender: $campaign->sender_name,
-                body: (string) $campaign->message?->body,
-                encoding: $campaign->message?->encoding ?? MessageEncoding::Gsm,
+                body: $body,
+                encoding: $this->outboundEncoding($campaign, $body),
                 segmentCount: $recipient->segment_count,
                 campaignId: $campaign->id,
             );
@@ -341,7 +358,7 @@ class CampaignDispatcher
                 'error' => $exception->getMessage(),
             ]);
 
-            foreach ($funded as $recipient) {
+            foreach ($fundedRecipients as $recipient) {
                 $this->markUnknown($recipient);
             }
 
@@ -355,7 +372,7 @@ class CampaignDispatcher
             $byRecipient[$result->recipientId] = $result;
         }
 
-        foreach ($funded as $recipient) {
+        foreach ($fundedRecipients as $recipient) {
             $result = $byRecipient[$recipient->id] ?? new GatewaySendResult(
                 recipientId: $recipient->id,
                 phone: $recipient->phone,
@@ -367,8 +384,31 @@ class CampaignDispatcher
             $this->applyResult($campaign, $recipient, $result);
         }
 
-        $this->confirmSubmittedDeliveries($funded);
+        $this->confirmSubmittedDeliveries($fundedRecipients);
         $this->finishDispatch($campaign);
+    }
+
+    private function outboundBody(Campaign $campaign, CampaignRecipient $recipient): ?string
+    {
+        if (! $campaign->personalized) {
+            return (string) $campaign->message?->body;
+        }
+
+        $body = (string) $recipient->body;
+        if ($body === '' || str_contains($body, PersonalizedMessage::PLACEHOLDER)) {
+            return null;
+        }
+
+        return $body;
+    }
+
+    private function outboundEncoding(Campaign $campaign, string $body): MessageEncoding
+    {
+        if (! $campaign->personalized) {
+            return $campaign->message?->encoding ?? MessageEncoding::Gsm;
+        }
+
+        return MessageEncoding::from($this->segmentation->analyze($body)['encoding']);
     }
 
     public function releaseDueScheduled(): int

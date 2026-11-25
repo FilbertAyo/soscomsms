@@ -28,6 +28,7 @@ class Campaign extends Model
         'credit_transaction_id',
         'name',
         'sender_name',
+        'personalized',
         'status',
         'recipient_count',
         'sent_count',
@@ -47,6 +48,7 @@ class Campaign extends Model
     {
         return [
             'status' => CampaignStatus::class,
+            'personalized' => 'boolean',
             'recipient_count' => 'integer',
             'sent_count' => 'integer',
             'delivered_count' => 'integer',
@@ -163,6 +165,7 @@ class Campaign extends Model
             'name' => $this->name,
             'senderId' => $this->sender_name,
             'status' => $this->status->value,
+            'personalized' => (bool) $this->personalized,
             'message' => $withMessage ? $this->message?->body : null,
             'encoding' => $withMessage ? $this->message?->encoding?->value : null,
             'characterCount' => $withMessage ? $this->message?->character_count : null,

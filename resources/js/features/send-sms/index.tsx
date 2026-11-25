@@ -15,13 +15,24 @@ import {
   withSmsBalance,
 } from '@/lib/credits'
 import { parseCsvText } from '@/lib/csv'
-import { formatNumber } from '@/lib/format'
+import { formatNumber, formatTzMobile } from '@/lib/format'
 import {
   fetchMessageTemplates,
   messageTemplatesQueryKey,
 } from '@/lib/message-templates'
 import { fetchUsableSenderIds, usableSenderIdsQueryKey } from '@/lib/sender-ids'
-import { analyzeSms, parsePhoneNumbers } from '@/lib/sms'
+import {
+  analyzeSms,
+  insertTextAtCursor,
+  messageUsesName,
+  NAME_EXAMPLE,
+  NAME_PLACEHOLDER,
+  parseNamedRecipients,
+  parsePhoneNumbers,
+  parseUploadRecipients,
+  renderNamedMessage,
+  type NamedRecipient,
+} from '@/lib/sms'
 import { useAuthStore } from '@/stores/auth-store'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -35,6 +46,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import {
@@ -62,9 +74,12 @@ export function SendSms() {
   const [numbers, setNumbers] = useState('')
   const [groupId, setGroupId] = useState('')
   const [uploadNumbers, setUploadNumbers] = useState<string[]>([])
+  const [uploadNamed, setUploadNamed] = useState<NamedRecipient[]>([])
   const [uploadName, setUploadName] = useState('')
   const [message, setMessage] = useState('')
+  const [personalize, setPersonalize] = useState(false)
   const [templatePickerOpen, setTemplatePickerOpen] = useState(false)
+  const messageRef = useRef<HTMLTextAreaElement>(null)
   const [schedule, setSchedule] = useState(false)
   const [scheduleAt, setScheduleAt] = useState('')
   const [confirmOpen, setConfirmOpen] = useState(false)
@@ -107,6 +122,10 @@ export function SendSms() {
   }, [groupId, groups])
 
   const parsedNumbers = useMemo(() => parsePhoneNumbers(numbers), [numbers])
+  const namedFromNumbers = useMemo(() => parseNamedRecipients(numbers), [numbers])
+  const namedDraft =
+    mode === 'numbers' ? namedFromNumbers : mode === 'upload' ? uploadNamed : []
+  const localFirstNamed = namedDraft.find((person) => person.name !== '')
 
   const payload = useMemo((): Omit<CampaignPayload, 'sender_id'> & {
     sender_id?: string
@@ -114,11 +133,14 @@ export function SendSms() {
     const base = {
       message,
       sender_id: senderId || undefined,
+      personalize,
     }
 
     switch (mode) {
       case 'numbers':
-        return { ...base, source: 'numbers', numbers: parsedNumbers }
+        return personalize
+          ? { ...base, source: 'numbers', named_recipients: namedFromNumbers }
+          : { ...base, source: 'numbers', numbers: parsedNumbers }
       case 'group':
         return {
           ...base,
@@ -126,7 +148,9 @@ export function SendSms() {
           group_id: groupId ? Number(groupId) : undefined,
         }
       case 'upload':
-        return { ...base, source: 'upload', numbers: uploadNumbers }
+        return personalize
+          ? { ...base, source: 'upload', named_recipients: uploadNamed }
+          : { ...base, source: 'upload', numbers: uploadNumbers }
       default: {
         const exhaustive: never = mode
         return exhaustive
@@ -136,8 +160,11 @@ export function SendSms() {
     groupId,
     message,
     mode,
+    namedFromNumbers,
     parsedNumbers,
+    personalize,
     senderId,
+    uploadNamed,
     uploadNumbers,
   ])
 
@@ -159,13 +186,35 @@ export function SendSms() {
   })
   const preview = previewQuery.data
   const analysis = analyzeSms(message)
+  const previewIsCurrent =
+    previewQuery.isSuccess &&
+    !previewQuery.isFetching &&
+    JSON.stringify(payload) === JSON.stringify(debouncedPayload)
+  const usesName = messageUsesName(message)
+  const exampleName =
+    (previewIsCurrent ? preview?.example?.name : null) ||
+    localFirstNamed?.name ||
+    NAME_EXAMPLE
+  const examplePhone =
+    (previewIsCurrent ? preview?.example?.phone : null) || localFirstNamed?.phone || ''
+  const exampleMessage =
+    personalize && usesName
+      ? (previewIsCurrent ? preview?.example?.message : null) ||
+        renderNamedMessage(message, exampleName)
+      : message
+  const shownAnalysis =
+    personalize && usesName ? analyzeSms(exampleMessage) : analysis
 
   const smsBalance = useAuthStore((state) => state.user?.customer?.smsBalance ?? 0)
   const suspended = useAuthStore(
     (state) => state.user?.customer?.status === 'suspended'
   )
   const recipientCount = preview?.recipientCount ?? 0
-  const segments = preview?.segmentsPerRecipient ?? analysis.segmentCount
+  const segments = preview?.segmentsPerRecipient ?? shownAnalysis.segmentCount
+  const perPerson =
+    preview && preview.personalized && preview.segmentsMin !== preview.segmentsMax
+      ? `${preview.segmentsMin}–${preview.segmentsMax}`
+      : String(segments || 0)
   const totalSms = preview?.totalSms ?? recipientCount * segments
   const balanceAfter = preview?.balanceAfter ?? smsBalance - totalSms
   const activeSender = senderIds.find((item) => item.name === senderId)
@@ -222,12 +271,38 @@ export function SendSms() {
       toast.error('Please select a Sender ID.')
       return
     }
-    if (recipientCount < 1) {
-      toast.error('Add at least one valid Tanzanian number.')
-      return
-    }
     if (!message.trim()) {
       toast.error('Type a message before sending.')
+      return
+    }
+    if (mode === 'group' && !groupId) {
+      toast.error('Choose a contact group.')
+      return
+    }
+    if (!previewIsCurrent || !preview) {
+      toast.error('Still checking this SMS. Wait a moment, then try again.')
+      return
+    }
+    if (personalize && !preview.placeholderReady) {
+      toast.error(
+        'Add {name} where each person’s name should appear, or turn names off.'
+      )
+      return
+    }
+    if (personalize && preview.missingNameCount > 0) {
+      toast.error(
+        'Every person needs a name. Use one line per person: 0712445221, Amina.'
+      )
+      return
+    }
+    if (personalize && preview.overLimitCount > 0) {
+      toast.error(
+        'A name makes the message longer than 2,000 characters. Shorten the message or the name.'
+      )
+      return
+    }
+    if (recipientCount < 1) {
+      toast.error('Add at least one valid Tanzanian number.')
       return
     }
     if (willSchedule && !scheduleAt) {
@@ -245,17 +320,44 @@ export function SendSms() {
     setUploadName(file?.name ?? '')
     if (!file) {
       setUploadNumbers([])
+      setUploadNamed([])
       return
     }
 
     const rows = parseCsvText(await file.text())
     const phones = rows.flatMap((row) => row.map((cell) => cell.trim())).filter(Boolean)
     setUploadNumbers(phones)
+    setUploadNamed(parseUploadRecipients(rows))
   }
 
   function insertTemplate(template: MessageTemplate) {
     setMessage(template.body)
+    if (messageUsesName(template.body)) {
+      setPersonalize(true)
+      toast('This template includes {name}. Add a name for each person.')
+    }
     setTemplatePickerOpen(false)
+  }
+
+  function insertName() {
+    const field = messageRef.current
+    const next = insertTextAtCursor(
+      message,
+      NAME_PLACEHOLDER,
+      field?.selectionStart ?? null,
+      field?.selectionEnd ?? null
+    )
+    if (next.value.length > 2000) {
+      toast.error('The message is already at the 2,000 character limit.')
+      return
+    }
+
+    setPersonalize(true)
+    setMessage(next.value)
+    window.requestAnimationFrame(() => {
+      field?.focus()
+      field?.setSelectionRange(next.caret, next.caret)
+    })
   }
 
   return (
@@ -264,7 +366,7 @@ export function SendSms() {
       <Main>
         <PageHeader
           title='Send SMS'
-          description='Longer messages use more than 1 SMS per person. You will see the total before you send.'
+          description='Send the same SMS to everyone, or turn on names so each person gets their own. You will see a preview before it sends.'
         />
 
         {suspended ? (
@@ -323,6 +425,22 @@ export function SendSms() {
                     : ''}
                 </p>
               </div>
+              <div className='mb-4 flex items-start justify-between gap-4 rounded-lg border bg-muted/40 px-3 py-3'>
+                <div>
+                  <Label htmlFor='use-names'>Use each person’s name</Label>
+                  <p className='mt-1 text-sm font-normal text-muted-foreground'>
+                    {personalize
+                      ? 'Write {name} in the message. Each person gets their own name there. Turn this off to send the same SMS to everyone.'
+                      : 'Off: everyone receives the same message. Turn this on when each SMS should include that person’s name.'}
+                  </p>
+                </div>
+                <Switch
+                  id='use-names'
+                  className='mt-0.5'
+                  checked={personalize}
+                  onCheckedChange={setPersonalize}
+                />
+              </div>
               <Tabs
                 value={mode}
                 onValueChange={(value) => setMode(value as RecipientMode)}
@@ -336,7 +454,11 @@ export function SendSms() {
                   <Textarea
                     value={numbers}
                     onChange={(event) => setNumbers(event.target.value)}
-                    placeholder='0712445221, one number per line'
+                    placeholder={
+                      personalize
+                        ? '0712445221, Amina\n0754221891, Juma Hassan'
+                        : '0712445221, one number per line'
+                    }
                     rows={6}
                   />
                 </TabsContent>
@@ -375,43 +497,120 @@ export function SendSms() {
                   />
                   <p className='mt-2 text-sm text-muted-foreground'>
                     {uploadName
-                      ? `${uploadName}: ${formatNumber(uploadNumbers.length)} values found.`
-                      : 'Upload a CSV of Tanzanian numbers.'}
+                      ? personalize
+                        ? `${uploadName}: ${formatNumber(uploadNamed.length)} rows found.`
+                        : `${uploadName}: ${formatNumber(uploadNumbers.length)} values found.`
+                      : personalize
+                        ? 'Upload a CSV with two columns: number, then name. A header row like phone,name is fine.'
+                        : 'Upload a CSV of Tanzanian numbers.'}
                   </p>
                 </TabsContent>
               </Tabs>
+              {personalize && mode === 'group' ? (
+                <p className='mt-3 text-sm text-muted-foreground'>
+                  Each contact’s saved name replaces {'{name}'}. A contact without a name is stopped before sending.
+                </p>
+              ) : null}
+              {personalize && mode === 'group' && (preview?.missingNameCount ?? 0) > 0 ? (
+                <p className='mt-2 text-sm text-amber-700 dark:text-amber-400'>
+                  {formatNumber(preview?.missingNameCount ?? 0)}{' '}
+                  {preview?.missingNameCount === 1 ? 'contact has' : 'contacts have'} no name. Add the name in Contacts, then come back.
+                </p>
+              ) : null}
+              {personalize && mode !== 'group' ? (
+                <PeoplePreview people={namedDraft} />
+              ) : null}
             </section>
 
             <section className='rounded-xl border bg-card p-5'>
-              <div className='flex items-center justify-between gap-3'>
+              <div className='flex flex-wrap items-center justify-between gap-3'>
                 <Label htmlFor='message'>Message</Label>
-                <Button
-                  type='button'
-                  size='sm'
-                  variant='outline'
-                  onClick={() => setTemplatePickerOpen(true)}
-                >
-                  Insert template
-                </Button>
+                <div className='flex flex-wrap gap-2'>
+                  <Button
+                    type='button'
+                    size='sm'
+                    variant='outline'
+                    onClick={insertName}
+                  >
+                    Insert {'{name}'}
+                  </Button>
+                  <Button
+                    type='button'
+                    size='sm'
+                    variant='outline'
+                    onClick={() => setTemplatePickerOpen(true)}
+                  >
+                    Insert template
+                  </Button>
+                </div>
               </div>
               <Textarea
+                ref={messageRef}
                 id='message'
                 className='mt-2 min-h-36'
-                placeholder='Type your message here...'
+                placeholder={
+                  personalize
+                    ? 'Hello {name}, your fee is due tomorrow.'
+                    : 'Type your message here...'
+                }
                 value={message}
                 maxLength={2000}
                 onChange={(event) => setMessage(event.target.value)}
               />
               <div className='mt-2 flex flex-wrap gap-4 text-sm text-muted-foreground'>
                 <span>
-                  Characters: {analysis.characterCount} / {analysis.singleLimit}
+                  Characters: {shownAnalysis.characterCount} / {shownAnalysis.singleLimit}
+                  {personalize && usesName ? ` for ${exampleName}` : ''}
                 </span>
-                <span>SMS per person: {analysis.segmentCount}</span>
+                <span>
+                  SMS per person: {shownAnalysis.segmentCount}
+                  {personalize && usesName ? ' for this example' : ''}
+                </span>
               </div>
-              {analysis.segmentCount > 1 ? (
-                <p className='mt-2 text-sm text-amber-700 dark:text-amber-400'>
-                  This message uses {analysis.segmentCount} SMS for each person.
+              {personalize && usesName ? (
+                <p className='mt-2 text-sm text-muted-foreground'>
+                  A longer name can use more SMS. The total on the right counts every person.
                 </p>
+              ) : null}
+              {shownAnalysis.segmentCount > 1 ? (
+                <p className='mt-2 text-sm text-amber-700 dark:text-amber-400'>
+                  {personalize && usesName
+                    ? `This example uses ${shownAnalysis.segmentCount} SMS for each person.`
+                    : `This message uses ${shownAnalysis.segmentCount} SMS for each person.`}
+                </p>
+              ) : null}
+              {personalize && message.trim() !== '' && !usesName ? (
+                <p className='mt-2 text-sm text-amber-700 dark:text-amber-400'>
+                  Add {'{name}'} where the name should appear, or turn names off to send this same text to everyone.
+                </p>
+              ) : null}
+              {!personalize && usesName ? (
+                <div className='mt-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-3 text-sm'>
+                  <p>
+                    This message contains {'{name}'}. If you send now, people receive those brackets as text.
+                  </p>
+                  <Button
+                    type='button'
+                    size='sm'
+                    variant='outline'
+                    className='mt-2'
+                    onClick={() => setPersonalize(true)}
+                  >
+                    Use each person’s name
+                  </Button>
+                </div>
+              ) : null}
+              {personalize && usesName ? (
+                <div className='mt-3 rounded-lg border bg-muted/40 px-3 py-3'>
+                  <p className='text-xs font-medium text-muted-foreground'>
+                    Example for {exampleName}
+                    {examplePhone ? ` (${formatTzMobile(examplePhone)})` : ''}
+                  </p>
+                  <p className='mt-1 text-sm whitespace-pre-wrap'>{exampleMessage}</p>
+                  <p className='mt-2 text-xs text-muted-foreground'>
+                    This is the first person. You will see it again before sending.
+                  </p>
+                </div>
               ) : null}
             </section>
 
@@ -463,7 +662,7 @@ export function SendSms() {
             <h2 className='font-semibold'>Summary</h2>
             <dl className='mt-4 space-y-3 text-sm'>
               <Row label='Recipients' value={formatNumber(recipientCount)} />
-              <Row label='SMS per person' value={String(segments || 0)} />
+              <Row label='SMS per person' value={perPerson} />
               <Row label='Total SMS' value={formatNumber(totalSms)} />
               <Row
                 label='Balance after sending'
@@ -513,7 +712,14 @@ export function SendSms() {
                   className='w-full rounded-lg border px-3 py-2 text-left hover:bg-accent'
                   onClick={() => insertTemplate(template)}
                 >
-                  <span className='block text-sm font-medium'>{template.name}</span>
+                  <span className='flex flex-wrap items-center gap-2 text-sm font-medium'>
+                    {template.name}
+                    {messageUsesName(template.body) ? (
+                      <span className='rounded-full bg-muted px-2 py-0.5 text-xs font-normal text-muted-foreground'>
+                        Uses {'{name}'}
+                      </span>
+                    ) : null}
+                  </span>
                   <span className='mt-1 block truncate text-xs text-muted-foreground'>
                     {template.body}
                   </span>
@@ -531,9 +737,38 @@ export function SendSms() {
       <ConfirmDialog
         open={confirmOpen}
         onOpenChange={setConfirmOpen}
+        className='sm:max-w-lg'
         title={schedule ? 'Schedule this SMS?' : 'Send this SMS?'}
         desc={
-          <div className='space-y-2 text-sm'>
+          <div className='space-y-3 text-sm'>
+            {preview?.example ? (
+              <div className='rounded-lg border bg-muted/50 px-3 py-2'>
+                <p className='text-xs font-medium text-muted-foreground'>
+                  {preview.example.name
+                    ? `Example for ${preview.example.name} (${formatTzMobile(preview.example.phone)})`
+                    : `Example for ${formatTzMobile(preview.example.phone)}`}
+                </p>
+                <p className='mt-1 text-foreground whitespace-pre-wrap'>
+                  {preview.example.message}
+                </p>
+              </div>
+            ) : (
+              <p className='text-foreground whitespace-pre-wrap'>{message}</p>
+            )}
+            {personalize && preview?.example?.name ? (
+              <p className='text-muted-foreground'>
+                This is the first person. Everyone else gets their own name in place of {'{name}'}.
+              </p>
+            ) : (
+              <p className='text-muted-foreground'>
+                Everyone receives this same message.
+              </p>
+            )}
+            {!personalize && usesName ? (
+              <p className='text-amber-700 dark:text-amber-400'>
+                {'{name}'} will be sent as text. Turn on “Use each person’s name” if you want a real name instead.
+              </p>
+            ) : null}
             <p>
               {formatNumber(totalSms)} SMS from{' '}
               <span className='text-foreground font-medium'>
@@ -560,6 +795,55 @@ export function SendSms() {
         handleConfirm={() => sendMutation.mutate()}
       />
     </>
+  )
+}
+
+function PeoplePreview({ people }: { people: NamedRecipient[] }) {
+  if (people.length === 0) {
+    return (
+      <p className='mt-3 text-sm text-muted-foreground'>
+        One person per line: number, then name. Example: 0712445221, Amina
+      </p>
+    )
+  }
+
+  const shown = people.slice(0, 3)
+  const missing = people.filter((person) => person.name === '').length
+
+  return (
+    <div className='mt-3 rounded-lg border px-3 py-2'>
+      <p className='text-xs font-medium text-muted-foreground'>How we read this</p>
+      <ul className='mt-2 space-y-1 text-sm'>
+        {shown.map((person, index) => (
+          <li
+            key={`${person.phone}-${index}`}
+            className='flex items-center justify-between gap-3'
+          >
+            <span
+              className={
+                person.name
+                  ? 'truncate'
+                  : 'text-amber-700 dark:text-amber-400'
+              }
+            >
+              {person.name || 'Name missing'}
+            </span>
+            <span className='shrink-0 text-muted-foreground'>{person.phone}</span>
+          </li>
+        ))}
+      </ul>
+      {people.length > shown.length ? (
+        <p className='mt-2 text-xs text-muted-foreground'>
+          and {formatNumber(people.length - shown.length)} more
+        </p>
+      ) : null}
+      {missing > 0 ? (
+        <p className='mt-2 text-sm text-amber-700 dark:text-amber-400'>
+          {formatNumber(missing)}{' '}
+          {missing === 1 ? 'person still needs' : 'people still need'} a name.
+        </p>
+      ) : null}
+    </div>
   )
 }
 

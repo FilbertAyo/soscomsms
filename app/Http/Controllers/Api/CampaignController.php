@@ -132,15 +132,19 @@ class CampaignController extends Controller
     }
 
     /**
-     * @return array{source: string, numbers?: list<string>, contact_ids?: list<int>, group_id?: int|null, message: string, sender_id?: string, name?: string|null, scheduled_at?: string|null}
+     * @return array{source: string, numbers?: list<string>, named_recipients?: list<array{phone: string, name?: string|null}>, contact_ids?: list<int>, group_id?: int|null, message: string, sender_id?: string, name?: string|null, scheduled_at?: string|null, personalize?: bool}
      */
     private function validatedPreview(Request $request, bool $requireSender = false): array
     {
         $rules = [
             'source' => ['required', Rule::in(['numbers', 'contacts', 'group', 'upload'])],
             'message' => ['required', 'string', 'max:2000'],
+            'personalize' => ['sometimes', 'boolean'],
             'numbers' => ['nullable', 'array', 'max:5000'],
             'numbers.*' => ['string', 'max:32'],
+            'named_recipients' => ['nullable', 'array', 'max:5000'],
+            'named_recipients.*.phone' => ['required', 'string', 'max:32'],
+            'named_recipients.*.name' => ['nullable', 'string', 'max:120'],
             'contact_ids' => ['nullable', 'array', 'max:5000'],
             'contact_ids.*' => ['integer'],
             'group_id' => ['nullable', 'integer'],

@@ -168,6 +168,19 @@ it('requires a known template type', function () {
         ->assertJsonValidationErrors('type');
 });
 
+it('stores a template that uses the name placeholder', function () {
+    [$user] = templateCustomer();
+
+    $this->actingAs($user)
+        ->postJson('/api/message-templates', [
+            'name' => 'Named reminder',
+            'type' => 'transactional',
+            'body' => 'Hello {name}, your fee is due.',
+        ])
+        ->assertCreated()
+        ->assertJsonPath('template.body', 'Hello {name}, your fee is due.');
+});
+
 it('changes the type when a template is updated', function () {
     [$user, $customer] = templateCustomer();
     $template = MessageTemplate::factory()->create(['customer_id' => $customer->id]);

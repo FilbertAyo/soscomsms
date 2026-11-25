@@ -10,7 +10,7 @@ import {
 } from '@/lib/campaigns'
 import { normalizeError } from '@/lib/api-error'
 import { creditTransactionsQueryKey, walletQueryKey, withSmsBalance } from '@/lib/credits'
-import { formatDateTime, formatNumber } from '@/lib/format'
+import { formatDateTime, formatNumber, formatTzMobile } from '@/lib/format'
 import { useAuthStore } from '@/stores/auth-store'
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/confirm-dialog'
@@ -121,7 +121,9 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
           title={campaign?.name ?? 'Campaign'}
           description={
             campaign
-              ? `From ${campaign.senderId} · ${campaign.segmentsPerRecipient ?? 0} SMS per person`
+              ? campaign.personalized
+                ? `From ${campaign.senderId} · each SMS includes that person’s name`
+                : `From ${campaign.senderId} · ${campaign.segmentsPerRecipient ?? 0} SMS per person`
               : 'Loading campaign…'
           }
           actions={
@@ -160,7 +162,12 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
                   )}
                 </span>
               </div>
-              <p className='mt-4 text-sm'>{campaign.message}</p>
+              <p className='mt-4 text-sm whitespace-pre-wrap'>{campaign.message}</p>
+              {campaign.personalized ? (
+                <p className='mt-2 text-sm text-muted-foreground'>
+                  {'{name}'} was replaced with each person’s name. The text each person received is listed below.
+                </p>
+              ) : null}
               {campaign.status === 'queued' ? (
                 <p className='mt-3 text-sm text-muted-foreground'>
                   We are sending this now. Delivery status will update on this
@@ -190,7 +197,7 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Recipient</TableHead>
+                    <TableHead>{campaign.personalized ? 'Person' : 'Recipient'}</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Message ID</TableHead>
                     <TableHead>SMS</TableHead>
@@ -200,7 +207,23 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
                 <TableBody>
                   {(campaign.recipientRows ?? []).map((item) => (
                     <TableRow key={item.id}>
-                      <TableCell>{item.phone}</TableCell>
+                      <TableCell>
+                        {campaign.personalized ? (
+                          <div>
+                            <div className='font-medium'>{item.name || '—'}</div>
+                            <div className='text-muted-foreground'>
+                              {formatTzMobile(item.phone)}
+                            </div>
+                            {item.message ? (
+                              <p className='mt-1 line-clamp-2 max-w-md text-xs text-muted-foreground'>
+                                {item.message}
+                              </p>
+                            ) : null}
+                          </div>
+                        ) : (
+                          item.phone
+                        )}
+                      </TableCell>
                       <TableCell>
                         <StatusBadge status={item.status} />
                       </TableCell>

@@ -27,6 +27,8 @@ export type CampaignRecipientStatus =
 export type CampaignRecipient = {
   id: number
   phone: string
+  name: string | null
+  message: string | null
   status: CampaignRecipientStatus
   contactId: number | null
   segmentCount: number
@@ -39,6 +41,7 @@ export type Campaign = {
   name: string
   senderId: string
   status: CampaignStatus
+  personalized?: boolean
   message: string | null
   encoding: 'gsm' | 'unicode' | null
   characterCount: number | null
@@ -80,13 +83,27 @@ export type CampaignPreview = {
   smsBalance: number
   balanceAfter: number
   enoughCredits: boolean
+  personalized: boolean
+  placeholderReady: boolean
+  missingNameCount: number
+  missingNameNumbers: string[]
+  overLimitCount: number
+  segmentsMin: number
+  segmentsMax: number
+  example: {
+    phone: string
+    name: string | null
+    message: string
+  } | null
 }
 
 export type CampaignPayload = {
   source: 'numbers' | 'contacts' | 'group' | 'upload'
   message: string
   sender_id: string
+  personalize?: boolean
   numbers?: string[]
+  named_recipients?: { phone: string; name: string }[]
   contact_ids?: number[]
   group_id?: number
   name?: string

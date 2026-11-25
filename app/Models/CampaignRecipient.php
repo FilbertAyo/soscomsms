@@ -22,6 +22,8 @@ class CampaignRecipient extends Model
         'message_id',
         'contact_id',
         'phone',
+        'recipient_name',
+        'body',
         'status',
         'segment_count',
     ];
@@ -70,7 +72,7 @@ class CampaignRecipient extends Model
     }
 
     /**
-     * @return array{id: int, phone: string, status: string, contactId: int|null, segmentCount: int, providerMessageId: string|null, deliveredAt: string|null}
+     * @return array{id: int, phone: string, name: string|null, message: string|null, status: string, contactId: int|null, segmentCount: int, providerMessageId: string|null, deliveredAt: string|null}
      */
     public function toApiArray(): array
     {
@@ -79,6 +81,8 @@ class CampaignRecipient extends Model
         return [
             'id' => $this->id,
             'phone' => $this->phone,
+            'name' => $this->recipient_name,
+            'message' => $this->body,
             'status' => $this->status->value,
             'contactId' => $this->contact_id,
             'segmentCount' => $this->segment_count,
