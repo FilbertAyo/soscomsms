@@ -516,7 +516,14 @@ export function SendSms() {
                 </p>
               ) : null}
               {personalize && mode !== 'group' ? (
-                <PeoplePreview people={namedDraft} />
+                <PeoplePreview
+                  people={namedDraft}
+                  emptyTip={
+                    mode === 'numbers'
+                      ? 'One person per line: number, then name. Example: 0712445221, Amina'
+                      : null
+                  }
+                />
               ) : null}
             </section>
 
@@ -779,9 +786,17 @@ export function SendSms() {
   )
 }
 
-function PeoplePreview({ people }: { people: NamedRecipient[] }) {
+function PeoplePreview({
+  people,
+  emptyTip = null,
+}: {
+  people: NamedRecipient[]
+  emptyTip?: string | null
+}) {
   if (people.length === 0) {
-    return null
+    return emptyTip ? (
+      <p className='mt-3 text-sm text-muted-foreground'>{emptyTip}</p>
+    ) : null
   }
 
   const shown = people.slice(0, 3)
