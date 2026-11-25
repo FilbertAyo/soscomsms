@@ -49,6 +49,7 @@ import {
 import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ConfirmDialog } from '@/components/confirm-dialog'
+import { DateTimePicker } from '@/components/date-time-picker'
 import {
   Dialog,
   DialogContent,
@@ -624,11 +625,11 @@ export function SendSms() {
               {schedule ? (
                 <div className='mt-4 space-y-2'>
                   <Label htmlFor='schedule-at'>Send date and time (Tanzania time)</Label>
-                  <Input
+                  <DateTimePicker
                     id='schedule-at'
-                    type='datetime-local'
                     value={scheduleAt}
-                    onChange={(event) => setScheduleAt(event.target.value)}
+                    onChange={setScheduleAt}
+                    placeholder='Pick date and time'
                   />
                   <p className='text-xs text-muted-foreground'>
                     We will send at this time. SMS is taken from your balance
