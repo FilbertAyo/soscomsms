@@ -781,11 +781,7 @@ export function SendSms() {
 
 function PeoplePreview({ people }: { people: NamedRecipient[] }) {
   if (people.length === 0) {
-    return (
-      <p className='mt-3 text-sm text-muted-foreground'>
-        One person per line: number, then name. Example: 0712445221, Amina
-      </p>
-    )
+    return null
   }
 
   const shown = people.slice(0, 3)
