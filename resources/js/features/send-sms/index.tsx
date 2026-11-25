@@ -195,8 +195,6 @@ export function SendSms() {
     (previewIsCurrent ? preview?.example?.name : null) ||
     localFirstNamed?.name ||
     NAME_EXAMPLE
-  const examplePhone =
-    (previewIsCurrent ? preview?.example?.phone : null) || localFirstNamed?.phone || ''
   const exampleMessage =
     personalize && usesName
       ? (previewIsCurrent ? preview?.example?.message : null) ||
@@ -567,11 +565,6 @@ export function SendSms() {
                   {personalize && usesName ? ' for this example' : ''}
                 </span>
               </div>
-              {personalize && usesName ? (
-                <p className='mt-2 text-sm text-muted-foreground'>
-                  A longer name can use more SMS. The total on the right counts every person.
-                </p>
-              ) : null}
               {shownAnalysis.segmentCount > 1 ? (
                 <p className='mt-2 text-sm text-amber-700 dark:text-amber-400'>
                   {personalize && usesName
@@ -598,18 +591,6 @@ export function SendSms() {
                   >
                     Use each person’s name
                   </Button>
-                </div>
-              ) : null}
-              {personalize && usesName ? (
-                <div className='mt-3 rounded-lg border bg-muted/40 px-3 py-3'>
-                  <p className='text-xs font-medium text-muted-foreground'>
-                    Example for {exampleName}
-                    {examplePhone ? ` (${formatTzMobile(examplePhone)})` : ''}
-                  </p>
-                  <p className='mt-1 text-sm whitespace-pre-wrap'>{exampleMessage}</p>
-                  <p className='mt-2 text-xs text-muted-foreground'>
-                    This is the first person. You will see it again before sending.
-                  </p>
                 </div>
               ) : null}
             </section>
