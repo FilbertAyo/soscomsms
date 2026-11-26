@@ -103,6 +103,7 @@ Route::prefix('api')->group(function (): void {
             Route::post('/campaigns/{campaign}/cancel', [CampaignController::class, 'cancel']);
             Route::get('/delivery-reports', [DeliveryReportController::class, 'index']);
             Route::get('/delivery-reports/export', [DeliveryReportController::class, 'export']);
+            Route::get('/delivery-reports/archive', [DeliveryReportController::class, 'archive']);
 
             Route::get('/api-keys', [ApiKeyController::class, 'index']);
             Route::post('/api-keys', [ApiKeyController::class, 'store']);

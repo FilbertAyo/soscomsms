@@ -8,16 +8,46 @@ use App\Support\PaginationMeta;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 
 class DeliveryReportController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
+        $validated = $request->validate([
+            'from' => ['nullable', 'date'],
+            'to' => ['nullable', 'date'],
+        ]);
+
+        $from = filled($validated['from'] ?? null)
+            ? Carbon::parse($validated['from'])->startOfDay()
+            : null;
+        $to = filled($validated['to'] ?? null)
+            ? Carbon::parse($validated['to'])->endOfDay()
+            : null;
+
+        if ($from !== null && $to !== null && $from->greaterThan($to)) {
+            return response()->json([
+                'message' => 'From must be on or before to.',
+            ], 422);
+        }
+
         $term = trim($request->string('q')->toString());
+        $hasRange = $from !== null || $to !== null;
 
         $reports = Delivery::query()
             ->with(['campaignRecipient.campaign.customer.user', 'campaignRecipient.message'])
             ->when($term !== '', fn (Builder $query) => $this->search($query, $term))
+            ->when($hasRange, function (Builder $query) use ($from, $to): void {
+                if ($from !== null) {
+                    $query->where('sent_at', '>=', $from);
+                }
+                if ($to !== null) {
+                    $query->where('sent_at', '<=', $to);
+                }
+            }, function (Builder $query): void {
+                $query->where('sent_at', '>=', now()->subDays(30)->startOfDay());
+            })
             ->latest('id')
             ->paginate(PaginationMeta::perPage($request, 20, 200));
 

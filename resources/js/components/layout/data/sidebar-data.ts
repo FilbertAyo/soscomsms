@@ -54,6 +54,7 @@ const customerNavGroups: SidebarData['navGroups'] = [
         items: [
           { title: 'All campaigns', url: '/campaigns' },
           { title: 'Delivery reports', url: '/reports' },
+          { title: 'Delivery report Old', url: '/reports/old' },
         ],
       },
       {

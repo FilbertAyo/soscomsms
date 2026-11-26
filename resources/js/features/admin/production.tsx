@@ -12,6 +12,7 @@ import {
   updateAdminProduction,
 } from '@/lib/admin'
 import { adminProviderBalanceQueryKey } from '@/lib/credits'
+import { formatDateTime } from '@/lib/format'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -250,7 +251,7 @@ export function AdminProduction() {
           <p className='text-sm text-muted-foreground'>
             Last backup:{' '}
             {snapshot?.lastBackupAt
-              ? new Date(snapshot.lastBackupAt).toLocaleString('en-TZ')
+              ? formatDateTime(snapshot.lastBackupAt)
               : 'None yet'}
             . Kept for {snapshot?.backupKeepDays ?? 14} days. Username:{' '}
             {snapshot?.provider.profileId || 'Not set'}. Password:{' '}

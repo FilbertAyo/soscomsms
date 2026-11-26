@@ -12,6 +12,7 @@ use App\Models\SenderId;
 use App\Models\User;
 use App\Services\Gateway\ProviderDeliveryStatus;
 use Illuminate\Support\Facades\Http;
+use PhpOffice\PhpSpreadsheet\IOFactory;
 
 function reportCustomer(int $balance = 20): array
 {
@@ -79,7 +80,74 @@ it('marks fake gateway sends as delivered and lists them on reports', function (
     expect($csv)->toContain('+255712445221')
         ->and($csv)->toContain('delivered')
         ->and($csv)->toContain('DLR demo')
-        ->and($csv)->not->toContain('Gateway ID');
+        ->and($csv)->not->toContain('Gateway ID')
+        ->and($csv)->not->toContain('Delivered at')
+        ->and($csv)->not->toContain('+03:00');
+});
+
+it('lists only the last 30 days and zips any older range as excel', function () {
+    [$user, , $sender] = reportCustomer(20);
+
+    $this->actingAs($user)
+        ->postJson('/api/campaigns', [
+            'source' => 'numbers',
+            'message' => 'Habari ya zamani',
+            'sender_id' => $sender->name,
+            'numbers' => ['0712445221'],
+            'name' => 'Old DLR',
+        ])
+        ->assertCreated();
+
+    $delivery = Delivery::query()->firstOrFail();
+    $delivery->forceFill(['sent_at' => now()->subDays(45)])->save();
+
+    $this->actingAs($user)
+        ->getJson('/api/delivery-reports')
+        ->assertOk()
+        ->assertJsonCount(0, 'reports');
+
+    $from = now()->subDays(50)->toDateString();
+    $to = now()->subDays(40)->toDateString();
+    $response = $this->actingAs($user)
+        ->get('/api/delivery-reports/archive?'.http_build_query([
+            'from' => $from,
+            'to' => $to,
+        ]));
+
+    $response->assertOk();
+    expect($response->headers->get('content-type'))->toContain('application/zip');
+
+    $bytes = $response->streamedContent();
+    $zipPath = tempnam(sys_get_temp_dir(), 'dlr-zip-test-');
+    $xlsxPath = tempnam(sys_get_temp_dir(), 'dlr-xlsx-test-');
+    expect($zipPath)->not->toBeFalse();
+    expect($xlsxPath)->not->toBeFalse();
+    file_put_contents($zipPath, $bytes);
+
+    $zip = new ZipArchive;
+    expect($zip->open($zipPath))->toBeTrue();
+    $xlsx = $zip->getFromName('delivery-reports.xlsx');
+    $zip->close();
+    expect($xlsx)->not->toBeFalse();
+    file_put_contents($xlsxPath, $xlsx);
+
+    $sheet = IOFactory::load($xlsxPath)->getActiveSheet();
+    expect($sheet->getCell('A2')->getValue())->toBe('+255712445221')
+        ->and($sheet->getCell('B2')->getValue())->toBe('Old DLR')
+        ->and($sheet->getCell('F1')->getValue())->toBe('Sent at')
+        ->and($sheet->getCell('G1')->getValue())->toBeNull()
+        ->and($sheet->getCell('F2')->getValue())->toMatch('/^\d{1,2} [A-Z][a-z]{2} \d{4}, \d{2}:\d{2}$/');
+
+    @unlink($zipPath);
+    @unlink($xlsxPath);
+
+    [$other] = reportCustomer();
+    $this->actingAs($other)
+        ->getJson('/api/delivery-reports/archive?'.http_build_query([
+            'from' => $from,
+            'to' => $to,
+        ]))
+        ->assertStatus(422);
 });
 
 it('applies an inbound delivery report without refunding a later failure', function () {

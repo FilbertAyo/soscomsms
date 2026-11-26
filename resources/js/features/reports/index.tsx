@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { Link } from '@tanstack/react-router'
 import { toast } from 'sonner'
 import { FileText } from 'lucide-react'
 import {
@@ -10,7 +11,7 @@ import {
   campaignsQueryKey,
 } from '@/lib/campaigns'
 import { fetchUsableSenderIds, usableSenderIdsQueryKey } from '@/lib/sender-ids'
-import { formatDateTime } from '@/lib/format'
+import { appDateDaysAgo, appDateInputValue, formatDateTime } from '@/lib/format'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -46,6 +47,8 @@ export function DeliveryReportsPage() {
   const [date, setDate] = useState('')
   const [exporting, setExporting] = useState(false)
   const [page, setPage] = useState(1)
+  const oldestDate = useMemo(() => appDateDaysAgo(30), [])
+  const newestDate = useMemo(() => appDateInputValue(), [])
 
   const filters = useMemo(
     () => ({
@@ -102,7 +105,7 @@ export function DeliveryReportsPage() {
       <Main>
         <PageHeader
           title='Delivery Reports'
-          description='See whether each message was delivered, sent, or failed.'
+          description='Messages from the last 30 days. See whether each one was delivered, sent, or failed.'
           actions={
             <Button
               variant='outline'
@@ -114,17 +117,31 @@ export function DeliveryReportsPage() {
           }
         />
         <p className='mb-4 rounded-xl border bg-muted/40 px-4 py-3 text-sm text-muted-foreground'>
+          This list shows the last 30 days only.{' '}
           <strong className='font-medium text-foreground'>Delivered</strong>{' '}
           means the network confirmed the phone received the SMS.{' '}
           <strong className='font-medium text-foreground'>Sent</strong> means
           the SMS went out but there is no delivery report yet. It may still
-          change to Delivered later.
+          change to Delivered later. For any older range, open{' '}
+          <Link
+            to='/reports/old'
+            className='font-medium text-foreground underline-offset-4 hover:underline'
+          >
+            Delivery report Old
+          </Link>{' '}
+          and download a zip.
         </p>
         <div className='mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5'>
           <Input
             type='date'
             value={date}
-            onChange={(event) => setDate(event.target.value)}
+            min={oldestDate}
+            max={newestDate}
+            aria-label='Day within the last 30 days'
+            onChange={(event) => {
+              setDate(event.target.value)
+              setPage(1)
+            }}
           />
           <Select
             value={campaign}
@@ -187,7 +204,7 @@ export function DeliveryReportsPage() {
           <EmptyState
             icon={FileText}
             title='No delivery reports'
-            description='Try another filter, or send an SMS to generate reports.'
+            description='Nothing in the last 30 days matches these filters. For an older range, use Delivery report Old.'
             actionLabel='Send SMS'
             actionTo='/send-sms'
           />
@@ -201,7 +218,6 @@ export function DeliveryReportsPage() {
                   <TableHead>Sender ID</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Sent At</TableHead>
-                  <TableHead>Delivered At</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -217,9 +233,6 @@ export function DeliveryReportsPage() {
                     </TableCell>
                     <TableCell>
                       {item.sentAt ? formatDateTime(item.sentAt) : '—'}
-                    </TableCell>
-                    <TableCell>
-                      {item.deliveredAt ? formatDateTime(item.deliveredAt) : '—'}
                     </TableCell>
                   </TableRow>
                 ))}

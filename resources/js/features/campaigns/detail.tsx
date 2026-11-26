@@ -201,7 +201,6 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
                     <TableHead>Status</TableHead>
                     <TableHead>Message ID</TableHead>
                     <TableHead>SMS</TableHead>
-                    <TableHead>Delivered At</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -231,9 +230,6 @@ export function CampaignDetail({ campaignId }: { campaignId: string }) {
                         {item.providerMessageId || '—'}
                       </TableCell>
                       <TableCell>{item.segmentCount}</TableCell>
-                      <TableCell>
-                        {item.deliveredAt ? formatDateTime(item.deliveredAt) : '—'}
-                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

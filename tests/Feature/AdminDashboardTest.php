@@ -177,6 +177,38 @@ it('lists live traffic and delivery reports for the demo customer', function () 
         ->assertJsonPath('reports.0.status', CampaignRecipientStatus::Delivered->value);
 });
 
+it('hides admin delivery reports older than 30 days until a range is set', function () {
+    [$admin, , $customer] = adminDashboardCustomer();
+    $campaign = Campaign::factory()->create([
+        'customer_id' => $customer->id,
+        'sender_name' => 'INFO',
+        'status' => CampaignStatus::Completed,
+    ]);
+    $recipient = CampaignRecipient::factory()->create([
+        'campaign_id' => $campaign->id,
+        'phone' => '+255712445221',
+        'status' => CampaignRecipientStatus::Delivered,
+    ]);
+    Delivery::factory()->create([
+        'campaign_recipient_id' => $recipient->id,
+        'provider_id' => Provider::current()->id,
+        'provider_message_id' => 'old-1',
+        'status' => DeliveryStatus::Delivered,
+        'sent_at' => now()->subDays(45),
+    ]);
+
+    $this->actingAs($admin)
+        ->getJson('/api/admin/delivery-reports')
+        ->assertOk()
+        ->assertJsonCount(0, 'reports');
+
+    $this->actingAs($admin)
+        ->getJson('/api/admin/delivery-reports?from='.now()->subDays(50)->toDateString())
+        ->assertOk()
+        ->assertJsonCount(1, 'reports')
+        ->assertJsonPath('reports.0.providerMessageId', 'old-1');
+});
+
 it('searches delivery reports by phone, message ID, Sender ID, and customer', function () {
     [$admin, , $customer] = adminDashboardCustomer();
     $other = Customer::factory()->complete()->create(['business_name' => 'Mchango Group']);

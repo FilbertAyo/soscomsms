@@ -27,8 +27,8 @@ export function formatDate(value: string) {
   })
 }
 
-export function formatDateTime(value: string) {
-  return new Date(value).toLocaleString('en-GB', {
+function dateTimeParts(value: Date) {
+  return new Intl.DateTimeFormat('en-GB', {
     timeZone: APP_TIMEZONE,
     day: 'numeric',
     month: 'short',
@@ -36,8 +36,49 @@ export function formatDateTime(value: string) {
     hour: '2-digit',
     minute: '2-digit',
     hourCycle: 'h23',
-    timeZoneName: 'short',
-  })
+  }).formatToParts(value)
+}
+
+function part(
+  parts: Intl.DateTimeFormatPart[],
+  type: Intl.DateTimeFormatPartTypes
+) {
+  return parts.find((item) => item.type === type)?.value ?? ''
+}
+
+/** Calendar date in the app timezone, as yyyy-mm-dd for date inputs. */
+export function appDateInputValue(date = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: APP_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date)
+
+  return `${part(parts, 'year')}-${part(parts, 'month')}-${part(parts, 'day')}`
+}
+
+/** yyyy-mm-dd that many calendar days before today in the app timezone. */
+export function appDateDaysAgo(days: number) {
+  const [year, month, day] = appDateInputValue().split('-').map(Number)
+  const date = new Date(Date.UTC(year, month - 1, day))
+  date.setUTCDate(date.getUTCDate() - days)
+  const nextYear = date.getUTCFullYear()
+  const nextMonth = String(date.getUTCMonth() + 1).padStart(2, '0')
+  const nextDay = String(date.getUTCDate()).padStart(2, '0')
+
+  return `${nextYear}-${nextMonth}-${nextDay}`
+}
+
+export function formatDateTime(value: string) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return value
+  }
+
+  const parts = dateTimeParts(date)
+
+  return `${part(parts, 'day')} ${part(parts, 'month')} ${part(parts, 'year')}, ${part(parts, 'hour')}:${part(parts, 'minute')}`
 }
 
 export function firstName(fullName: string) {

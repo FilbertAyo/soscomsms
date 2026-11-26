@@ -42,16 +42,25 @@ export async function fetchAdminTraffic(page = 1): Promise<AdminTraffic> {
   }
 }
 
-export async function fetchAdminDeliveryReports(
-  page = 1,
-  q = ''
-): Promise<{
+export async function fetchAdminDeliveryReports(options: {
+  page?: number
+  q?: string
+  from?: string
+  to?: string
+}): Promise<{
   reports: AdminDeliveryReport[]
   meta: PageMeta
 }> {
   const { data } = await api.get<{ reports: AdminDeliveryReport[]; meta?: PageMeta }>(
     '/api/admin/delivery-reports',
-    { params: { page, q: q || undefined } }
+    {
+      params: {
+        page: options.page || undefined,
+        q: options.q || undefined,
+        from: options.from || undefined,
+        to: options.to || undefined,
+      },
+    }
   )
   return {
     reports: data.reports,

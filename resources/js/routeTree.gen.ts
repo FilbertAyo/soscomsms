@@ -49,6 +49,7 @@ import { Route as AuthenticatedDeveloperWebhooksRouteImport } from './routes/_au
 import { Route as AuthenticatedErrorsErrorRouteImport } from './routes/_authenticated/errors/$error'
 import { Route as AuthenticatedHelpCenterIndexRouteImport } from './routes/_authenticated/help-center/index'
 import { Route as AuthenticatedReportsIndexRouteImport } from './routes/_authenticated/reports/index'
+import { Route as AuthenticatedReportsOldRouteImport } from './routes/_authenticated/reports/old'
 import { Route as AuthenticatedSendSmsIndexRouteImport } from './routes/_authenticated/send-sms/index'
 import { Route as AuthenticatedSenderIdsIndexRouteImport } from './routes/_authenticated/sender-ids/index'
 import { Route as AuthenticatedSenderIdsSenderIdRouteImport } from './routes/_authenticated/sender-ids/$senderId'
@@ -293,6 +294,12 @@ const AuthenticatedReportsIndexRoute =
     path: '/reports/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedReportsOldRoute =
+  AuthenticatedReportsOldRouteImport.update({
+    id: '/reports/old',
+    path: '/reports/old',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedSendSmsIndexRoute =
   AuthenticatedSendSmsIndexRouteImport.update({
     id: '/send-sms/',
@@ -457,6 +464,7 @@ export interface FileRoutesByFullPath {
   '/developer/docs': typeof AuthenticatedDeveloperDocsRoute
   '/developer/webhooks': typeof AuthenticatedDeveloperWebhooksRoute
   '/errors/$error': typeof AuthenticatedErrorsErrorRoute
+  '/reports/old': typeof AuthenticatedReportsOldRoute
   '/sender-ids/$senderId': typeof AuthenticatedSenderIdsSenderIdRoute
   '/sender-ids/request': typeof AuthenticatedSenderIdsRequestRoute
   '/settings/account': typeof AuthenticatedSettingsAccountRoute
@@ -517,6 +525,7 @@ export interface FileRoutesByTo {
   '/developer/docs': typeof AuthenticatedDeveloperDocsRoute
   '/developer/webhooks': typeof AuthenticatedDeveloperWebhooksRoute
   '/errors/$error': typeof AuthenticatedErrorsErrorRoute
+  '/reports/old': typeof AuthenticatedReportsOldRoute
   '/sender-ids/$senderId': typeof AuthenticatedSenderIdsSenderIdRoute
   '/sender-ids/request': typeof AuthenticatedSenderIdsRequestRoute
   '/settings/account': typeof AuthenticatedSettingsAccountRoute
@@ -582,6 +591,7 @@ export interface FileRoutesById {
   '/_authenticated/developer/docs': typeof AuthenticatedDeveloperDocsRoute
   '/_authenticated/developer/webhooks': typeof AuthenticatedDeveloperWebhooksRoute
   '/_authenticated/errors/$error': typeof AuthenticatedErrorsErrorRoute
+  '/_authenticated/reports/old': typeof AuthenticatedReportsOldRoute
   '/_authenticated/sender-ids/$senderId': typeof AuthenticatedSenderIdsSenderIdRoute
   '/_authenticated/sender-ids/request': typeof AuthenticatedSenderIdsRequestRoute
   '/_authenticated/settings/account': typeof AuthenticatedSettingsAccountRoute
@@ -646,6 +656,7 @@ export interface FileRouteTypes {
     | '/developer/docs'
     | '/developer/webhooks'
     | '/errors/$error'
+    | '/reports/old'
     | '/sender-ids/$senderId'
     | '/sender-ids/request'
     | '/settings/account'
@@ -706,6 +717,7 @@ export interface FileRouteTypes {
     | '/developer/docs'
     | '/developer/webhooks'
     | '/errors/$error'
+    | '/reports/old'
     | '/sender-ids/$senderId'
     | '/sender-ids/request'
     | '/settings/account'
@@ -770,6 +782,7 @@ export interface FileRouteTypes {
     | '/_authenticated/developer/docs'
     | '/_authenticated/developer/webhooks'
     | '/_authenticated/errors/$error'
+    | '/_authenticated/reports/old'
     | '/_authenticated/sender-ids/$senderId'
     | '/_authenticated/sender-ids/request'
     | '/_authenticated/settings/account'
@@ -1096,6 +1109,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedReportsIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/reports/old': {
+      id: '/_authenticated/reports/old'
+      path: '/reports/old'
+      fullPath: '/reports/old'
+      preLoaderRoute: typeof AuthenticatedReportsOldRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/send-sms/': {
       id: '/_authenticated/send-sms/'
       path: '/send-sms'
@@ -1361,6 +1381,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedDeveloperDocsRoute: typeof AuthenticatedDeveloperDocsRoute
   AuthenticatedDeveloperWebhooksRoute: typeof AuthenticatedDeveloperWebhooksRoute
   AuthenticatedErrorsErrorRoute: typeof AuthenticatedErrorsErrorRoute
+  AuthenticatedReportsOldRoute: typeof AuthenticatedReportsOldRoute
   AuthenticatedSenderIdsSenderIdRoute: typeof AuthenticatedSenderIdsSenderIdRoute
   AuthenticatedSenderIdsRequestRoute: typeof AuthenticatedSenderIdsRequestRoute
   AuthenticatedWalletBuyRoute: typeof AuthenticatedWalletBuyRoute
@@ -1386,6 +1407,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedDeveloperDocsRoute: AuthenticatedDeveloperDocsRoute,
   AuthenticatedDeveloperWebhooksRoute: AuthenticatedDeveloperWebhooksRoute,
   AuthenticatedErrorsErrorRoute: AuthenticatedErrorsErrorRoute,
+  AuthenticatedReportsOldRoute: AuthenticatedReportsOldRoute,
   AuthenticatedSenderIdsSenderIdRoute: AuthenticatedSenderIdsSenderIdRoute,
   AuthenticatedSenderIdsRequestRoute: AuthenticatedSenderIdsRequestRoute,
   AuthenticatedWalletBuyRoute: AuthenticatedWalletBuyRoute,

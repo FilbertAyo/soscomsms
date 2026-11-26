@@ -110,9 +110,7 @@ export function AdminProviderBalance() {
             <p className='mt-1'>
               Whitelisted:{' '}
               {snapshot?.staticIpWhitelistedAt
-                ? new Date(snapshot.staticIpWhitelistedAt).toLocaleString(
-                    'en-TZ'
-                  )
+                ? formatDateTime(snapshot.staticIpWhitelistedAt)
                 : 'Not confirmed'}
             </p>
             <p className='mt-1'>
@@ -121,9 +119,7 @@ export function AdminProviderBalance() {
             <p className='mt-1'>
               Tanzania account:{' '}
               {snapshot?.credentialsConfirmedAt
-                ? new Date(snapshot.credentialsConfirmedAt).toLocaleString(
-                    'en-TZ'
-                  )
+                ? formatDateTime(snapshot.credentialsConfirmedAt)
                 : 'Not confirmed'}
             </p>
           </div>

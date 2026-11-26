@@ -143,6 +143,88 @@ export async function fetchDeliveryReports(filters: {
   }
 }
 
+export async function downloadOldDeliveryReports(filters: {
+  from: string
+  to: string
+  campaignId?: string
+  senderId?: string
+  status?: string
+  q?: string
+}): Promise<void> {
+  try {
+    const response = await api.get<Blob>('/api/delivery-reports/archive', {
+      params: {
+        from: filters.from,
+        to: filters.to,
+        campaign_id: filters.campaignId || undefined,
+        sender_id: filters.senderId || undefined,
+        status: filters.status || undefined,
+        q: filters.q || undefined,
+      },
+      responseType: 'blob',
+      timeout: 180_000,
+    })
+    const url = URL.createObjectURL(response.data)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = filenameFromDisposition(
+      response.headers['content-disposition'],
+      `delivery-reports-${filters.from}-to-${filters.to}.zip`
+    )
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(url)
+  } catch (error) {
+    throw new Error(await archiveErrorMessage(error))
+  }
+}
+
+function filenameFromDisposition(header: unknown, fallback: string) {
+  if (typeof header !== 'string') {
+    return fallback
+  }
+
+  const encoded = /filename\*=UTF-8''([^;]+)/i.exec(header)
+  if (encoded?.[1]) {
+    try {
+      return decodeURIComponent(encoded[1])
+    } catch {
+      return encoded[1]
+    }
+  }
+
+  const plain = /filename="?([^";]+)"?/i.exec(header)
+  return plain?.[1] ?? fallback
+}
+
+async function archiveErrorMessage(error: unknown) {
+  if (typeof error === 'object' && error !== null && 'response' in error) {
+    const data = (error as { response?: { data?: unknown } }).response?.data
+    if (data instanceof Blob) {
+      try {
+        const parsed = JSON.parse(await data.text()) as { message?: unknown }
+        if (typeof parsed.message === 'string' && parsed.message.trim() !== '') {
+          return parsed.message
+        }
+      } catch {
+        return 'Could not download the delivery report.'
+      }
+    }
+  }
+
+  if (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    (error as { code?: string }).code === 'ECONNABORTED'
+  ) {
+    return 'The download took too long. Try a shorter date range.'
+  }
+
+  return 'Could not download the delivery report.'
+}
+
 export async function exportDeliveryReports(filters: {
   campaignId?: string
   senderId?: string
